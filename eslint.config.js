@@ -4,7 +4,7 @@ const expoConfig = require("eslint-config-expo/flat");
 const eslintPluginPrettierRecommended = require("eslint-plugin-prettier/recommended");
 
 module.exports = defineConfig([
-  globalIgnores(["dist/*", ".expo/*", "example/*", "expo-env.d.ts"]),
+  globalIgnores(["dist/*", ".expo/*", "expo-env.d.ts"]),
   expoConfig,
   eslintPluginPrettierRecommended,
 ]);
