@@ -12,6 +12,7 @@ export type LedgerError =
       readonly amountMinor: number;
     }
   | { readonly code: "UNKNOWN_MEMBER"; readonly memberId: MemberId }
+  | { readonly code: "ARCHIVED_MEMBER"; readonly memberId: MemberId }
   | { readonly code: "NO_PARTICIPANTS" }
   | { readonly code: "DUPLICATE_PARTICIPANT"; readonly memberId: MemberId }
   | {

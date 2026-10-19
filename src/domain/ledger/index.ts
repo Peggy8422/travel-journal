@@ -13,6 +13,29 @@ export type {
   Transfer,
 } from "./types";
 export type { LedgerError } from "./errors";
+export type {
+  ExpenseFx,
+  ExpenseRecord,
+  FxRateSource,
+  GeoPoint,
+  LedgerRecord,
+  MemberRecord,
+  SettlementRecord,
+} from "./records";
+export {
+  expenseMemberIds,
+  toExpense,
+  toLedger,
+  toSettlement,
+  validateNoArchivedMembers,
+} from "./records";
+export type {
+  ExpenseRepository,
+  LedgerRepository,
+  MemberRepository,
+  NewMember,
+  SettlementRepository,
+} from "./ports";
 export { computeShares } from "./split";
 export { computeBalances } from "./balance";
 export { simplifyDebts } from "./simplify";
