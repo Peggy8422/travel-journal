@@ -1,17 +1,5 @@
-import { StyleSheet, Text, View } from "react-native";
+import { LedgerListScreen } from "../../features/ledger/components/LedgerListScreen";
 
-export default function LedgersScreen() {
-  return (
-    <View style={styles.container}>
-      <Text>Ledgers</Text>
-    </View>
-  );
+export default function LedgersRoute() {
+  return <LedgerListScreen />;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-});
