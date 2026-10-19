@@ -14,6 +14,13 @@ src/app/  →  src/features/  →  src/domain/
 - `app/` 的路由檔要盡量薄，只是把 `features/` 的元件組起來。
 - `data/` 需要實作、`features/` 需要使用的介面放在 `domain/<模組>/ports.ts`（例如 `BotQuoteSource`、`BotQuoteCache`），不要定義在 `features/`，否則 `data/` 會反過來依賴 `features/`。
 
+## 畫面
+
+- 介面文字一律繁體中文，錯誤代碼轉成訊息集中在 `features/ledger/components/messages.ts`，新增錯誤代碼時要一起補。
+- 共用 UI 元件與主題色在 `src/shared/ui/`（只用 React Native 內建元件，不用 `@expo/ui`）。
+- 畫面讀資料用 `useFocusedQuery`（`src/shared/hooks/`），每次回到畫面都會重新讀取，寫入後不用另外通知其他畫面。
+- 新增路由後，`tsc` 會因為 typed routes 型別過期而報錯，要先跑一次 `npx expo start` 重新產生 `.expo/types/router.d.ts`。
+
 ## 錯誤處理慣例
 
 - `domain/` 與 parser 一律回傳 `Result`（`src/domain/common/result.ts`），不 throw。
