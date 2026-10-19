@@ -26,6 +26,15 @@ src/app/  →  src/features/  →  src/domain/
 - 日期以臺灣時間的 `YYYY-MM-DD` 判斷（`domain/fx/taipeiDate.ts`），不要用裝置的時區。
 - 新增臺銀支援的幣別時，`BOT_QUOTED_CURRENCIES`（`data/fx/botQuoteSource.ts`）和 `currency.ts` 要一起更新，測試會比對真實 CSV 檢查兩邊是否一致。
 
+## 資料庫（`src/data/db/`、`src/data/repositories/`）
+
+- repository 只依賴 `SqlExecutor`（`data/db/sqlDatabase.ts`），不直接用 expo-sqlite；App 端用 `fromExpoSqlite` 包裝，測試用 `testDatabase.ts`（better-sqlite3）跑真正的 SQLite。SQL 參數一律用位置參數 `?`，兩邊的具名參數語法不同。
+- 需要 transaction 時，在 `db.transaction(tx => ...)` 裡用 `createRepositories(tx)` 重新建立 repository，查詢才會經過同一個 transaction。
+- id 與時間戳記由呼叫端（features）產生後傳入，repository 不自行產生。
+- migration 只能新增，不可修改已發佈的；版本記在 `PRAGMA user_version`。
+- 分攤規則存在 `expenses.split` JSON 欄位，裡面的成員 ID 沒有外鍵保護；查「成員是否被引用」要用 `json_each`（見 `memberRepository.isReferenced`）。
+- `occurred_at_ms`、`settled_at_ms` 是排序用欄位，由 repository 從帶時區的時間字串算出，不要直接用 `occurred_at` 文字排序（不同時區的字串順序不等於時間順序）。
+
 ## 臺銀匯率來源
 
 - 從開發機用 curl 或 Node 打 `rate.bot.com.tw`，會拿到 HTTP 200 的「Challenge Validation」HTML 頁面，不是 CSV，所以沒辦法在電腦上用指令驗證網址或下載新的 fixture（請用瀏覽器下載）。手機上 App 的 `fetch` 可以正常拿到 CSV（2026-10-16 實機確認）。萬一 App 也被擋，parser 會判定為格式錯誤，流程會退回快取。
@@ -35,4 +44,5 @@ src/app/  →  src/features/  →  src/domain/
 - 測試檔一律用 `.test.ts`（元件用 `.test.tsx`）結尾，不要用 jest-expo 文件範例的 `-test.ts`。
 - `eslint.config.js` 用 `*.test.ts(x)` 判斷測試檔，讓測試檔不受 `domain/` 的 layer 限制（React Native 限制仍然有效）；檔名不符就會被當成一般檔案擋下。
 - `data/fx/__fixtures__/*.csv` 是從臺銀直接下載的原始檔，保留 BOM 和 CRLF，用來測試 parser 的容錯，不要用編輯器重新存檔。
+- 資料庫測試用的 better-sqlite3 需要 Node 22 以上；用 Node 20 跑多個 Jest worker 會直接 SIGSEGV，沒有錯誤訊息。IDE 的 Jest 外掛若用 nvm 預設版本，要確認預設是 22。
 - `tsconfig.json` 的 `types` 只有 `jest`，要用 Node API 的測試輔助檔（例如 `botFixtures.ts`）需要在檔案開頭加 `/// <reference types="node" />`。
