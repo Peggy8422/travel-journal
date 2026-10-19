@@ -11,6 +11,12 @@ export type LedgerError =
       readonly memberId: MemberId;
       readonly amountMinor: number;
     }
+  | { readonly code: "INVALID_AMOUNT_INPUT"; readonly text: string }
+  | {
+      readonly code: "TOO_MANY_DECIMALS";
+      readonly currency: string;
+      readonly decimals: number;
+    }
   | { readonly code: "UNKNOWN_MEMBER"; readonly memberId: MemberId }
   | { readonly code: "ARCHIVED_MEMBER"; readonly memberId: MemberId }
   | { readonly code: "NO_PARTICIPANTS" }

@@ -31,6 +31,10 @@ const CURRENCY_DECIMALS: Readonly<Record<CurrencyCode, number>> = {
   PHP: 2,
 };
 
+/** 帳本支援的所有幣別，順序同上表 */
+export const SUPPORTED_CURRENCIES: readonly CurrencyCode[] =
+  Object.keys(CURRENCY_DECIMALS);
+
 /** 匯率最多接受的小數位數 */
 const MAX_FX_RATE_DECIMALS = 10;
 const FX_RATE_PATTERN = new RegExp(

@@ -40,4 +40,10 @@ export { computeShares } from "./split";
 export { computeBalances } from "./balance";
 export { simplifyDebts } from "./simplify";
 export { validateSettlement } from "./settlement";
-export { convertToBase, getCurrencyDecimals, parseFxRate } from "./currency";
+export {
+  convertToBase,
+  getCurrencyDecimals,
+  parseFxRate,
+  SUPPORTED_CURRENCIES,
+} from "./currency";
+export { formatMinorAmount, parseAmountInput } from "./amount";
