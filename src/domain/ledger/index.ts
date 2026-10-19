@@ -39,6 +39,7 @@ export type {
 export { computeShares } from "./split";
 export { computeBalances } from "./balance";
 export { simplifyDebts } from "./simplify";
+export { findExpenseStatuses, type ExpenseStatus } from "./expenseStatus";
 export { validateSettlement } from "./settlement";
 export {
   convertToBase,

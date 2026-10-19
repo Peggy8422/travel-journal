@@ -58,8 +58,11 @@ function isActive(record: { deletedAt?: string | null }): boolean {
   return record.deletedAt == null;
 }
 
-/** 付款人墊付了全部份額的總和；每位參與者各自負擔自己的份額 */
-function applyExpense(
+/**
+ * 付款人墊付了全部份額的總和；每位參與者各自負擔自己的份額。
+ * 只給 ledger 模組內部使用（例如依記錄順序重播），不從 index.ts 公開。
+ */
+export function applyExpense(
   balances: Map<MemberId, number>,
   payerId: MemberId,
   shares: Shares,
@@ -72,8 +75,8 @@ function applyExpense(
   addTo(balances, payerId, paid);
 }
 
-/** 付錢的人欠款減少，收錢的人應收減少 */
-function applySettlement(
+/** 付錢的人欠款減少，收錢的人應收減少。只給 ledger 模組內部使用 */
+export function applySettlement(
   balances: Map<MemberId, number>,
   settlement: Settlement,
 ): void {
