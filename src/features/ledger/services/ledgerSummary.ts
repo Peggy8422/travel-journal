@@ -1,12 +1,14 @@
 import { err, ok, type Result } from "../../../domain/common/result";
 import {
   computeBalances,
+  findExpenseStatuses,
   simplifyDebts,
   toExpense,
   toLedger,
   toSettlement,
   type Balances,
   type ExpenseRecord,
+  type ExpenseStatus,
   type LedgerError,
   type LedgerRecord,
   type MemberRecord,
@@ -27,6 +29,8 @@ export interface LedgerSummary {
   readonly balances: Balances;
   /** 最少筆數的還款建議 */
   readonly transfers: readonly Transfer[];
+  /** 消費 id → 已結清／已抵銷，沒有狀態的消費不在其中；規則見 findExpenseStatuses */
+  readonly expenseStatuses: ReadonlyMap<string, ExpenseStatus>;
 }
 
 export type LedgerSummaryError =
@@ -57,6 +61,8 @@ export async function loadLedgerSummary(
   if (!balances.ok) return balances;
   const transfers = simplifyDebts(balances.value, ledger);
   if (!transfers.ok) return transfers;
+  const expenseStatuses = findExpenseStatuses(ledger, expenses, settlements);
+  if (!expenseStatuses.ok) return expenseStatuses;
 
   return ok({
     ledger: ledgerRecord,
@@ -65,5 +71,6 @@ export async function loadLedgerSummary(
     settlements,
     balances: balances.value,
     transfers: transfers.value,
+    expenseStatuses: expenseStatuses.value,
   });
 }

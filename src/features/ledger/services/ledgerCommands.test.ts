@@ -211,6 +211,29 @@ describe("settlements", () => {
     expect(summary.settlements).toHaveLength(1);
   });
 
+  it("marks expenses settled up to the settlement, not ones added later", async () => {
+    const { db, deps, ledgerId, a, b } = await setup();
+    let clock = NOW.getTime();
+    // 每次寫入往後一分鐘，讓記錄時間有先後
+    const ticking = { ...deps, now: () => new Date((clock += 60_000)) };
+    const before = unwrap(
+      await addExpense(ticking, ledgerId, ramen(a, [a, b])),
+    );
+    unwrap(
+      await addSettlement(ticking, ledgerId, {
+        fromId: b,
+        toId: a,
+        amountMinor: 300,
+        settledAt: "2026-10-12T20:00:00+09:00",
+      }),
+    );
+    const after = unwrap(await addExpense(ticking, ledgerId, ramen(a, [a, b])));
+
+    const summary = unwrap(await loadLedgerSummary(db, ledgerId));
+    expect(summary.expenseStatuses.get(before.id)).toBe("settled");
+    expect(summary.expenseStatuses.has(after.id)).toBe(false);
+  });
+
   it("allows archived members to settle", async () => {
     const { db, deps, ledgerId, a, b } = await setup();
     await db.runAsync("UPDATE members SET archived_at = 'x' WHERE id = ?", [b]);
