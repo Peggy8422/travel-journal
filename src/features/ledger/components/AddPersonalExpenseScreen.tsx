@@ -25,7 +25,8 @@ export function AddPersonalExpenseScreen() {
         split: { kind: "equal", participantIds: [self.id] },
         category: null,
         note: null,
-        extras: { placeName: null, location: null },
+        placeName: null,
+        location: null,
       }}
       onSubmit={async ({ payerId: _payer, split: _split, ...input }) => {
         const result = await addPersonalExpense(deps, input);

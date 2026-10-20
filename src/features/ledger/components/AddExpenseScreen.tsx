@@ -29,7 +29,8 @@ export function AddExpenseScreen({ ledgerId }: { ledgerId: string }) {
         split: { kind: "equal", participantIds: active.map((m) => m.id) },
         category: null,
         note: null,
-        extras: { placeName: null, location: null },
+        placeName: null,
+        location: null,
       }}
       onSubmit={async (input) => {
         const result = await addExpense(deps, ledgerId, input);

@@ -3,6 +3,7 @@ import type { BackupFileError } from "../../../data/backup/backupFile";
 import type { RestoreReport } from "../services/backupCommands";
 import type { LedgerCommandError } from "../services/ledgerCommands";
 import type { LedgerSummaryError } from "../services/ledgerSummary";
+import type { LocateError } from "../services/locateCurrentPlace";
 import type {
   ManualReason,
   ResolveFxRateError,
@@ -12,7 +13,8 @@ type DisplayableError =
   | LedgerCommandError
   | LedgerSummaryError
   | ResolveFxRateError
-  | BackupFileError;
+  | BackupFileError
+  | LocateError;
 
 /** 錯誤代碼轉成給使用者看的訊息 */
 export function describeError(error: DisplayableError): string {
@@ -82,6 +84,10 @@ export function describeError(error: DisplayableError): string {
       return "時間格式錯誤";
     case "FUTURE_DATE":
       return "消費時間不能是未來";
+    case "LOCATION_PERMISSION_DENIED":
+      return "沒有定位權限，請到系統設定開啟，或直接輸入地名";
+    case "LOCATION_UNAVAILABLE":
+      return "目前無法定位，請確認定位服務已開啟，或直接輸入地名";
     default:
       return `資料有誤（${error.code}）`;
   }

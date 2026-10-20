@@ -1,10 +1,13 @@
 import type { ExpenseFx } from "../../../domain/ledger";
 import {
+  applyLocatedPlace,
   buildSplitRule,
   chooseExpenseFx,
+  initialPlaceDraft,
   normalizeNote,
   previewRemaining,
   resolveOccurredAt,
+  toPlaceFields,
 } from "./expenseFormLogic";
 import { unwrap, unwrapErr } from "../../../domain/ledger/testFixtures";
 
@@ -184,5 +187,88 @@ describe("normalizeNote", () => {
   it("stores blank input as null", () => {
     expect(normalizeNote("")).toBeNull();
     expect(normalizeNote(" \n ")).toBeNull();
+  });
+});
+
+describe("place draft", () => {
+  const shibuya = { latitude: 35.6595, longitude: 139.7005 };
+  const shinjuku = { latitude: 35.6909, longitude: 139.7003 };
+
+  it("starts from the stored place", () => {
+    expect(initialPlaceDraft("一蘭", shibuya)).toEqual({
+      placeName: "一蘭",
+      location: shibuya,
+      suggestedName: null,
+    });
+    expect(initialPlaceDraft(null, null).placeName).toBe("");
+  });
+
+  it("fills an empty name with the located name", () => {
+    const draft = applyLocatedPlace(initialPlaceDraft(null, null), {
+      location: shibuya,
+      placeName: "渋谷駅",
+    });
+
+    expect(draft).toEqual({
+      placeName: "渋谷駅",
+      location: shibuya,
+      suggestedName: "渋谷駅",
+    });
+  });
+
+  it("replaces a name that was filled by the previous locate", () => {
+    const first = applyLocatedPlace(initialPlaceDraft(null, null), {
+      location: shibuya,
+      placeName: "渋谷駅",
+    });
+
+    const second = applyLocatedPlace(first, {
+      location: shinjuku,
+      placeName: "新宿駅",
+    });
+
+    expect(second.placeName).toBe("新宿駅");
+    expect(second.location).toEqual(shinjuku);
+  });
+
+  it("clears a previously suggested name when the new spot has none", () => {
+    const first = applyLocatedPlace(initialPlaceDraft(null, null), {
+      location: shibuya,
+      placeName: "渋谷駅",
+    });
+
+    expect(
+      applyLocatedPlace(first, { location: shinjuku, placeName: null })
+        .placeName,
+    ).toBe("");
+  });
+
+  it.each([
+    ["typed before locating", initialPlaceDraft("朋友家", null)],
+    [
+      "edited after locating",
+      { placeName: "渋谷駅 西口", location: shibuya, suggestedName: "渋谷駅" },
+    ],
+  ])("keeps a name the user %s but updates the location", (_, draft) => {
+    const next = applyLocatedPlace(draft, {
+      location: shinjuku,
+      placeName: "新宿駅",
+    });
+
+    expect(next.placeName).toBe(draft.placeName);
+    expect(next.location).toEqual(shinjuku);
+  });
+
+  it("converts to stored fields, trimming and nulling a blank name", () => {
+    expect(
+      toPlaceFields({
+        placeName: "  一蘭 ",
+        location: shibuya,
+        suggestedName: null,
+      }),
+    ).toEqual({ placeName: "一蘭", location: shibuya });
+    expect(
+      toPlaceFields({ placeName: "  ", location: null, suggestedName: null }),
+    ).toEqual({ placeName: null, location: null });
   });
 });

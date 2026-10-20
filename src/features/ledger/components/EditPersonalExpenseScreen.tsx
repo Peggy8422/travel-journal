@@ -71,7 +71,8 @@ export function EditPersonalExpenseScreen({
         recordedAt: new Date(expense.createdAt),
         fx: expense.fx,
         note: expense.note,
-        extras: { placeName: expense.placeName, location: expense.location },
+        placeName: expense.placeName,
+        location: expense.location,
       }}
       onSubmit={async ({ payerId: _payer, split: _split, ...input }) => {
         const result = await updatePersonalExpense(deps, expenseId, input);
