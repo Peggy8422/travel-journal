@@ -21,6 +21,12 @@ export function describeError(error: DisplayableError): string {
       return "找不到這筆消費，可能已被刪除";
     case "SETTLEMENT_NOT_FOUND":
       return "找不到這筆還款，可能已被刪除";
+    case "MEMBER_NOT_FOUND":
+      return "找不到這位成員，可能已被刪除";
+    case "MEMBER_REFERENCED":
+      return "這位成員已經有消費或還款紀錄，不能刪除，可以改用封存";
+    case "LAST_ACTIVE_MEMBER":
+      return "帳本至少要保留一位未封存的成員";
     case "INVALID_AMOUNT_INPUT":
       return "請輸入正確的金額";
     case "TOO_MANY_DECIMALS":

@@ -42,9 +42,14 @@ export type LedgerCommandError =
   | { readonly code: "INVALID_TIMESTAMP"; readonly value: string }
   | { readonly code: "LEDGER_NOT_FOUND"; readonly ledgerId: string }
   | { readonly code: "EXPENSE_NOT_FOUND"; readonly expenseId: string }
-  | { readonly code: "SETTLEMENT_NOT_FOUND"; readonly settlementId: string };
+  | { readonly code: "SETTLEMENT_NOT_FOUND"; readonly settlementId: string }
+  | { readonly code: "MEMBER_NOT_FOUND"; readonly memberId: MemberId }
+  /** 成員已出現在消費或還款中，只能封存不能刪除 */
+  | { readonly code: "MEMBER_REFERENCED"; readonly memberId: MemberId }
+  /** 帳本至少要保留一位未封存的成員，才能繼續新增消費 */
+  | { readonly code: "LAST_ACTIVE_MEMBER"; readonly memberId: MemberId };
 
-type CommandResult<T> = Promise<Result<T, LedgerCommandError>>;
+export type CommandResult<T> = Promise<Result<T, LedgerCommandError>>;
 
 /** 使用者輸入的消費內容；id、帳本與時間戳記由這一層補上 */
 export type ExpenseInput = Omit<
@@ -93,6 +98,40 @@ export async function createLedger(
     return inserted;
   });
   return ok({ ledger, members });
+}
+
+/** 重新命名帳本 */
+export async function renameLedger(
+  deps: LedgerCommandDeps,
+  ledgerId: string,
+  name: string,
+): CommandResult<LedgerRecord> {
+  const trimmed = name.trim();
+  if (trimmed === "") return err({ code: "EMPTY_NAME" });
+  const repos = createRepositories(deps.db);
+  const ledger = await repos.ledgers.findById(ledgerId);
+  if (!ledger) return err({ code: "LEDGER_NOT_FOUND", ledgerId });
+
+  const updated: LedgerRecord = {
+    ...ledger,
+    name: trimmed,
+    updatedAt: deps.now().toISOString(),
+  };
+  await repos.ledgers.update(updated);
+  return ok(updated);
+}
+
+/** 永久刪除帳本，連同成員、消費與還款一起刪除，無法復原 */
+export async function deleteLedger(
+  deps: LedgerCommandDeps,
+  ledgerId: string,
+): CommandResult<void> {
+  const repos = createRepositories(deps.db);
+  if (!(await repos.ledgers.findById(ledgerId))) {
+    return err({ code: "LEDGER_NOT_FOUND", ledgerId });
+  }
+  await repos.ledgers.delete(ledgerId);
+  return ok(undefined);
 }
 
 export async function addMember(

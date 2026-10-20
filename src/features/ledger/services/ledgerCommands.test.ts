@@ -6,7 +6,9 @@ import {
   addSettlement,
   createLedger,
   deleteExpense,
+  deleteLedger,
   deleteSettlement,
+  renameLedger,
   updateExpense,
   type ExpenseInput,
   type LedgerCommandDeps,
@@ -94,6 +96,55 @@ describe("createLedger", () => {
       "SELECT count(*) AS n FROM ledgers WHERE name = '失敗'",
     );
     expect(row?.n).toBe(0);
+  });
+});
+
+describe("renameLedger", () => {
+  it("renames and updates updatedAt", async () => {
+    const { db, deps, ledgerId } = await setup();
+    const later = { ...deps, now: () => new Date("2026-10-20T00:00:00Z") };
+    const renamed = unwrap(await renameLedger(later, ledgerId, " 大阪 "));
+    expect(renamed).toMatchObject({
+      name: "大阪",
+      createdAt: NOW.toISOString(),
+      updatedAt: "2026-10-20T00:00:00.000Z",
+    });
+    expect(unwrap(await loadLedgerSummary(db, ledgerId)).ledger.name).toBe(
+      "大阪",
+    );
+  });
+
+  it("rejects an empty name and a missing ledger", async () => {
+    const { deps, ledgerId } = await setup();
+    expect(unwrapErr(await renameLedger(deps, ledgerId, "  ")).code).toBe(
+      "EMPTY_NAME",
+    );
+    expect(unwrapErr(await renameLedger(deps, "missing", "X")).code).toBe(
+      "LEDGER_NOT_FOUND",
+    );
+  });
+});
+
+describe("deleteLedger", () => {
+  it("deletes the ledger with everything in it", async () => {
+    const { db, deps, ledgerId, a, b } = await setup();
+    unwrap(await addExpense(deps, ledgerId, ramen(a, [a, b])));
+    unwrap(await deleteLedger(deps, ledgerId));
+
+    expect(unwrapErr(await loadLedgerSummary(db, ledgerId)).code).toBe(
+      "LEDGER_NOT_FOUND",
+    );
+    const row = await db.getFirstAsync<{ n: number }>(
+      "SELECT (SELECT count(*) FROM members) + (SELECT count(*) FROM expenses) AS n",
+    );
+    expect(row?.n).toBe(0);
+  });
+
+  it("reports a missing ledger", async () => {
+    const { deps } = await setup();
+    expect(unwrapErr(await deleteLedger(deps, "missing")).code).toBe(
+      "LEDGER_NOT_FOUND",
+    );
   });
 });
 
