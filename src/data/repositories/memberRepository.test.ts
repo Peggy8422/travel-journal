@@ -69,6 +69,37 @@ describe("MemberRepository", () => {
     ).rejects.toThrow(/FOREIGN KEY/);
   });
 
+  it("finds a member by id", async () => {
+    const { repos } = await setupLedger();
+    expect(await repos.members.findById("b")).toMatchObject({
+      id: "b",
+      name: "Bob",
+      sortOrder: 1,
+    });
+    expect(await repos.members.findById("missing")).toBeUndefined();
+  });
+
+  it("deletes an unreferenced member and keeps appending after the others", async () => {
+    const { repos } = await setupLedger();
+    await repos.members.delete("c");
+    const dave = await repos.members.insert({
+      id: "d",
+      ledgerId: "ledger-1",
+      name: "Dave",
+      createdAt: T0,
+    });
+    expect(dave.sortOrder).toBe(2);
+    expect(
+      (await repos.members.listByLedger("ledger-1")).map((m) => m.id),
+    ).toEqual(["a", "b", "d"]);
+  });
+
+  it("refuses to delete a payer, guarded by the foreign key", async () => {
+    const { repos } = await setupLedger();
+    await repos.expenses.insert(makeExpenseRecord({ payerId: "c" }));
+    await expect(repos.members.delete("c")).rejects.toThrow(/FOREIGN KEY/);
+  });
+
   describe("isReferenced", () => {
     it("is false for a member without expenses or settlements", async () => {
       const { repos } = await setupLedger();

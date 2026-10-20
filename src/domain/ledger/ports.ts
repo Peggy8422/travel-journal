@@ -35,8 +35,14 @@ export interface MemberRepository {
   rename(id: MemberId, name: string): Promise<void>;
   /** archivedAt 傳 null 代表取消封存 */
   setArchived(id: MemberId, archivedAt: string | null): Promise<void>;
+  findById(id: MemberId): Promise<MemberRecord | undefined>;
   /** 依加入順序排列，包含已封存的成員 */
   listByLedger(ledgerId: string): Promise<MemberRecord[]>;
+  /**
+   * 永久刪除成員。只能刪除沒有被引用的成員（先用 isReferenced 確認）；
+   * 付款人、結算雙方由外鍵擋下，但 split JSON 裡的引用不受外鍵保護。
+   */
+  delete(id: MemberId): Promise<void>;
   /** 是否出現在任何消費（付款人或分攤對象）或結算中，包含已刪除的消費與結算 */
   isReferenced(id: MemberId): Promise<boolean>;
 }

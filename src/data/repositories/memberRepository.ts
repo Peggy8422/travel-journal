@@ -45,6 +45,18 @@ export function createMemberRepository(db: SqlExecutor): MemberRepository {
       ]);
     },
 
+    async findById(id) {
+      const row = await db.getFirstAsync<MemberRow>(
+        "SELECT * FROM members WHERE id = ?",
+        [id],
+      );
+      return row && toRecord(row);
+    },
+
+    async delete(id) {
+      await db.runAsync("DELETE FROM members WHERE id = ?", [id]);
+    },
+
     async listByLedger(ledgerId) {
       const rows = await db.getAllAsync<MemberRow>(
         "SELECT * FROM members WHERE ledger_id = ? ORDER BY sort_order",
