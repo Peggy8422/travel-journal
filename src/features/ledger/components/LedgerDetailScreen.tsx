@@ -1,6 +1,6 @@
 import { router, Stack } from "expo-router";
 import { useState } from "react";
-import { Alert, View } from "react-native";
+import { Alert, Pressable, View } from "react-native";
 
 import {
   formatMinorAmount,
@@ -145,27 +145,40 @@ export function LedgerDetailScreen({ ledgerId }: { ledgerId: string }) {
         </Section>
       )}
 
-      <Section title="消費">
+      <Section title="消費（點一下可編輯或刪除）">
         {summary.expenses.length === 0 && <Label muted>還沒有消費</Label>}
         {[...summary.expenses].reverse().map((expense) => (
-          <Row key={expense.id}>
-            <View style={{ flex: 1 }}>
-              <Label>{expense.title}</Label>
-              <Label muted>
-                {formatLocalDateTime(expense.occurredAt)} ·{" "}
-                {nameOf(expense.payerId)} 付款
-              </Label>
-            </View>
-            <View style={{ alignItems: "flex-end" }}>
-              <Label>
-                {expense.currency}{" "}
-                {formatMinorAmount(expense.amountMinor, expense.currency)}
-              </Label>
-              <ExpenseStatusLabel
-                status={summary.expenseStatuses.get(expense.id)}
-              />
-            </View>
-          </Row>
+          <Pressable
+            key={expense.id}
+            accessibilityRole="button"
+            accessibilityHint="編輯或刪除這筆消費"
+            onPress={() =>
+              router.push({
+                pathname: "/ledger/[id]/expense/[expenseId]",
+                params: { id: ledgerId, expenseId: expense.id },
+              })
+            }
+            style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+          >
+            <Row>
+              <View style={{ flex: 1 }}>
+                <Label>{expense.title}</Label>
+                <Label muted>
+                  {formatLocalDateTime(expense.occurredAt)} ·{" "}
+                  {nameOf(expense.payerId)} 付款
+                </Label>
+              </View>
+              <View style={{ alignItems: "flex-end" }}>
+                <Label>
+                  {expense.currency}{" "}
+                  {formatMinorAmount(expense.amountMinor, expense.currency)}
+                </Label>
+                <ExpenseStatusLabel
+                  status={summary.expenseStatuses.get(expense.id)}
+                />
+              </View>
+            </Row>
+          </Pressable>
         ))}
       </Section>
     </Screen>

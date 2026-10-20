@@ -1,0 +1,410 @@
+import { router } from "expo-router";
+import { useState, type ReactNode } from "react";
+import { ScrollView } from "react-native";
+
+import {
+  parseAmountInput,
+  SUPPORTED_CURRENCIES,
+  type CurrencyCode,
+  type ExpenseFx,
+  type MemberId,
+  type MemberRecord,
+} from "../../../domain/ledger";
+import {
+  Button,
+  Chip,
+  ChipGroup,
+  ErrorText,
+  Label,
+  Row,
+  Screen,
+  Section,
+  TextField,
+} from "../../../shared/ui/components";
+import {
+  DateTimeField,
+  formatDateTime,
+} from "../../../shared/ui/DateTimeField";
+import {
+  useFxRateResolution,
+  type FxRateState,
+} from "../hooks/useFxRateResolution";
+import { expenseFxFromResolution, manualFx } from "../services/expenseFx";
+import type { ExpenseInput } from "../services/ledgerCommands";
+import { toLocalIsoString } from "../services/localTimestamp";
+import { describeError, describeManualReason } from "./messages";
+
+/** 表單初始值。新增時大多是空白，編輯時來自原本的消費 */
+export interface ExpenseFormInitial {
+  readonly title: string;
+  readonly amountText: string;
+  readonly currency: CurrencyCode;
+  readonly payerId: MemberId | undefined;
+  readonly participantIds: readonly MemberId[];
+  /** 編輯時傳入原本的消費時間；沒有修改時間就原樣保存，不換成目前裝置的時區 */
+  readonly occurredAt?: string;
+  /** 編輯時傳入原本的記錄時間；新增時省略，顯示開啟畫面的時間 */
+  readonly recordedAt?: Date;
+  /** 編輯時傳入原本的匯率；幣別與時間都沒改就沿用，不重新查詢 */
+  readonly fx?: ExpenseFx | null;
+  /** 表單沒有提供編輯的欄位，原樣帶回 */
+  readonly extras: Pick<
+    ExpenseInput,
+    "note" | "category" | "placeName" | "location"
+  >;
+}
+
+export function ExpenseForm({
+  baseCurrency,
+  members,
+  initial,
+  notice,
+  onSubmit,
+  footer,
+}: {
+  baseCurrency: CurrencyCode;
+  /** 可以選的成員，依加入順序 */
+  members: readonly MemberRecord[];
+  initial: ExpenseFormInitial;
+  /** 顯示在儲存按鈕上方的提醒 */
+  notice?: string;
+  /** 儲存；成功回傳 null 並關閉畫面，失敗回傳要顯示的錯誤訊息 */
+  onSubmit: (input: ExpenseInput) => Promise<string | null>;
+  footer?: ReactNode;
+}) {
+  const [openedAt] = useState(() => new Date());
+  const [occurredAtDate, setOccurredAtDate] = useState(() =>
+    initial.occurredAt ? new Date(initial.occurredAt) : openedAt,
+  );
+  const [occurredAtTouched, setOccurredAtTouched] = useState(false);
+  // 新增或改過時間時，存成選擇當下裝置時區的時間，出國時就是當地時間
+  const occurredAt =
+    initial.occurredAt && !occurredAtTouched
+      ? initial.occurredAt
+      : toLocalIsoString(occurredAtDate);
+
+  const [title, setTitle] = useState(initial.title);
+  const [amountText, setAmountText] = useState(initial.amountText);
+  const [currency, setCurrency] = useState(initial.currency);
+  const [payerId, setPayerId] = useState(initial.payerId);
+  const [participantIds, setParticipantIds] = useState(initial.participantIds);
+  const [storedFx, setStoredFx] = useState(
+    initial.fx && initial.fx.source !== "manual" ? initial.fx : undefined,
+  );
+  const [manualRate, setManualRate] = useState<string | null>(
+    initial.fx?.source === "manual" ? initial.fx.rateToBase : null,
+  );
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const isForeign = currency !== baseCurrency;
+  const fxState = useFxRateResolution(
+    currency,
+    occurredAt,
+    isForeign && storedFx === undefined,
+  );
+
+  function selectCurrency(next: CurrencyCode) {
+    setCurrency(next);
+    setManualRate(null);
+    setStoredFx(undefined);
+  }
+
+  function changeOccurredAt(date: Date) {
+    setOccurredAtDate(date);
+    setOccurredAtTouched(true);
+    // 時間改了，原本的臺銀報價日期可能不再適用
+    setStoredFx(undefined);
+  }
+
+  function toggleParticipant(id: MemberId) {
+    setParticipantIds((ids) =>
+      ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id],
+    );
+  }
+
+  /** 決定要存的匯率；回傳 undefined 代表還缺匯率 */
+  function chooseFx(): ExpenseFx | null | undefined {
+    if (!isForeign) return null;
+    if (manualRate !== null) return manualFx(manualRate.trim());
+    if (storedFx) return storedFx;
+    if (fxState.status !== "done" || !fxState.result.ok) return undefined;
+    return expenseFxFromResolution(fxState.result.value);
+  }
+
+  async function submit() {
+    setError(null);
+    if (title.trim() === "") return setError("請輸入消費名稱");
+    if (!payerId) return setError("請選擇付款人");
+    const amount = parseAmountInput(amountText, currency);
+    if (!amount.ok) return setError(describeError(amount.error));
+    const fx = chooseFx();
+    if (fx === undefined) return setError("請輸入匯率");
+
+    setSaving(true);
+    try {
+      const failure = await onSubmit({
+        payerId,
+        amountMinor: amount.value,
+        currency,
+        fx,
+        split: {
+          kind: "equal",
+          // 依成員加入順序，讓資料與顯示一致
+          participantIds: members
+            .map((m) => m.id)
+            .filter((id) => participantIds.includes(id)),
+        },
+        title: title.trim(),
+        ...initial.extras,
+        occurredAt,
+      });
+      if (failure) {
+        setError(failure);
+        return;
+      }
+      router.back();
+    } catch {
+      setError("儲存失敗，請再試一次");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const memberLabel = (m: MemberRecord) =>
+    m.archivedAt ? `${m.name}（已封存）` : m.name;
+
+  return (
+    <Screen>
+      <TextField
+        label="消費名稱"
+        placeholder="例如：午餐拉麵"
+        value={title}
+        onChangeText={setTitle}
+      />
+      <TextField
+        label={`金額（${currency}）`}
+        placeholder="0"
+        keyboardType="decimal-pad"
+        value={amountText}
+        onChangeText={setAmountText}
+      />
+
+      <Section title="時間">
+        <DateTimeField
+          label="消費時間"
+          value={occurredAtDate}
+          onChange={changeOccurredAt}
+          maximumDate={openedAt}
+        />
+        <Row>
+          <Label muted>記錄時間</Label>
+          <Label muted>{formatDateTime(initial.recordedAt ?? openedAt)}</Label>
+        </Row>
+      </Section>
+
+      <Section title="幣別">
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <ChipGroup>
+            {SUPPORTED_CURRENCIES.map((code) => (
+              <Chip
+                key={code}
+                label={code}
+                selected={code === currency}
+                onPress={() => selectCurrency(code)}
+              />
+            ))}
+          </ChipGroup>
+        </ScrollView>
+      </Section>
+
+      {isForeign && (
+        <Section title="匯率">
+          <FxRateInfo
+            currency={currency}
+            baseCurrency={baseCurrency}
+            fxState={fxState}
+            storedFx={storedFx}
+            onRequery={() => setStoredFx(undefined)}
+            manualRate={manualRate}
+            onManualRateChange={setManualRate}
+          />
+        </Section>
+      )}
+
+      <Section title="付款人">
+        <ChipGroup>
+          {members.map((m) => (
+            <Chip
+              key={m.id}
+              label={memberLabel(m)}
+              selected={m.id === payerId}
+              onPress={() => setPayerId(m.id)}
+            />
+          ))}
+        </ChipGroup>
+      </Section>
+
+      <Section title="平均分攤給">
+        <ChipGroup>
+          {members.map((m) => (
+            <Chip
+              key={m.id}
+              label={memberLabel(m)}
+              selected={participantIds.includes(m.id)}
+              onPress={() => toggleParticipant(m.id)}
+            />
+          ))}
+        </ChipGroup>
+      </Section>
+
+      {notice && <Label muted>{notice}</Label>}
+      <ErrorText message={error} />
+      <Button title="儲存" onPress={submit} disabled={saving} />
+      {footer}
+    </Screen>
+  );
+}
+
+function FxRateInfo({
+  currency,
+  baseCurrency,
+  fxState,
+  storedFx,
+  onRequery,
+  manualRate,
+  onManualRateChange,
+}: {
+  currency: CurrencyCode;
+  baseCurrency: CurrencyCode;
+  fxState: FxRateState;
+  /** 編輯時沿用的臺銀匯率 */
+  storedFx: (ExpenseFx & { source: "bot-live" | "bot-cached" }) | undefined;
+  onRequery: () => void;
+  manualRate: string | null;
+  onManualRateChange: (rate: string | null) => void;
+}) {
+  const manualField = (
+    <TextField
+      label={`1 ${currency} = ? ${baseCurrency}`}
+      placeholder="例如 0.2134"
+      keyboardType="decimal-pad"
+      value={manualRate ?? ""}
+      onChangeText={onManualRateChange}
+    />
+  );
+
+  // 可以「改回」的臺銀匯率：編輯時原本存的，或這次查到的
+  const resolved =
+    fxState.status === "done" &&
+    fxState.result.ok &&
+    fxState.result.value.status === "resolved"
+      ? fxState.result.value
+      : undefined;
+  const botRate = storedFx?.rateToBase ?? resolved?.rate;
+
+  if (manualRate !== null) {
+    return (
+      <>
+        {manualField}
+        {botRate !== undefined && (
+          <Button
+            title={`改回臺銀匯率 ${botRate}`}
+            variant="secondary"
+            onPress={() => onManualRateChange(null)}
+          />
+        )}
+      </>
+    );
+  }
+
+  if (storedFx) {
+    return (
+      <>
+        <BotRateText
+          currency={currency}
+          baseCurrency={baseCurrency}
+          rate={storedFx.rateToBase}
+          detail={`臺灣銀行 ${storedFx.quoteDate} ${basisLabel(storedFx.basis)}中價（原本的匯率）`}
+        />
+        <Button
+          title="手動修改匯率"
+          variant="secondary"
+          onPress={() => onManualRateChange(storedFx.rateToBase)}
+        />
+        <Button
+          title="重新查詢臺銀匯率"
+          variant="secondary"
+          onPress={onRequery}
+        />
+      </>
+    );
+  }
+
+  if (fxState.status === "idle" || fxState.status === "loading") {
+    return <Label muted>查詢臺灣銀行匯率中…</Label>;
+  }
+  if (!fxState.result.ok) {
+    return (
+      <>
+        <ErrorText message={describeError(fxState.result.error)} />
+        {manualField}
+      </>
+    );
+  }
+
+  const resolution = fxState.result.value;
+  if (resolution.status === "manual-required") {
+    return (
+      <>
+        <Label muted>
+          {describeManualReason(resolution.reason)}，請手動輸入
+        </Label>
+        {manualField}
+      </>
+    );
+  }
+  if (resolution.status !== "resolved") return null;
+
+  const source = resolution.source === "bot-live" ? "" : "，離線快取";
+  return (
+    <>
+      <BotRateText
+        currency={currency}
+        baseCurrency={baseCurrency}
+        rate={resolution.rate}
+        detail={`臺灣銀行 ${resolution.quoteDate} ${basisLabel(resolution.basis)}中價${source}`}
+      />
+      <Button
+        title="手動修改匯率"
+        variant="secondary"
+        onPress={() => onManualRateChange(resolution.rate)}
+      />
+    </>
+  );
+}
+
+function BotRateText({
+  currency,
+  baseCurrency,
+  rate,
+  detail,
+}: {
+  currency: CurrencyCode;
+  baseCurrency: CurrencyCode;
+  rate: string;
+  detail: string;
+}) {
+  return (
+    <>
+      <Label>
+        1 {currency} = {rate} {baseCurrency}
+      </Label>
+      <Label muted>{detail}</Label>
+    </>
+  );
+}
+
+function basisLabel(basis: "spot" | "cash"): string {
+  return basis === "spot" ? "即期" : "現金";
+}

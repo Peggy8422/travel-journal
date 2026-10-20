@@ -15,6 +15,10 @@ export default function RootLayout() {
             name="ledger/[id]/add-expense"
             options={{ title: "新增消費", presentation: "modal" }}
           />
+          <Stack.Screen
+            name="ledger/[id]/expense/[expenseId]"
+            options={{ title: "編輯消費", presentation: "modal" }}
+          />
         </Stack>
       </DatabaseProvider>
     </ThemeProvider>
