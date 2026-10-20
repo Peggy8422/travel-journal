@@ -10,9 +10,7 @@ import {
 import {
   Button,
   ErrorText,
-  Label,
   MessageScreen,
-  Screen,
 } from "../../../shared/ui/components";
 import { useLedgerCommandDeps } from "../../database/DatabaseProvider";
 import { useLedgerSummary } from "../hooks/useLedgerQueries";
@@ -76,16 +74,6 @@ export function EditExpenseScreen({
     </>
   );
 
-  // 表單目前只支援平均分攤
-  if (expense.split.kind !== "equal") {
-    return (
-      <Screen>
-        <Label muted>這筆消費使用指定金額分攤，目前無法在這裡編輯。</Label>
-        {deleteSection}
-      </Screen>
-    );
-  }
-
   // 可選成員：未封存的成員，加上原本就在這筆消費裡的封存成員
   const involved = expenseMemberIds(expense);
   const selectable = members.filter(
@@ -101,13 +89,13 @@ export function EditExpenseScreen({
         amountText: toAmountInput(expense.amountMinor, expense.currency),
         currency: expense.currency,
         payerId: expense.payerId,
-        participantIds: expense.split.participantIds,
+        split: expense.split,
+        category: expense.category,
         occurredAt: expense.occurredAt,
         recordedAt: new Date(expense.createdAt),
         fx: expense.fx,
         extras: {
           note: expense.note,
-          category: expense.category,
           placeName: expense.placeName,
           location: expense.location,
         },

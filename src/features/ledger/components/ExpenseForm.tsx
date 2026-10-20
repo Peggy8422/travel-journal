@@ -1,14 +1,20 @@
 import { router } from "expo-router";
 import { useState, type ReactNode } from "react";
-import { ScrollView } from "react-native";
+import { Alert, ScrollView } from "react-native";
 
 import {
+  EXPENSE_CATEGORIES,
+  formatMinorAmount,
+  isExpenseCategory,
   parseAmountInput,
+  remainingToAllocate,
   SUPPORTED_CURRENCIES,
+  toAmountInput,
   type CurrencyCode,
   type ExpenseFx,
   type MemberId,
   type MemberRecord,
+  type SplitRule,
 } from "../../../domain/ledger";
 import {
   Button,
@@ -29,10 +35,19 @@ import {
   useFxRateResolution,
   type FxRateState,
 } from "../hooks/useFxRateResolution";
-import { expenseFxFromResolution, manualFx } from "../services/expenseFx";
+import {
+  buildSplitRule,
+  chooseExpenseFx,
+  previewRemaining,
+  resolveOccurredAt,
+} from "../services/expenseFormLogic";
 import type { ExpenseInput } from "../services/ledgerCommands";
-import { toLocalIsoString } from "../services/localTimestamp";
-import { describeError, describeManualReason } from "./messages";
+import { categoryLabel } from "./categories";
+import {
+  describeAllocationGap,
+  describeError,
+  describeManualReason,
+} from "./messages";
 
 /** 表單初始值。新增時大多是空白，編輯時來自原本的消費 */
 export interface ExpenseFormInitial {
@@ -40,7 +55,8 @@ export interface ExpenseFormInitial {
   readonly amountText: string;
   readonly currency: CurrencyCode;
   readonly payerId: MemberId | undefined;
-  readonly participantIds: readonly MemberId[];
+  readonly split: SplitRule;
+  readonly category: string | null;
   /** 編輯時傳入原本的消費時間；沒有修改時間就原樣保存，不換成目前裝置的時區 */
   readonly occurredAt?: string;
   /** 編輯時傳入原本的記錄時間；新增時省略，顯示開啟畫面的時間 */
@@ -48,10 +64,7 @@ export interface ExpenseFormInitial {
   /** 編輯時傳入原本的匯率；幣別與時間都沒改就沿用，不重新查詢 */
   readonly fx?: ExpenseFx | null;
   /** 表單沒有提供編輯的欄位，原樣帶回 */
-  readonly extras: Pick<
-    ExpenseInput,
-    "note" | "category" | "placeName" | "location"
-  >;
+  readonly extras: Pick<ExpenseInput, "note" | "placeName" | "location">;
 }
 
 export function ExpenseForm({
@@ -78,16 +91,35 @@ export function ExpenseForm({
   );
   const [occurredAtTouched, setOccurredAtTouched] = useState(false);
   // 新增或改過時間時，存成選擇當下裝置時區的時間，出國時就是當地時間
-  const occurredAt =
-    initial.occurredAt && !occurredAtTouched
-      ? initial.occurredAt
-      : toLocalIsoString(occurredAtDate);
+  const occurredAt = resolveOccurredAt(
+    initial.occurredAt,
+    occurredAtTouched,
+    occurredAtDate,
+  );
 
   const [title, setTitle] = useState(initial.title);
   const [amountText, setAmountText] = useState(initial.amountText);
   const [currency, setCurrency] = useState(initial.currency);
   const [payerId, setPayerId] = useState(initial.payerId);
-  const [participantIds, setParticipantIds] = useState(initial.participantIds);
+  const [category, setCategory] = useState(initial.category);
+  const [splitKind, setSplitKind] = useState(initial.split.kind);
+  // 兩種分攤方式各自保留輸入，切換時不會清掉另一邊
+  const [participantIds, setParticipantIds] = useState<readonly MemberId[]>(
+    () =>
+      initial.split.kind === "equal"
+        ? initial.split.participantIds
+        : members.filter((m) => m.archivedAt === null).map((m) => m.id),
+  );
+  const [shareTexts, setShareTexts] = useState<Record<MemberId, string>>(() =>
+    initial.split.kind === "exact"
+      ? Object.fromEntries(
+          initial.split.shares.map((s) => [
+            s.memberId,
+            toAmountInput(s.amountMinor, initial.currency),
+          ]),
+        )
+      : {},
+  );
   const [storedFx, setStoredFx] = useState(
     initial.fx && initial.fx.source !== "manual" ? initial.fx : undefined,
   );
@@ -123,23 +155,38 @@ export function ExpenseForm({
     );
   }
 
-  /** 決定要存的匯率；回傳 undefined 代表還缺匯率 */
-  function chooseFx(): ExpenseFx | null | undefined {
-    if (!isForeign) return null;
-    if (manualRate !== null) return manualFx(manualRate.trim());
-    if (storedFx) return storedFx;
-    if (fxState.status !== "done" || !fxState.result.ok) return undefined;
-    return expenseFxFromResolution(fxState.result.value);
-  }
-
   async function submit() {
     setError(null);
     if (title.trim() === "") return setError("請輸入消費名稱");
     if (!payerId) return setError("請選擇付款人");
     const amount = parseAmountInput(amountText, currency);
     if (!amount.ok) return setError(describeError(amount.error));
-    const fx = chooseFx();
+    const fx = chooseExpenseFx({
+      isForeign,
+      manualRate,
+      storedFx,
+      resolution: fxState.status === "done" ? fxState.result : undefined,
+    });
     if (fx === undefined) return setError("請輸入匯率");
+    const memberOrder = members.map((m) => m.id);
+    const split = buildSplitRule(
+      splitKind === "equal"
+        ? { kind: "equal", participantIds }
+        : { kind: "exact", shareTexts },
+      memberOrder,
+      currency,
+    );
+    if (!split.ok) return setError(describeError(split.error));
+    if (split.value.kind === "exact") {
+      const gap = describeAllocationGap(
+        remainingToAllocate(amount.value, split.value.shares),
+        currency,
+      );
+      if (gap) {
+        Alert.alert("分攤金額不符", gap);
+        return;
+      }
+    }
 
     setSaving(true);
     try {
@@ -148,15 +195,10 @@ export function ExpenseForm({
         amountMinor: amount.value,
         currency,
         fx,
-        split: {
-          kind: "equal",
-          // 依成員加入順序，讓資料與顯示一致
-          participantIds: members
-            .map((m) => m.id)
-            .filter((id) => participantIds.includes(id)),
-        },
+        split: split.value,
         title: title.trim(),
         ...initial.extras,
+        category,
         occurredAt,
       });
       if (failure) {
@@ -173,6 +215,20 @@ export function ExpenseForm({
 
   const memberLabel = (m: MemberRecord) =>
     m.archivedAt ? `${m.name}（已封存）` : m.name;
+  // 清單以外的舊分類（例如早期的自由文字）也要能看到並保留
+  const categoryOptions: readonly string[] =
+    category !== null && !isExpenseCategory(category)
+      ? [...EXPENSE_CATEGORIES, category]
+      : EXPENSE_CATEGORIES;
+  const remaining =
+    splitKind === "exact"
+      ? previewRemaining(
+          amountText,
+          shareTexts,
+          members.map((m) => m.id),
+          currency,
+        )
+      : undefined;
 
   return (
     <Screen>
@@ -245,14 +301,60 @@ export function ExpenseForm({
         </ChipGroup>
       </Section>
 
-      <Section title="平均分攤給">
+      <Section title="分攤方式">
         <ChipGroup>
-          {members.map((m) => (
+          <Chip
+            label="平均分攤"
+            selected={splitKind === "equal"}
+            onPress={() => setSplitKind("equal")}
+          />
+          <Chip
+            label="指定金額"
+            selected={splitKind === "exact"}
+            onPress={() => setSplitKind("exact")}
+          />
+        </ChipGroup>
+        {splitKind === "equal" ? (
+          <ChipGroup>
+            {members.map((m) => (
+              <Chip
+                key={m.id}
+                label={memberLabel(m)}
+                selected={participantIds.includes(m.id)}
+                onPress={() => toggleParticipant(m.id)}
+              />
+            ))}
+          </ChipGroup>
+        ) : (
+          <>
+            {members.map((m) => (
+              <Row key={m.id}>
+                <Label>{memberLabel(m)}</Label>
+                <TextField
+                  placeholder="不分攤"
+                  keyboardType="decimal-pad"
+                  value={shareTexts[m.id] ?? ""}
+                  onChangeText={(text) =>
+                    setShareTexts((texts) => ({ ...texts, [m.id]: text }))
+                  }
+                  style={{ width: 120, textAlign: "right" }}
+                />
+              </Row>
+            ))}
+            <RemainingLabel remaining={remaining} currency={currency} />
+          </>
+        )}
+      </Section>
+
+      <Section title="分類">
+        <ChipGroup>
+          {categoryOptions.map((code) => (
             <Chip
-              key={m.id}
-              label={memberLabel(m)}
-              selected={participantIds.includes(m.id)}
-              onPress={() => toggleParticipant(m.id)}
+              key={code}
+              label={categoryLabel(code)}
+              selected={code === category}
+              // 再點一次取消，變回未分類
+              onPress={() => setCategory(code === category ? null : code)}
             />
           ))}
         </ChipGroup>
@@ -263,6 +365,25 @@ export function ExpenseForm({
       <Button title="儲存" onPress={submit} disabled={saving} />
       {footer}
     </Screen>
+  );
+}
+
+function RemainingLabel({
+  remaining,
+  currency,
+}: {
+  remaining: number | undefined;
+  currency: CurrencyCode;
+}) {
+  if (remaining === undefined) {
+    return <Label muted>輸入總金額與每人金額後，會顯示還剩多少沒分配</Label>;
+  }
+  if (remaining === 0) return <Label muted>已全部分配</Label>;
+  const amount = `${currency} ${formatMinorAmount(Math.abs(remaining), currency)}`;
+  return (
+    <ErrorText
+      message={remaining > 0 ? `還剩 ${amount} 沒分配` : `超出 ${amount}`}
+    />
   );
 }
 

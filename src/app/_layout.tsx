@@ -17,6 +17,7 @@ export default function RootLayout() {
             name="ledger/[id]/settings"
             options={{ title: "帳本設定" }}
           />
+          <Stack.Screen name="ledger/[id]/stats" options={{ title: "統計" }} />
           <Stack.Screen
             name="ledger/[id]/add-expense"
             options={{ title: "新增消費", presentation: "modal" }}

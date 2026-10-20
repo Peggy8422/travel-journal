@@ -19,11 +19,12 @@ import {
 import { useTheme } from "../../../shared/ui/theme";
 import { useLedgerCommandDeps } from "../../database/DatabaseProvider";
 import { useLedgerSummary } from "../hooks/useLedgerQueries";
-import { addSettlement } from "../services/ledgerCommands";
+import { addSettlement, settleAll } from "../services/ledgerCommands";
 import {
   formatLocalDateTime,
   toLocalIsoString,
 } from "../services/localTimestamp";
+import { categoryLabel } from "./categories";
 import { describeError } from "./messages";
 
 export function LedgerDetailScreen({ ledgerId }: { ledgerId: string }) {
@@ -67,6 +68,36 @@ export function LedgerDetailScreen({ ledgerId }: { ledgerId: string }) {
     }
   }
 
+  function confirmSettleAll() {
+    const lines = summary.transfers.map(
+      (t) =>
+        `${nameOf(t.fromId)} → ${nameOf(t.toId)} ${base} ${formatMinorAmount(t.amountMinor, base)}`,
+    );
+    Alert.alert(
+      "全部結清",
+      `記錄以下 ${lines.length} 筆還款？\n${lines.join("\n")}`,
+      [
+        { text: "取消", style: "cancel" },
+        { text: "記錄", onPress: recordAll },
+      ],
+    );
+  }
+
+  async function recordAll() {
+    setActionError(null);
+    try {
+      const result = await settleAll(
+        deps,
+        ledgerId,
+        toLocalIsoString(new Date()),
+      );
+      if (!result.ok) setActionError(describeError(result.error));
+      reload();
+    } catch {
+      setActionError("記錄失敗，請再試一次");
+    }
+  }
+
   return (
     <Screen>
       <Stack.Screen
@@ -94,6 +125,16 @@ export function LedgerDetailScreen({ ledgerId }: { ledgerId: string }) {
         onPress={() =>
           router.push({
             pathname: "/ledger/[id]/add-expense",
+            params: { id: ledgerId },
+          })
+        }
+      />
+      <Button
+        title="查看統計"
+        variant="secondary"
+        onPress={() =>
+          router.push({
+            pathname: "/ledger/[id]/stats",
             params: { id: ledgerId },
           })
         }
@@ -126,6 +167,13 @@ export function LedgerDetailScreen({ ledgerId }: { ledgerId: string }) {
 
       <Section title="還款建議">
         {summary.transfers.length === 0 && <Label muted>目前沒有欠款</Label>}
+        {summary.transfers.length > 1 && (
+          <Button
+            title={`全部結清（${summary.transfers.length} 筆）`}
+            variant="secondary"
+            onPress={confirmSettleAll}
+          />
+        )}
         {summary.transfers.map((transfer) => (
           <Row key={`${transfer.fromId}-${transfer.toId}`}>
             <View style={{ flex: 1 }}>
@@ -184,6 +232,8 @@ export function LedgerDetailScreen({ ledgerId }: { ledgerId: string }) {
                 <Label muted>
                   {formatLocalDateTime(expense.occurredAt)} ·{" "}
                   {nameOf(expense.payerId)} 付款
+                  {expense.category !== null &&
+                    ` · ${categoryLabel(expense.category)}`}
                 </Label>
               </View>
               <View style={{ alignItems: "flex-end" }}>
@@ -191,6 +241,15 @@ export function LedgerDetailScreen({ ledgerId }: { ledgerId: string }) {
                   {expense.currency}{" "}
                   {formatMinorAmount(expense.amountMinor, expense.currency)}
                 </Label>
+                {expense.currency !== base && (
+                  <Label muted>
+                    ≈ {base}{" "}
+                    {formatMinorAmount(
+                      summary.expenseBaseAmounts.get(expense.id) ?? 0,
+                      base,
+                    )}
+                  </Label>
+                )}
                 <ExpenseStatusLabel
                   status={summary.expenseStatuses.get(expense.id)}
                 />

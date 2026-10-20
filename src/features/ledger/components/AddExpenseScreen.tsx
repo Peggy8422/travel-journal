@@ -26,8 +26,9 @@ export function AddExpenseScreen({ ledgerId }: { ledgerId: string }) {
         // 預設沿用上一筆消費的幣別，出國時通常連續記同一種外幣
         currency: expenses.at(-1)?.currency ?? ledger.baseCurrency,
         payerId: active[0]?.id,
-        participantIds: active.map((m) => m.id),
-        extras: { note: null, category: null, placeName: null, location: null },
+        split: { kind: "equal", participantIds: active.map((m) => m.id) },
+        category: null,
+        extras: { note: null, placeName: null, location: null },
       }}
       onSubmit={async (input) => {
         const result = await addExpense(deps, ledgerId, input);

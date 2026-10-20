@@ -1,3 +1,4 @@
+import { formatMinorAmount, type CurrencyCode } from "../../../domain/ledger";
 import type { LedgerCommandError } from "../services/ledgerCommands";
 import type { LedgerSummaryError } from "../services/ledgerSummary";
 import type {
@@ -37,6 +38,20 @@ export function describeError(error: DisplayableError): string {
       return "金額必須大於 0";
     case "UNSUPPORTED_CURRENCY":
       return `不支援的幣別：${error.currency}`;
+    case "INVALID_SHARE_INPUT":
+      return `分攤金額有誤：${describeError(error.cause)}`;
+    case "EXACT_SHARES_SUM_MISMATCH":
+      return "每個人的分攤金額加總和消費金額不符";
+    case "SHARE_NOT_POSITIVE_INTEGER":
+      return "分攤金額必須大於 0，不分攤的人請留空";
+    case "DUPLICATE_PARTICIPANT":
+      return "同一位成員重複出現在分攤名單中";
+    case "FX_RATE_UNEXPECTED":
+      return "新台幣消費不需要匯率";
+    case "INVALID_EXPENSE":
+      return `有一筆消費資料有誤（${describeError(error.cause)}），請編輯或刪除該筆消費`;
+    case "INVALID_SETTLEMENT":
+      return `有一筆還款資料有誤（${describeError(error.cause)}）`;
     case "NO_PARTICIPANTS":
       return "請至少選一位分攤的人";
     case "UNKNOWN_MEMBER":
@@ -78,4 +93,19 @@ export function describeManualReason(reason: ManualReason): string {
     case "cache-read-failed":
       return "無法讀取匯率紀錄";
   }
+}
+
+/**
+ * 指定金額分攤時，加總與消費金額不符的說明；剛好分配完時回傳 null。
+ * remainingMinor 為正代表還沒分配完，為負代表分配超過。
+ */
+export function describeAllocationGap(
+  remainingMinor: number,
+  currency: CurrencyCode,
+): string | null {
+  if (remainingMinor === 0) return null;
+  const amount = `${currency} ${formatMinorAmount(Math.abs(remainingMinor), currency)}`;
+  return remainingMinor > 0
+    ? `還有 ${amount} 沒有分配，請調整每個人的金額，讓加總等於消費金額。`
+    : `分配的金額超出 ${amount}，請調整每個人的金額，讓加總等於消費金額。`;
 }
