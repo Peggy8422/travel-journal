@@ -55,3 +55,11 @@ export function formatMinorAmount(
 function groupThousands(digits: string): string {
   return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
+
+/** 把最小單位整數轉回輸入框用的文字（不加千分位），例如 USD 123450 → "1234.50" */
+export function toAmountInput(
+  amountMinor: number,
+  currency: CurrencyCode,
+): string {
+  return formatMinorAmount(amountMinor, currency).replace(/,/g, "");
+}

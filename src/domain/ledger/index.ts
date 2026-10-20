@@ -47,4 +47,4 @@ export {
   parseFxRate,
   SUPPORTED_CURRENCIES,
 } from "./currency";
-export { formatMinorAmount, parseAmountInput } from "./amount";
+export { formatMinorAmount, parseAmountInput, toAmountInput } from "./amount";

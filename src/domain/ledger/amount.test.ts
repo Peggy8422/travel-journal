@@ -1,4 +1,4 @@
-import { formatMinorAmount, parseAmountInput } from "./amount";
+import { formatMinorAmount, parseAmountInput, toAmountInput } from "./amount";
 import { unwrap, unwrapErr } from "./testFixtures";
 
 describe("parseAmountInput", () => {
@@ -57,5 +57,21 @@ describe("formatMinorAmount", () => {
     [999, "XXX", "999"],
   ])("formats %d %s as %s", (minor, currency, expected) => {
     expect(formatMinorAmount(minor, currency)).toBe(expected);
+  });
+});
+
+describe("toAmountInput", () => {
+  it.each([
+    [123450, "USD", "1234.50"],
+    [1500, "JPY", "1500"],
+    [1234567, "TWD", "1234567"],
+  ])("formats %d %s as %s without grouping", (minor, currency, expected) => {
+    expect(toAmountInput(minor, currency)).toBe(expected);
+  });
+
+  it("round-trips through parseAmountInput", () => {
+    expect(unwrap(parseAmountInput(toAmountInput(123405, "USD"), "USD"))).toBe(
+      123405,
+    );
   });
 });
