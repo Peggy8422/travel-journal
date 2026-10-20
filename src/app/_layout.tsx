@@ -1,12 +1,14 @@
 import { Stack, ThemeProvider } from "expo-router";
 
 import { DatabaseProvider } from "../features/database/DatabaseProvider";
+import { BotQuoteCacheRefresher } from "../features/ledger/components/BotQuoteCacheRefresher";
 import { useNavigationTheme } from "../shared/ui/theme";
 
 export default function RootLayout() {
   return (
     <ThemeProvider value={useNavigationTheme()}>
       <DatabaseProvider>
+        <BotQuoteCacheRefresher />
         <Stack screenOptions={{ headerBackTitle: "返回" }}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="ledger/new" options={{ title: "建立帳本" }} />

@@ -1,14 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { createBotQuoteSource } from "../../../data/fx/botQuoteSource";
-import {
-  fetchBotDailyCsv,
-  fetchBotHistoryCsv,
-} from "../../../data/fx/botRateClient";
-import { createRepositories } from "../../../data/repositories";
 import type { Result } from "../../../domain/common/result";
 import type { CurrencyCode } from "../../../domain/ledger";
 import { useDatabase } from "../../database/DatabaseProvider";
+import { createBotQuoteDeps } from "../services/botQuoteDeps";
 import {
   resolveFxRate,
   type FxRateResolution,
@@ -34,18 +29,7 @@ export function useFxRateResolution(
   enabled = true,
 ): FxRateState {
   const db = useDatabase();
-  const deps = useMemo<ResolveFxRateDeps>(() => {
-    const now = () => new Date();
-    return {
-      source: createBotQuoteSource({
-        fetchDailyCsv: () => fetchBotDailyCsv(),
-        fetchHistoryCsv: (c) => fetchBotHistoryCsv(c),
-        now,
-      }),
-      cache: createRepositories(db, now).botQuotes,
-      now,
-    };
-  }, [db]);
+  const deps = useMemo<ResolveFxRateDeps>(() => createBotQuoteDeps(db), [db]);
 
   const key = `${currency}@${occurredAt}`;
   const [state, setState] = useState<{
