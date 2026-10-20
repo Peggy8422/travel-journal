@@ -14,6 +14,10 @@ export default function RootLayout() {
           <Stack.Screen name="ledger/new" options={{ title: "建立帳本" }} />
           <Stack.Screen name="ledger/[id]/index" options={{ title: "帳本" }} />
           <Stack.Screen
+            name="ledger/[id]/settings"
+            options={{ title: "帳本設定" }}
+          />
+          <Stack.Screen
             name="ledger/[id]/add-expense"
             options={{ title: "新增消費", presentation: "modal" }}
           />

@@ -69,7 +69,25 @@ export function LedgerDetailScreen({ ledgerId }: { ledgerId: string }) {
 
   return (
     <Screen>
-      <Stack.Screen options={{ title: summary.ledger.name }} />
+      <Stack.Screen
+        options={{
+          title: summary.ledger.name,
+          headerRight: () => (
+            <Pressable
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={() =>
+                router.push({
+                  pathname: "/ledger/[id]/settings",
+                  params: { id: ledgerId },
+                })
+              }
+            >
+              <Label color={theme.primary}>設定</Label>
+            </Pressable>
+          ),
+        }}
+      />
 
       <Button
         title="新增消費"
