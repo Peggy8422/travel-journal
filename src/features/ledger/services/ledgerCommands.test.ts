@@ -9,11 +9,12 @@ import {
   deleteLedger,
   deleteSettlement,
   renameLedger,
+  settleAll,
   updateExpense,
   type ExpenseInput,
   type LedgerCommandDeps,
 } from "./ledgerCommands";
-import { loadLedgerSummary } from "./ledgerSummary";
+import { loadLedgerStats, loadLedgerSummary } from "./ledgerSummary";
 
 const NOW = new Date("2026-10-12T03:00:00.000Z");
 
@@ -179,6 +180,7 @@ describe("expenses", () => {
       { fromId: b, toId: a, amountMinor: 200 },
       { fromId: c, toId: a, amountMinor: 200 },
     ]);
+    expect([...summary.expenseBaseAmounts.values()]).toEqual([600]);
   });
 
   it("validates with domain rules before writing", async () => {
@@ -325,6 +327,81 @@ describe("settlements", () => {
     expect((await deleteSettlement(deps, s.id)).ok).toBe(true);
     expect(unwrapErr(await deleteSettlement(deps, s.id)).code).toBe(
       "SETTLEMENT_NOT_FOUND",
+    );
+  });
+});
+
+describe("settleAll", () => {
+  const settledAt = "2026-10-15T20:00:00+08:00";
+
+  it("records every suggested transfer and clears all debts", async () => {
+    const { db, deps, ledgerId, a, b, c } = await setup();
+    unwrap(await addExpense(deps, ledgerId, ramen(a, [a, b, c])));
+    unwrap(await addExpense(deps, ledgerId, ramen(b, [b, c])));
+
+    const recorded = unwrap(await settleAll(deps, ledgerId, settledAt));
+    expect(recorded.length).toBeGreaterThan(0);
+    expect(recorded.every((s) => s.settledAt === settledAt)).toBe(true);
+
+    const summary = unwrap(await loadLedgerSummary(db, ledgerId));
+    expect(summary.transfers).toEqual([]);
+    expect([...summary.balances.values()].every((v) => v === 0)).toBe(true);
+    expect(summary.settlements).toHaveLength(recorded.length);
+    expect([...summary.expenseStatuses.values()]).toEqual([
+      "settled",
+      "settled",
+    ]);
+  });
+
+  it("does nothing when there is no debt", async () => {
+    const { db, deps, ledgerId } = await setup();
+    expect(unwrap(await settleAll(deps, ledgerId, settledAt))).toEqual([]);
+    expect(unwrap(await loadLedgerSummary(db, ledgerId)).settlements).toEqual(
+      [],
+    );
+  });
+
+  it("writes nothing if any insert fails", async () => {
+    const { db, deps, ledgerId, a, b, c } = await setup();
+    unwrap(await addExpense(deps, ledgerId, ramen(a, [a, b, c])));
+    // 兩筆還款拿到同一個 id，第二筆寫入失敗
+    const failing = { ...deps, newId: () => "same-id" };
+    await expect(settleAll(failing, ledgerId, settledAt)).rejects.toThrow();
+    expect(unwrap(await loadLedgerSummary(db, ledgerId)).settlements).toEqual(
+      [],
+    );
+  });
+
+  it("validates the time and the ledger", async () => {
+    const { deps, ledgerId } = await setup();
+    expect(
+      unwrapErr(await settleAll(deps, ledgerId, "2026-10-15T20:00:00")).code,
+    ).toBe("INVALID_TIMESTAMP");
+    expect(unwrapErr(await settleAll(deps, "missing", settledAt)).code).toBe(
+      "LEDGER_NOT_FOUND",
+    );
+  });
+});
+
+describe("loadLedgerStats", () => {
+  it("summarizes spending in the base currency", async () => {
+    const { db, deps, ledgerId, a, b, c } = await setup();
+    unwrap(await addExpense(deps, ledgerId, ramen(a, [a, b, c])));
+    const { stats, members } = unwrap(await loadLedgerStats(db, ledgerId));
+    expect(members).toHaveLength(3);
+    expect(stats.totalMinor).toBe(600);
+    expect(stats.members).toEqual([
+      { memberId: a, paidMinor: 600, shareMinor: 200 },
+      { memberId: b, paidMinor: 0, shareMinor: 200 },
+      { memberId: c, paidMinor: 0, shareMinor: 200 },
+    ]);
+    expect(stats.categories).toEqual([{ category: "food", totalMinor: 600 }]);
+  });
+
+  it("reports a missing ledger", async () => {
+    const { db } = await setup();
+    expect(unwrapErr(await loadLedgerStats(db, "missing")).code).toBe(
+      "LEDGER_NOT_FOUND",
     );
   });
 });

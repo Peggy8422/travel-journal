@@ -20,6 +20,7 @@ import {
   createRepositories,
   type Repositories,
 } from "../../../data/repositories";
+import { loadLedgerSummary } from "./ledgerSummary";
 
 /*
  * 帳本的寫入流程：產生 id 與時間 → 用 domain 函式驗證 → 寫入資料庫。
@@ -251,6 +252,44 @@ export async function addSettlement(
 
   await repos.settlements.insert(settlement);
   return ok(settlement);
+}
+
+/**
+ * 依目前的還款建議一次記錄所有還款（「全部結清」）。
+ * 在同一個 transaction 裡重新計算建議再寫入，避免用到畫面上過期的建議，
+ * 也避免只寫入一部分。沒有欠款時回傳空陣列。
+ */
+export async function settleAll(
+  deps: LedgerCommandDeps,
+  ledgerId: string,
+  settledAt: string,
+): CommandResult<SettlementRecord[]> {
+  if (!toTaipeiDate(settledAt).ok) {
+    return err({ code: "INVALID_TIMESTAMP", value: settledAt });
+  }
+  const timestamp = deps.now().toISOString();
+
+  return deps.db.transaction(async (tx) => {
+    const summary = await loadLedgerSummary(tx, ledgerId);
+    if (!summary.ok) return summary;
+
+    const repos = createRepositories(tx);
+    const recorded: SettlementRecord[] = [];
+    for (const transfer of summary.value.transfers) {
+      const settlement: SettlementRecord = {
+        ...transfer,
+        id: deps.newId(),
+        ledgerId,
+        settledAt,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        deletedAt: null,
+      };
+      await repos.settlements.insert(settlement);
+      recorded.push(settlement);
+    }
+    return ok(recorded);
+  });
 }
 
 export async function deleteSettlement(

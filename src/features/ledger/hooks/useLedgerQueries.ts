@@ -3,7 +3,7 @@ import { useCallback } from "react";
 import { createRepositories } from "../../../data/repositories";
 import { useFocusedQuery } from "../../../shared/hooks/useFocusedQuery";
 import { useDatabase } from "../../database/DatabaseProvider";
-import { loadLedgerSummary } from "../services/ledgerSummary";
+import { loadLedgerStats, loadLedgerSummary } from "../services/ledgerSummary";
 
 /** 所有帳本，依建立時間由新到舊；畫面取得焦點時重新讀取 */
 export function useLedgerList() {
@@ -19,5 +19,12 @@ export function useLedgerSummary(ledgerId: string) {
     () => loadLedgerSummary(db, ledgerId),
     [db, ledgerId],
   );
+  return useFocusedQuery(load);
+}
+
+/** 帳本的花費統計；data 是 Result */
+export function useLedgerStats(ledgerId: string) {
+  const db = useDatabase();
+  const load = useCallback(() => loadLedgerStats(db, ledgerId), [db, ledgerId]);
   return useFocusedQuery(load);
 }
