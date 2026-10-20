@@ -2,6 +2,7 @@ import type {
   ExpenseRecord,
   LedgerKind,
   LedgerRecord,
+  LocatedExpenseRecord,
   MemberRecord,
   SettlementRecord,
 } from "./records";
@@ -66,6 +67,13 @@ export interface ExpenseRepository {
     ledgerId: string,
     options?: { readonly includeDeleted?: boolean },
   ): Promise<ExpenseRecord[]>;
+  /**
+   * 有座標、未刪除的消費，給地圖用；依消費時間由舊到新。
+   * 省略 ledgerId 時查所有帳本。
+   */
+  listWithLocation(options?: {
+    readonly ledgerId?: string;
+  }): Promise<LocatedExpenseRecord[]>;
 }
 
 export interface SettlementRepository {

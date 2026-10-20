@@ -1,5 +1,10 @@
 import { StoredDataError } from "./shared";
-import { makeExpenseRecord, setupLedger } from "./testRecords";
+import {
+  makeExpenseRecord,
+  makeLedgerRecord,
+  setupLedger,
+  T0,
+} from "./testRecords";
 
 describe("ExpenseRepository", () => {
   it("round-trips every field", async () => {
@@ -173,6 +178,95 @@ describe("ExpenseRepository", () => {
       await expect(insert("bot-live", "2026-10-12", "{")).rejects.toThrow(
         /CHECK/,
       );
+    });
+  });
+
+  describe("listWithLocation", () => {
+    const shinjuku = { latitude: 35.6905, longitude: 139.7024 };
+    const kyoto = { latitude: 35.0116, longitude: 135.7681 };
+
+    /** ledger-1 之外再建一本 ledger-2（成員 x） */
+    async function setupTwoLedgers() {
+      const setup = await setupLedger();
+      await setup.repos.ledgers.insert(
+        makeLedgerRecord({ id: "ledger-2", name: "京都" }),
+      );
+      await setup.repos.members.insert({
+        id: "x",
+        ledgerId: "ledger-2",
+        name: "Xavier",
+        createdAt: T0,
+      });
+      return setup;
+    }
+
+    it("returns only undeleted expenses that have a location", async () => {
+      const { repos } = await setupLedger();
+      await repos.expenses.insert(
+        makeExpenseRecord({ id: "located", location: shinjuku }),
+      );
+      await repos.expenses.insert(
+        makeExpenseRecord({ id: "name-only", placeName: "朋友家" }),
+      );
+      await repos.expenses.insert(
+        makeExpenseRecord({
+          id: "deleted",
+          location: kyoto,
+          deletedAt: T0,
+        }),
+      );
+
+      const located = await repos.expenses.listWithLocation();
+
+      expect(located.map((e) => e.id)).toEqual(["located"]);
+      expect(located[0].location).toEqual(shinjuku);
+    });
+
+    it("lists every ledger by default, ordered by the actual instant", async () => {
+      const { repos } = await setupTwoLedgers();
+      await repos.expenses.insert(
+        makeExpenseRecord({
+          id: "taipei",
+          location: shinjuku,
+          occurredAt: "2026-10-12T09:30:00+08:00",
+        }),
+      );
+      await repos.expenses.insert(
+        makeExpenseRecord({
+          id: "tokyo",
+          ledgerId: "ledger-2",
+          payerId: "x",
+          split: { kind: "equal", participantIds: ["x"] },
+          location: kyoto,
+          occurredAt: "2026-10-12T10:00:00+09:00",
+        }),
+      );
+
+      expect(
+        (await repos.expenses.listWithLocation()).map((e) => e.id),
+      ).toEqual(["tokyo", "taipei"]);
+    });
+
+    it("filters by ledger when asked", async () => {
+      const { repos } = await setupTwoLedgers();
+      await repos.expenses.insert(
+        makeExpenseRecord({ id: "mine", location: shinjuku }),
+      );
+      await repos.expenses.insert(
+        makeExpenseRecord({
+          id: "other",
+          ledgerId: "ledger-2",
+          payerId: "x",
+          split: { kind: "equal", participantIds: ["x"] },
+          location: kyoto,
+        }),
+      );
+
+      expect(
+        (await repos.expenses.listWithLocation({ ledgerId: "ledger-2" })).map(
+          (e) => e.id,
+        ),
+      ).toEqual(["other"]);
     });
   });
 });

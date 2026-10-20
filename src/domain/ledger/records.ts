@@ -85,6 +85,17 @@ export interface ExpenseRecord {
   readonly deletedAt: string | null;
 }
 
+/** 有座標、可以放上地圖的消費 */
+export type LocatedExpenseRecord = ExpenseRecord & {
+  readonly location: GeoPoint;
+};
+
+export function hasLocation(
+  expense: ExpenseRecord,
+): expense is LocatedExpenseRecord {
+  return expense.location !== null;
+}
+
 export interface SettlementRecord {
   readonly id: string;
   readonly ledgerId: string;

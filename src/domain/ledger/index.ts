@@ -20,11 +20,13 @@ export type {
   GeoPoint,
   LedgerKind,
   LedgerRecord,
+  LocatedExpenseRecord,
   MemberRecord,
   SettlementRecord,
 } from "./records";
 export {
   expenseMemberIds,
+  hasLocation,
   toExpense,
   toLedger,
   toSettlement,
