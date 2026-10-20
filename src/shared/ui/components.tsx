@@ -85,7 +85,8 @@ export function Button({
   title: string;
   onPress: () => void;
   disabled?: boolean;
-  variant?: "primary" | "secondary";
+  /** danger：刪除這類無法輕易復原的操作 */
+  variant?: "primary" | "secondary" | "danger";
 }) {
   const theme = useTheme();
   const primary = variant === "primary";
@@ -105,7 +106,13 @@ export function Button({
       <Text
         style={[
           styles.buttonText,
-          { color: primary ? theme.onPrimary : theme.text },
+          {
+            color: primary
+              ? theme.onPrimary
+              : variant === "danger"
+                ? theme.negative
+                : theme.text,
+          },
         ]}
       >
         {title}
