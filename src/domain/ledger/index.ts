@@ -40,6 +40,12 @@ export { computeShares } from "./split";
 export { computeBalances } from "./balance";
 export { simplifyDebts } from "./simplify";
 export { findExpenseStatuses, type ExpenseStatus } from "./expenseStatus";
+export {
+  computeLedgerStats,
+  type CategoryTotal,
+  type LedgerStats,
+  type MemberSpending,
+} from "./stats";
 export { validateSettlement } from "./settlement";
 export {
   convertToBase,
@@ -48,3 +54,13 @@ export {
   SUPPORTED_CURRENCIES,
 } from "./currency";
 export { formatMinorAmount, parseAmountInput, toAmountInput } from "./amount";
+export {
+  parseShareInputs,
+  remainingToAllocate,
+  type ShareInput,
+} from "./exactSplitInput";
+export {
+  EXPENSE_CATEGORIES,
+  isExpenseCategory,
+  type ExpenseCategory,
+} from "./categories";

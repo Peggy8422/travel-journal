@@ -17,6 +17,11 @@ export type LedgerError =
       readonly currency: string;
       readonly decimals: number;
     }
+  | {
+      readonly code: "INVALID_SHARE_INPUT";
+      readonly memberId: MemberId;
+      readonly cause: LedgerError;
+    }
   | { readonly code: "UNKNOWN_MEMBER"; readonly memberId: MemberId }
   | { readonly code: "ARCHIVED_MEMBER"; readonly memberId: MemberId }
   | { readonly code: "NO_PARTICIPANTS" }
