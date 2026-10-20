@@ -17,6 +17,7 @@ src/app/  →  src/features/  →  src/domain/
 ## 畫面
 
 - 介面文字一律繁體中文，錯誤代碼轉成訊息集中在 `features/ledger/components/messages.ts`，新增錯誤代碼時要一起補。
+- 消費分類：代碼在 `domain/ledger/categories.ts`（存進資料庫的是代碼，只能新增不能改名或刪除），中文名稱在 `features/ledger/components/categories.ts`；清單以外的舊分類文字會原樣顯示。
 - 共用 UI 元件與主題色在 `src/shared/ui/`（只用 React Native 內建元件，不用 `@expo/ui`）。
 - 畫面讀資料用 `useFocusedQuery`（`src/shared/hooks/`），每次回到畫面都會重新讀取，寫入後不用另外通知其他畫面。
 - 新增路由後，`tsc` 會因為 typed routes 型別過期而報錯，要先跑一次 `npx expo start` 重新產生 `.expo/types/router.d.ts`。
