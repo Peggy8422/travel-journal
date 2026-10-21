@@ -5,7 +5,6 @@ import { Alert, Pressable, Share, View } from "react-native";
 import {
   formatMinorAmount,
   type SettlementRecord,
-  type ExpenseStatus,
   type Transfer,
 } from "../../../domain/ledger";
 import {
@@ -30,7 +29,7 @@ import {
   toLocalIsoString,
 } from "../services/localTimestamp";
 import { buildSettlementShareText } from "../services/settlementShareText";
-import { categoryLabel } from "./categories";
+import { ExpenseList } from "./ExpenseList";
 import { describeError } from "./messages";
 
 export function LedgerDetailScreen({ ledgerId }: { ledgerId: string }) {
@@ -280,63 +279,7 @@ export function LedgerDetailScreen({ ledgerId }: { ledgerId: string }) {
         </Section>
       )}
 
-      <Section title="消費（點一下可編輯或刪除）">
-        {summary.expenses.length === 0 && <Label muted>還沒有消費</Label>}
-        {[...summary.expenses].reverse().map((expense) => (
-          <Pressable
-            key={expense.id}
-            accessibilityRole="button"
-            accessibilityHint="編輯或刪除這筆消費"
-            onPress={() =>
-              router.push({
-                pathname: "/ledger/[id]/expense/[expenseId]",
-                params: { id: ledgerId, expenseId: expense.id },
-              })
-            }
-            style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
-          >
-            <Row>
-              <View style={{ flex: 1 }}>
-                <Label>{expense.title}</Label>
-                <Label muted>
-                  {formatLocalDateTime(expense.occurredAt)} ·{" "}
-                  {nameOf(expense.payerId)} 付款
-                  {expense.category !== null &&
-                    ` · ${categoryLabel(expense.category)}`}
-                </Label>
-                {expense.note !== null && (
-                  <Label muted>備註：{expense.note}</Label>
-                )}
-              </View>
-              <View style={{ alignItems: "flex-end" }}>
-                <Label>
-                  {expense.currency}{" "}
-                  {formatMinorAmount(expense.amountMinor, expense.currency)}
-                </Label>
-                {expense.currency !== base && (
-                  <Label muted>
-                    ≈ {base}{" "}
-                    {formatMinorAmount(
-                      summary.expenseBaseAmounts.get(expense.id) ?? 0,
-                      base,
-                    )}
-                  </Label>
-                )}
-                <ExpenseStatusLabel
-                  status={summary.expenseStatuses.get(expense.id)}
-                />
-              </View>
-            </Row>
-          </Pressable>
-        ))}
-      </Section>
+      <ExpenseList ledgerId={ledgerId} summary={summary} />
     </Screen>
   );
-}
-
-function ExpenseStatusLabel({ status }: { status?: ExpenseStatus }) {
-  const theme = useTheme();
-  if (status === "settled") return <Label color={theme.positive}>已結清</Label>;
-  if (status === "offset") return <Label muted>已抵銷</Label>;
-  return null;
 }
