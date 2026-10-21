@@ -4,6 +4,7 @@ import { Alert, Pressable, View } from "react-native";
 
 import {
   formatMinorAmount,
+  type SettlementRecord,
   type ExpenseStatus,
   type Transfer,
 } from "../../../domain/ledger";
@@ -19,7 +20,11 @@ import {
 import { useTheme } from "../../../shared/ui/theme";
 import { useLedgerCommandDeps } from "../../database/DatabaseProvider";
 import { useLedgerSummary } from "../hooks/useLedgerQueries";
-import { addSettlement, settleAll } from "../services/ledgerCommands";
+import {
+  addSettlement,
+  deleteSettlement,
+  settleAll,
+} from "../services/ledgerCommands";
 import {
   formatLocalDateTime,
   toLocalIsoString,
@@ -81,6 +86,33 @@ export function LedgerDetailScreen({ ledgerId }: { ledgerId: string }) {
         { text: "記錄", onPress: recordAll },
       ],
     );
+  }
+
+  function confirmDeleteSettlement(settlement: SettlementRecord) {
+    const amount = `${base} ${formatMinorAmount(settlement.amountMinor, base)}`;
+    Alert.alert(
+      "刪除還款",
+      `確定要刪除「${nameOf(settlement.fromId)} → ${nameOf(settlement.toId)} ${amount}」這筆還款嗎？\n刪除後會重新計算結餘與還款建議，因這筆還款而「已結清」的消費可能會變回未結清。`,
+      [
+        { text: "取消", style: "cancel" },
+        {
+          text: "刪除",
+          style: "destructive",
+          onPress: () => removeSettlement(settlement.id),
+        },
+      ],
+    );
+  }
+
+  async function removeSettlement(settlementId: string) {
+    setActionError(null);
+    try {
+      const result = await deleteSettlement(deps, settlementId);
+      if (!result.ok) setActionError(describeError(result.error));
+      reload();
+    } catch {
+      setActionError("刪除失敗，請再試一次");
+    }
   }
 
   async function recordAll() {
@@ -196,19 +228,29 @@ export function LedgerDetailScreen({ ledgerId }: { ledgerId: string }) {
       </Section>
 
       {summary.settlements.length > 0 && (
-        <Section title="還款紀錄">
+        <Section title="還款紀錄（點一下可刪除）">
           {[...summary.settlements].reverse().map((settlement) => (
-            <Row key={settlement.id}>
-              <View style={{ flex: 1 }}>
+            <Pressable
+              key={settlement.id}
+              accessibilityRole="button"
+              accessibilityHint="刪除這筆還款"
+              onPress={() => confirmDeleteSettlement(settlement)}
+              style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+            >
+              <Row>
+                <View style={{ flex: 1 }}>
+                  <Label>
+                    {nameOf(settlement.fromId)} → {nameOf(settlement.toId)}
+                  </Label>
+                  <Label muted>
+                    {formatLocalDateTime(settlement.settledAt)}
+                  </Label>
+                </View>
                 <Label>
-                  {nameOf(settlement.fromId)} → {nameOf(settlement.toId)}
+                  {base} {formatMinorAmount(settlement.amountMinor, base)}
                 </Label>
-                <Label muted>{formatLocalDateTime(settlement.settledAt)}</Label>
-              </View>
-              <Label>
-                {base} {formatMinorAmount(settlement.amountMinor, base)}
-              </Label>
-            </Row>
+              </Row>
+            </Pressable>
           ))}
         </Section>
       )}

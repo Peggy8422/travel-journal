@@ -314,6 +314,35 @@ describe("settlements", () => {
     ).toBe("LEDGER_NOT_FOUND");
   });
 
+  it("restores the debt and the expense status when a settlement is deleted", async () => {
+    const { db, deps, ledgerId, a, b } = await setup();
+    let clock = NOW.getTime();
+    const ticking = { ...deps, now: () => new Date((clock += 60_000)) };
+    const expense = unwrap(
+      await addExpense(ticking, ledgerId, ramen(a, [a, b])),
+    );
+    const settlement = unwrap(
+      await addSettlement(ticking, ledgerId, {
+        fromId: b,
+        toId: a,
+        amountMinor: 300,
+        settledAt: "2026-10-12T20:00:00+09:00",
+      }),
+    );
+    const settled = unwrap(await loadLedgerSummary(db, ledgerId));
+    expect(settled.transfers).toEqual([]);
+    expect(settled.expenseStatuses.get(expense.id)).toBe("settled");
+
+    unwrap(await deleteSettlement(ticking, settlement.id));
+
+    const reopened = unwrap(await loadLedgerSummary(db, ledgerId));
+    expect(reopened.settlements).toEqual([]);
+    expect(reopened.transfers).toEqual([
+      { fromId: b, toId: a, amountMinor: 300 },
+    ]);
+    expect(reopened.expenseStatuses.has(expense.id)).toBe(false);
+  });
+
   it("soft-deletes a settlement once", async () => {
     const { deps, ledgerId, a, b } = await setup();
     const s = unwrap(
