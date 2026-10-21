@@ -64,3 +64,4 @@ export {
   isExpenseCategory,
   type ExpenseCategory,
 } from "./categories";
+export type { LedgerBackup } from "./backup";
