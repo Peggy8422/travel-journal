@@ -1,6 +1,6 @@
 import { router, Stack } from "expo-router";
 import { useState } from "react";
-import { Alert, Pressable, View } from "react-native";
+import { Alert, Pressable, Share, View } from "react-native";
 
 import {
   formatMinorAmount,
@@ -29,6 +29,7 @@ import {
   formatLocalDateTime,
   toLocalIsoString,
 } from "../services/localTimestamp";
+import { buildSettlementShareText } from "../services/settlementShareText";
 import { categoryLabel } from "./categories";
 import { describeError } from "./messages";
 
@@ -112,6 +113,23 @@ export function LedgerDetailScreen({ ledgerId }: { ledgerId: string }) {
       reload();
     } catch {
       setActionError("刪除失敗，請再試一次");
+    }
+  }
+
+  async function shareSettlement() {
+    setActionError(null);
+    const text = buildSettlementShareText(summary, new Date());
+    if (!text.ok) {
+      setActionError(describeError(text.error));
+      return;
+    }
+    try {
+      await Share.share({
+        title: `${summary.ledger.name} 結算`,
+        message: text.value,
+      });
+    } catch {
+      setActionError("分享失敗，請再試一次");
     }
   }
 
@@ -225,6 +243,13 @@ export function LedgerDetailScreen({ ledgerId }: { ledgerId: string }) {
             />
           </Row>
         ))}
+        {summary.expenses.length > 0 && (
+          <Button
+            title="分享結算結果"
+            variant="secondary"
+            onPress={shareSettlement}
+          />
+        )}
       </Section>
 
       {summary.settlements.length > 0 && (
