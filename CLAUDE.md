@@ -41,6 +41,8 @@ src/app/  →  src/features/  →  src/domain/
 - id 與時間戳記由呼叫端（features）產生後傳入，repository 不自行產生。
 - migration 只能新增，不可修改已發佈的；版本記在 `PRAGMA user_version`。
 - 分攤規則存在 `expenses.split` JSON 欄位，裡面的成員 ID 沒有外鍵保護；查「成員是否被引用」要用 `json_each`（見 `memberRepository.isReferenced`）。
+- 帳本有兩種 `kind`：`shared`（分帳）與 `personal`（個人分頁新增的消費，整個 App 只有一本、只有「我」一位成員，由部分唯一索引保證）。`ledgers.list()` 不帶參數會包含個人帳本（備份要用），畫面上的帳本列表要用 `list({ kind: "shared" })`。個人消費的付款人與分攤固定是「我」，只能透過 `personalCommands` 修改。
+- 成員的 `isSelf` 標記「我」（每本帳本最多一位），個人分頁用它算出我在各分帳帳本負擔的金額；沒有標記的帳本不算進個人花費。
 - 備份檔格式在 `data/backup/backupFile.ts`。`*Record` 新增或修改欄位（通常伴隨 migration）時，要同步更新它的解析，必要時提高 `BACKUP_VERSION`，並確認舊版備份仍能還原；備份還原會保留原本的 id，同一份備份重複還原會被略過。
 - `occurred_at_ms`、`settled_at_ms` 是排序用欄位，由 repository 從帶時區的時間字串算出，不要直接用 `occurred_at` 文字排序（不同時區的字串順序不等於時間順序）。
 
