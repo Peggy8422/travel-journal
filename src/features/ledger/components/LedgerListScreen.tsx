@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { Pressable } from "react-native";
+import { Pressable, View } from "react-native";
 
 import {
   Button,
@@ -35,7 +35,10 @@ export function LedgerListScreen() {
               }
             >
               <Row>
-                <Label>{ledger.name}</Label>
+                {/* 名稱太長時換行，不把日期擠出畫面 */}
+                <View style={{ flex: 1 }}>
+                  <Label>{ledger.name}</Label>
+                </View>
                 <Label muted>{ledger.createdAt.slice(0, 10)}</Label>
               </Row>
             </Pressable>

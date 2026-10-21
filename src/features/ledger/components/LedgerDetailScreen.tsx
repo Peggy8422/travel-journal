@@ -152,10 +152,12 @@ export function LedgerDetailScreen({ ledgerId }: { ledgerId: string }) {
                 : theme.textMuted;
           return (
             <Row key={member.id}>
-              <Label>
-                {member.name}
-                {member.archivedAt && "（已封存）"}
-              </Label>
+              <View style={{ flex: 1 }}>
+                <Label>
+                  {member.name}
+                  {member.archivedAt && "（已封存）"}
+                </Label>
+              </View>
               <Label color={color}>
                 {balance > 0 ? "+" : ""}
                 {formatMinorAmount(balance, base)}

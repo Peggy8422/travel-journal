@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useState, type ReactNode } from "react";
-import { Alert, ScrollView } from "react-native";
+import { Alert, ScrollView, View } from "react-native";
 
 import {
   EXPENSE_CATEGORIES,
@@ -329,7 +329,9 @@ export function ExpenseForm({
           <>
             {members.map((m) => (
               <Row key={m.id}>
-                <Label>{memberLabel(m)}</Label>
+                <View style={{ flex: 1 }}>
+                  <Label>{memberLabel(m)}</Label>
+                </View>
                 <TextField
                   placeholder="不分攤"
                   keyboardType="decimal-pad"

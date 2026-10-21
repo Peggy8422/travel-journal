@@ -120,7 +120,9 @@ export function LedgerStatsScreen({ ledgerId }: { ledgerId: string }) {
             <Row>
               <View style={styles.legendName}>
                 <View style={[styles.swatch, { backgroundColor: c.color }]} />
-                <Label>{c.label}</Label>
+                <View style={{ flex: 1 }}>
+                  <Label>{c.label}</Label>
+                </View>
               </View>
               <Label>
                 {money(c.totalMinor)}
@@ -140,6 +142,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   legendName: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,

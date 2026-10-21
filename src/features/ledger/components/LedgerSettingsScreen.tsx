@@ -186,7 +186,9 @@ export function LedgerSettingsScreen({ ledgerId }: { ledgerId: string }) {
               }}
             >
               <Row>
-                <Label>{member.name}</Label>
+                <View style={{ flex: 1 }}>
+                  <Label>{member.name}</Label>
+                </View>
                 {member.archivedAt && <Label muted>已封存</Label>}
               </Row>
             </Pressable>
