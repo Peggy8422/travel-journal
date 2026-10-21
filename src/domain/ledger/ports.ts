@@ -1,5 +1,6 @@
 import type {
   ExpenseRecord,
+  LedgerKind,
   LedgerRecord,
   MemberRecord,
   SettlementRecord,
@@ -21,13 +22,18 @@ export interface LedgerRepository {
   /** 只更新 name 與 updatedAt */
   update(ledger: LedgerRecord): Promise<void>;
   findById(id: string): Promise<LedgerRecord | undefined>;
-  /** 依建立時間由新到舊 */
-  list(): Promise<LedgerRecord[]>;
+  /** 依建立時間由新到舊；指定 kind 時只列出該種帳本 */
+  list(options?: { readonly kind?: LedgerKind }): Promise<LedgerRecord[]>;
+  /** 個人帳本（整個 App 最多一本），還沒建立時為 undefined */
+  findPersonal(): Promise<LedgerRecord | undefined>;
   /** 永久刪除帳本，連同成員、消費、結算 */
   delete(id: string): Promise<void>;
 }
 
-export type NewMember = Omit<MemberRecord, "sortOrder" | "archivedAt">;
+export type NewMember = Omit<
+  MemberRecord,
+  "sortOrder" | "archivedAt" | "isSelf"
+>;
 
 export interface MemberRepository {
   /** 加到帳本最後面，回傳含 sortOrder 的完整紀錄 */
@@ -35,6 +41,8 @@ export interface MemberRepository {
   rename(id: MemberId, name: string): Promise<void>;
   /** archivedAt 傳 null 代表取消封存 */
   setArchived(id: MemberId, archivedAt: string | null): Promise<void>;
+  /** 指定帳本裡的「我」，memberId 為 null 代表取消；會先清掉同帳本原本的「我」 */
+  setSelf(ledgerId: string, memberId: MemberId | null): Promise<void>;
   findById(id: MemberId): Promise<MemberRecord | undefined>;
   /** 依加入順序排列，包含已封存的成員 */
   listByLedger(ledgerId: string): Promise<MemberRecord[]>;

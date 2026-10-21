@@ -18,6 +18,7 @@ export type {
   ExpenseRecord,
   FxRateSource,
   GeoPoint,
+  LedgerKind,
   LedgerRecord,
   MemberRecord,
   SettlementRecord,

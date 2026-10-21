@@ -126,6 +126,7 @@ describe("ExpenseRepository", () => {
       const { repos } = await setupLedger();
       await repos.ledgers.insert({
         id: "ledger-2",
+        kind: "shared",
         name: "首爾",
         baseCurrency: "TWD",
         createdAt: "2026-10-01T00:00:00Z",

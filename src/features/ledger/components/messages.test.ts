@@ -47,6 +47,7 @@ describe("describeError", () => {
 describe("describeRestoreReport", () => {
   const ledger = (name: string) => ({
     id: name,
+    kind: "shared" as const,
     name,
     baseCurrency: "TWD",
     createdAt: "",

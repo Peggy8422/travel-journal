@@ -18,7 +18,13 @@ import { decodeSplitRule } from "../db/splitRuleJson";
  */
 
 export const BACKUP_FORMAT = "travel-journal-backup";
-export const BACKUP_VERSION = 1;
+/**
+ * 目前寫出的版本。
+ * 2：帳本加上 kind（分帳／個人）、成員加上 isSelf。讀取 1 版時這兩個欄位用預設值。
+ */
+export const BACKUP_VERSION = 2;
+/** 可以讀取的版本 */
+const READABLE_VERSIONS: readonly unknown[] = [1, 2];
 
 export interface BackupContents {
   /** 匯出時間，ISO 8601 UTC */
@@ -55,7 +61,7 @@ export function parseBackup(
   if (!isObject(value) || value.format !== BACKUP_FORMAT) {
     return invalid("not a travel journal backup");
   }
-  if (value.version !== BACKUP_VERSION) {
+  if (!READABLE_VERSIONS.includes(value.version)) {
     return err({ code: "UNSUPPORTED_BACKUP_VERSION", version: value.version });
   }
   if (typeof value.exportedAt !== "string")
@@ -122,8 +128,14 @@ function parseLedger(value: unknown): Parsed<LedgerRecord> {
     updatedAt: isString,
   });
   if (missing) return err(missing);
+  // 1 版沒有 kind，當時只有分帳帳本
+  const kind = value.kind ?? "shared";
+  if (kind !== "shared" && kind !== "personal") {
+    return err(`unknown kind: ${String(kind)}`);
+  }
   return ok({
     id: value.id as string,
+    kind,
     name: value.name as string,
     baseCurrency: value.baseCurrency as string,
     createdAt: value.createdAt as string,
@@ -142,12 +154,16 @@ function parseMember(value: unknown): Parsed<MemberRecord> {
     createdAt: isString,
   });
   if (missing) return err(missing);
+  // 1 版沒有 isSelf
+  const isSelf = value.isSelf ?? false;
+  if (typeof isSelf !== "boolean") return err("invalid isSelf");
   return ok({
     id: value.id as string,
     ledgerId: value.ledgerId as string,
     name: value.name as string,
     sortOrder: value.sortOrder as number,
     archivedAt: value.archivedAt as string | null,
+    isSelf,
     createdAt: value.createdAt as string,
   });
 }

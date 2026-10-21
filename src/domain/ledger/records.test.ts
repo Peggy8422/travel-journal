@@ -14,6 +14,7 @@ const member = (id: string, sortOrder: number): MemberRecord => ({
   name: id,
   sortOrder,
   archivedAt: sortOrder === 1 ? T0 : null,
+  isSelf: false,
   createdAt: T0,
 });
 
@@ -41,6 +42,7 @@ describe("toLedger", () => {
     const ledger = toLedger(
       {
         id: "l1",
+        kind: "shared",
         name: "東京",
         baseCurrency: "TWD",
         createdAt: T0,

@@ -63,10 +63,17 @@ export type SettlementInput = Pick<
   "fromId" | "toId" | "amountMinor" | "settledAt"
 >;
 
-/** 建立帳本與初始成員（依傳入順序加入），在同一個 transaction 完成 */
+/**
+ * 建立帳本與初始成員（依傳入順序加入），在同一個 transaction 完成。
+ * selfIndex 指定哪一位成員是「我」（memberNames 的索引），省略代表之後再指定。
+ */
 export async function createLedger(
   deps: LedgerCommandDeps,
-  input: { readonly name: string; readonly memberNames: readonly string[] },
+  input: {
+    readonly name: string;
+    readonly memberNames: readonly string[];
+    readonly selfIndex?: number;
+  },
 ): CommandResult<{ ledger: LedgerRecord; members: MemberRecord[] }> {
   const name = input.name.trim();
   if (name === "") return err({ code: "EMPTY_NAME" });
@@ -77,6 +84,7 @@ export async function createLedger(
   const timestamp = deps.now().toISOString();
   const ledger: LedgerRecord = {
     id: deps.newId(),
+    kind: "shared",
     name,
     baseCurrency: BASE_CURRENCY,
     createdAt: timestamp,
@@ -95,6 +103,12 @@ export async function createLedger(
           createdAt: timestamp,
         }),
       );
+    }
+    const self =
+      input.selfIndex === undefined ? undefined : inserted[input.selfIndex];
+    if (self) {
+      await repos.members.setSelf(ledger.id, self.id);
+      inserted[input.selfIndex!] = { ...self, isSelf: true };
     }
     return inserted;
   });

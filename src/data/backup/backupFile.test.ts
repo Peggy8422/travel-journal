@@ -17,6 +17,7 @@ const entry: LedgerBackup = {
       name: "Alice",
       sortOrder: 0,
       archivedAt: null,
+      isSelf: false,
       createdAt: T0,
     },
     {
@@ -25,6 +26,7 @@ const entry: LedgerBackup = {
       name: "Bob",
       sortOrder: 1,
       archivedAt: "2026-10-05T00:00:00.000Z",
+      isSelf: false,
       createdAt: T0,
     },
   ],
@@ -116,5 +118,18 @@ describe("backup file", () => {
     const error = unwrapErr(parseBackup(corrupted(mutate)));
     expect(error.code).toBe("INVALID_BACKUP");
     expect(error).toMatchObject({ reason: expect.stringContaining(where) });
+  });
+});
+
+describe("backup file version 1", () => {
+  it("still reads, treating ledgers as shared and members as not-self", () => {
+    const raw = JSON.parse(serializeBackup(contents));
+    raw.version = 1;
+    delete raw.ledgers[0].ledger.kind;
+    for (const member of raw.ledgers[0].members) delete member.isSelf;
+
+    const parsed = unwrap(parseBackup(JSON.stringify(raw)));
+    expect(parsed.ledgers[0]?.ledger.kind).toBe("shared");
+    expect(parsed.ledgers[0]?.members.every((m) => !m.isSelf)).toBe(true);
   });
 });

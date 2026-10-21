@@ -7,6 +7,7 @@ interface MemberRow {
   name: string;
   sort_order: number;
   archived_at: string | null;
+  is_self: number;
   created_at: string;
 }
 
@@ -43,6 +44,22 @@ export function createMemberRepository(db: SqlExecutor): MemberRepository {
         archivedAt,
         id,
       ]);
+    },
+
+    async setSelf(ledgerId, memberId) {
+      // 先清掉再設定，部分唯一索引保證同帳本最多一位「我」
+      await db.runAsync(
+        "UPDATE members SET is_self = 0 WHERE ledger_id = ? AND is_self = 1",
+        [ledgerId],
+      );
+      if (memberId === null) return;
+      const { changes } = await db.runAsync(
+        "UPDATE members SET is_self = 1 WHERE id = ? AND ledger_id = ?",
+        [memberId, ledgerId],
+      );
+      if (changes === 0) {
+        throw new Error(`Member ${memberId} is not in ledger ${ledgerId}`);
+      }
     },
 
     async findById(id) {
@@ -94,6 +111,7 @@ function toRecord(row: MemberRow): MemberRecord {
     name: row.name,
     sortOrder: row.sort_order,
     archivedAt: row.archived_at,
+    isSelf: row.is_self === 1,
     createdAt: row.created_at,
   };
 }

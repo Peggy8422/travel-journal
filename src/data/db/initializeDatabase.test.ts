@@ -82,3 +82,25 @@ describe("initializeDatabase", () => {
     ).rejects.toThrow(/contiguous/);
   });
 });
+
+describe("migration 002 (personal ledger)", () => {
+  it("defaults existing ledgers to shared and members to not-self", async () => {
+    const db = openInMemoryDatabase();
+    await initializeDatabase(db, MIGRATIONS.slice(0, 1));
+    await db.execAsync(`
+      INSERT INTO ledgers (id, name, base_currency, created_at, updated_at)
+        VALUES ('l1', '舊帳本', 'TWD', 't', 't');
+      INSERT INTO members (id, ledger_id, name, sort_order, created_at)
+        VALUES ('m1', 'l1', 'Alice', 0, 't');
+    `);
+
+    await initializeDatabase(db);
+
+    expect(
+      await db.getFirstAsync("SELECT kind FROM ledgers WHERE id = 'l1'"),
+    ).toEqual({ kind: "shared" });
+    expect(
+      await db.getFirstAsync("SELECT is_self FROM members WHERE id = 'm1'"),
+    ).toEqual({ is_self: 0 });
+  });
+});

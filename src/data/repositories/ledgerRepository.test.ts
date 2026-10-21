@@ -43,3 +43,33 @@ describe("LedgerRepository", () => {
     }
   });
 });
+
+describe("LedgerRepository — kinds", () => {
+  it("lists only the requested kind and finds the personal ledger", async () => {
+    const { repos } = await setupLedger();
+    await repos.ledgers.insert(
+      makeLedgerRecord({ id: "personal", kind: "personal", name: "個人" }),
+    );
+
+    expect((await repos.ledgers.list()).map((l) => l.id)).toHaveLength(2);
+    expect(
+      (await repos.ledgers.list({ kind: "shared" })).map((l) => l.id),
+    ).toEqual(["ledger-1"]);
+    expect((await repos.ledgers.findPersonal())?.id).toBe("personal");
+  });
+
+  it("allows only one personal ledger", async () => {
+    const { repos } = await setupLedger();
+    await repos.ledgers.insert(
+      makeLedgerRecord({ id: "p1", kind: "personal" }),
+    );
+    await expect(
+      repos.ledgers.insert(makeLedgerRecord({ id: "p2", kind: "personal" })),
+    ).rejects.toThrow(/UNIQUE/);
+  });
+
+  it("has no personal ledger until one is created", async () => {
+    const { repos } = await setupLedger();
+    expect(await repos.ledgers.findPersonal()).toBeUndefined();
+  });
+});

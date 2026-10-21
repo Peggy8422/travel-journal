@@ -17,8 +17,15 @@ import type {
  * 時間戳記（createdAt 等）一律是 ISO 8601 UTC 字串。
  */
 
+/**
+ * shared：和他人分帳的帳本，出現在帳本列表。
+ * personal：「個人」分頁新增的個人消費存放處，整個 App 只有一本、只有「我」一位成員，不出現在帳本列表。
+ */
+export type LedgerKind = "shared" | "personal";
+
 export interface LedgerRecord {
   readonly id: string;
+  readonly kind: LedgerKind;
   readonly name: string;
   readonly baseCurrency: CurrencyCode;
   readonly createdAt: string;
@@ -33,6 +40,8 @@ export interface MemberRecord {
   readonly sortOrder: number;
   /** 封存的成員不能再被選為新消費的參與者，但舊資料仍會參與計算 */
   readonly archivedAt: string | null;
+  /** 這位成員是不是使用者本人；每本帳本最多一位，用來計算個人分頁的花費 */
+  readonly isSelf: boolean;
   readonly createdAt: string;
 }
 

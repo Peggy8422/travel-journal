@@ -14,6 +14,7 @@ export function makeLedgerRecord(
 ): LedgerRecord {
   return {
     id: "ledger-1",
+    kind: "shared",
     name: "東京五日遊",
     baseCurrency: "TWD",
     createdAt: T0,

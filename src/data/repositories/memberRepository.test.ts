@@ -10,6 +10,7 @@ describe("MemberRepository", () => {
     const { repos } = await setupLedger();
     await repos.ledgers.insert({
       id: "ledger-2",
+      kind: "shared",
       name: "首爾",
       baseCurrency: "TWD",
       createdAt: T0,
@@ -35,6 +36,7 @@ describe("MemberRepository", () => {
       name: "Dave",
       sortOrder: 3,
       archivedAt: null,
+      isSelf: false,
       createdAt: T0,
     });
     expect(
@@ -50,6 +52,7 @@ describe("MemberRepository", () => {
     expect(b).toMatchObject({
       name: "Bobby",
       archivedAt: "2026-10-03T00:00:00.000Z",
+      isSelf: false,
     });
 
     await repos.members.setArchived("b", null);
@@ -159,5 +162,31 @@ describe("MemberRepository", () => {
       );
       expect(await repos.members.isReferenced("c")).toBe(true);
     });
+  });
+});
+
+describe("MemberRepository.setSelf", () => {
+  const selfIds = async (
+    repos: Awaited<ReturnType<typeof setupLedger>>["repos"],
+  ) =>
+    (await repos.members.listByLedger("ledger-1"))
+      .filter((m) => m.isSelf)
+      .map((m) => m.id);
+
+  it("marks one member as self and moves the mark when changed", async () => {
+    const { repos } = await setupLedger();
+    await repos.members.setSelf("ledger-1", "a");
+    expect(await selfIds(repos)).toEqual(["a"]);
+    await repos.members.setSelf("ledger-1", "c");
+    expect(await selfIds(repos)).toEqual(["c"]);
+    await repos.members.setSelf("ledger-1", null);
+    expect(await selfIds(repos)).toEqual([]);
+  });
+
+  it("refuses a member from another ledger", async () => {
+    const { repos } = await setupLedger();
+    await expect(repos.members.setSelf("ledger-1", "stranger")).rejects.toThrow(
+      /not in ledger/,
+    );
   });
 });
