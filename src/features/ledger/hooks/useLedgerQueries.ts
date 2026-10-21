@@ -1,14 +1,14 @@
 import { useCallback } from "react";
 
-import { createRepositories } from "../../../data/repositories";
 import { useFocusedQuery } from "../../../shared/hooks/useFocusedQuery";
 import { useDatabase } from "../../database/DatabaseProvider";
+import { loadLedgerOverviews } from "../services/ledgerOverview";
 import { loadLedgerStats, loadLedgerSummary } from "../services/ledgerSummary";
 
-/** 所有帳本，依建立時間由新到舊；畫面取得焦點時重新讀取 */
+/** 所有帳本與摘要，依建立時間由新到舊；畫面取得焦點時重新讀取 */
 export function useLedgerList() {
   const db = useDatabase();
-  const load = useCallback(() => createRepositories(db).ledgers.list(), [db]);
+  const load = useCallback(() => loadLedgerOverviews(db), [db]);
   return useFocusedQuery(load);
 }
 
