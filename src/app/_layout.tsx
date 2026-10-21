@@ -13,6 +13,18 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="ledger/new" options={{ title: "建立帳本" }} />
           <Stack.Screen name="backup" options={{ title: "備份與還原" }} />
+          <Stack.Screen
+            name="personal/spending"
+            options={{ title: "個人記帳" }}
+          />
+          <Stack.Screen
+            name="personal/add-expense"
+            options={{ title: "新增個人消費", presentation: "modal" }}
+          />
+          <Stack.Screen
+            name="personal/expense/[expenseId]"
+            options={{ title: "編輯個人消費", presentation: "modal" }}
+          />
           <Stack.Screen name="ledger/[id]/index" options={{ title: "帳本" }} />
           <Stack.Screen
             name="ledger/[id]/settings"

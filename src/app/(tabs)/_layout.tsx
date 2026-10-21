@@ -5,6 +5,7 @@ export default function TabLayout() {
     <Tabs>
       <Tabs.Screen name="index" options={{ title: "地圖" }} />
       <Tabs.Screen name="ledgers" options={{ title: "帳本" }} />
+      <Tabs.Screen name="personal" options={{ title: "個人" }} />
     </Tabs>
   );
 }

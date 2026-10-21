@@ -76,6 +76,7 @@ export function ExpenseForm({
   notice,
   onSubmit,
   footer,
+  hidePeople = false,
 }: {
   baseCurrency: CurrencyCode;
   /** 可以選的成員，依加入順序 */
@@ -86,6 +87,8 @@ export function ExpenseForm({
   /** 儲存；成功回傳 null 並關閉畫面，失敗回傳要顯示的錯誤訊息 */
   onSubmit: (input: ExpenseInput) => Promise<string | null>;
   footer?: ReactNode;
+  /** 個人消費：付款人與分攤固定是「我」，不顯示這兩個區塊 */
+  hidePeople?: boolean;
 }) {
   const [openedAt] = useState(() => new Date());
   const [occurredAtDate, setOccurredAtDate] = useState(() =>
@@ -292,65 +295,69 @@ export function ExpenseForm({
         </Section>
       )}
 
-      <Section title="付款人">
-        <ChipGroup>
-          {members.map((m) => (
-            <Chip
-              key={m.id}
-              label={memberLabel(m)}
-              selected={m.id === payerId}
-              onPress={() => setPayerId(m.id)}
-            />
-          ))}
-        </ChipGroup>
-      </Section>
-
-      <Section title="分攤方式">
-        <ChipGroup>
-          <Chip
-            label="平均分攤"
-            selected={splitKind === "equal"}
-            onPress={() => setSplitKind("equal")}
-          />
-          <Chip
-            label="指定金額"
-            selected={splitKind === "exact"}
-            onPress={() => setSplitKind("exact")}
-          />
-        </ChipGroup>
-        {splitKind === "equal" ? (
-          <ChipGroup>
-            {members.map((m) => (
-              <Chip
-                key={m.id}
-                label={memberLabel(m)}
-                selected={participantIds.includes(m.id)}
-                onPress={() => toggleParticipant(m.id)}
-              />
-            ))}
-          </ChipGroup>
-        ) : (
-          <>
-            {members.map((m) => (
-              <Row key={m.id}>
-                <View style={{ flex: 1 }}>
-                  <Label>{memberLabel(m)}</Label>
-                </View>
-                <TextField
-                  placeholder="不分攤"
-                  keyboardType="decimal-pad"
-                  value={shareTexts[m.id] ?? ""}
-                  onChangeText={(text) =>
-                    setShareTexts((texts) => ({ ...texts, [m.id]: text }))
-                  }
-                  style={{ width: 120, textAlign: "right" }}
+      {!hidePeople && (
+        <>
+          <Section title="付款人">
+            <ChipGroup>
+              {members.map((m) => (
+                <Chip
+                  key={m.id}
+                  label={memberLabel(m)}
+                  selected={m.id === payerId}
+                  onPress={() => setPayerId(m.id)}
                 />
-              </Row>
-            ))}
-            <RemainingLabel remaining={remaining} currency={currency} />
-          </>
-        )}
-      </Section>
+              ))}
+            </ChipGroup>
+          </Section>
+
+          <Section title="分攤方式">
+            <ChipGroup>
+              <Chip
+                label="平均分攤"
+                selected={splitKind === "equal"}
+                onPress={() => setSplitKind("equal")}
+              />
+              <Chip
+                label="指定金額"
+                selected={splitKind === "exact"}
+                onPress={() => setSplitKind("exact")}
+              />
+            </ChipGroup>
+            {splitKind === "equal" ? (
+              <ChipGroup>
+                {members.map((m) => (
+                  <Chip
+                    key={m.id}
+                    label={memberLabel(m)}
+                    selected={participantIds.includes(m.id)}
+                    onPress={() => toggleParticipant(m.id)}
+                  />
+                ))}
+              </ChipGroup>
+            ) : (
+              <>
+                {members.map((m) => (
+                  <Row key={m.id}>
+                    <View style={{ flex: 1 }}>
+                      <Label>{memberLabel(m)}</Label>
+                    </View>
+                    <TextField
+                      placeholder="不分攤"
+                      keyboardType="decimal-pad"
+                      value={shareTexts[m.id] ?? ""}
+                      onChangeText={(text) =>
+                        setShareTexts((texts) => ({ ...texts, [m.id]: text }))
+                      }
+                      style={{ width: 120, textAlign: "right" }}
+                    />
+                  </Row>
+                ))}
+                <RemainingLabel remaining={remaining} currency={currency} />
+              </>
+            )}
+          </Section>
+        </>
+      )}
 
       <Section title="分類">
         <ChipGroup>

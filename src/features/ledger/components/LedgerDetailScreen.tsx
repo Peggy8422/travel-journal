@@ -204,6 +204,7 @@ export function LedgerDetailScreen({ ledgerId }: { ledgerId: string }) {
               <View style={{ flex: 1 }}>
                 <Label>
                   {member.name}
+                  {member.isSelf && "（我）"}
                   {member.archivedAt && "（已封存）"}
                 </Label>
               </View>

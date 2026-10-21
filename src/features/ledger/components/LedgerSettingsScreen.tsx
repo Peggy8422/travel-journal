@@ -25,6 +25,7 @@ import {
   archiveMember,
   removeMember,
   renameMember,
+  setSelfMember,
   unarchiveMember,
 } from "../services/memberCommands";
 import type { Result } from "../../../domain/common/result";
@@ -194,6 +195,15 @@ export function LedgerSettingsScreen({ ledgerId }: { ledgerId: string }) {
                 )
               }
               onRemove={() => confirmRemove(member)}
+              onToggleSelf={() =>
+                run(() =>
+                  setSelfMember(
+                    deps,
+                    ledgerId,
+                    member.isSelf ? null : member.id,
+                  ),
+                )
+              }
               onClose={() => setEditingId(null)}
             />
           ) : (
@@ -207,7 +217,10 @@ export function LedgerSettingsScreen({ ledgerId }: { ledgerId: string }) {
             >
               <Row>
                 <View style={{ flex: 1 }}>
-                  <Label>{member.name}</Label>
+                  <Label>
+                    {member.name}
+                    {member.isSelf && "（我）"}
+                  </Label>
                 </View>
                 {member.archivedAt && <Label muted>已封存</Label>}
               </Row>
@@ -264,6 +277,7 @@ function MemberEditor({
   onRename,
   onToggleArchive,
   onRemove,
+  onToggleSelf,
   onClose,
 }: {
   member: MemberRecord;
@@ -271,6 +285,7 @@ function MemberEditor({
   onRename: (name: string) => void;
   onToggleArchive: () => void;
   onRemove: () => void;
+  onToggleSelf: () => void;
   onClose: () => void;
 }) {
   const [name, setName] = useState(member.name);
@@ -287,6 +302,14 @@ function MemberEditor({
         </View>
         <Button title="完成" variant="secondary" onPress={onClose} />
       </Row>
+      <Button
+        title={
+          member.isSelf ? "取消設為我" : "這是我（負擔的金額會算進個人分頁）"
+        }
+        variant="secondary"
+        onPress={onToggleSelf}
+        disabled={busy}
+      />
       <Button
         title={member.archivedAt ? "取消封存" : "封存（不能再加進新消費）"}
         variant="secondary"
