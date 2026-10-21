@@ -38,6 +38,7 @@ import {
 import {
   buildSplitRule,
   chooseExpenseFx,
+  normalizeNote,
   previewRemaining,
   resolveOccurredAt,
 } from "../services/expenseFormLogic";
@@ -64,7 +65,8 @@ export interface ExpenseFormInitial {
   /** 編輯時傳入原本的匯率；幣別與時間都沒改就沿用，不重新查詢 */
   readonly fx?: ExpenseFx | null;
   /** 表單沒有提供編輯的欄位，原樣帶回 */
-  readonly extras: Pick<ExpenseInput, "note" | "placeName" | "location">;
+  readonly note: string | null;
+  readonly extras: Pick<ExpenseInput, "placeName" | "location">;
 }
 
 export function ExpenseForm({
@@ -102,6 +104,7 @@ export function ExpenseForm({
   const [currency, setCurrency] = useState(initial.currency);
   const [payerId, setPayerId] = useState(initial.payerId);
   const [category, setCategory] = useState(initial.category);
+  const [noteText, setNoteText] = useState(initial.note ?? "");
   const [splitKind, setSplitKind] = useState(initial.split.kind);
   // 兩種分攤方式各自保留輸入，切換時不會清掉另一邊
   const [participantIds, setParticipantIds] = useState<readonly MemberId[]>(
@@ -198,6 +201,7 @@ export function ExpenseForm({
         split: split.value,
         title: title.trim(),
         ...initial.extras,
+        note: normalizeNote(noteText),
         category,
         occurredAt,
       });
@@ -361,6 +365,15 @@ export function ExpenseForm({
           ))}
         </ChipGroup>
       </Section>
+
+      <TextField
+        label="備註"
+        placeholder="例如：誰沒吃甜點、收據放在誰那裡"
+        value={noteText}
+        onChangeText={setNoteText}
+        multiline
+        style={{ minHeight: 72, textAlignVertical: "top" }}
+      />
 
       {notice && <Label muted>{notice}</Label>}
       <ErrorText message={error} />

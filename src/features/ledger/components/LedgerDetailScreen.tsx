@@ -304,6 +304,9 @@ export function LedgerDetailScreen({ ledgerId }: { ledgerId: string }) {
                   {expense.category !== null &&
                     ` · ${categoryLabel(expense.category)}`}
                 </Label>
+                {expense.note !== null && (
+                  <Label muted>備註：{expense.note}</Label>
+                )}
               </View>
               <View style={{ alignItems: "flex-end" }}>
                 <Label>

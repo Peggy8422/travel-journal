@@ -55,6 +55,12 @@ export function resolveOccurredAt(
   return toLocalIsoString(picked, offsetMinutes);
 }
 
+/** 備註去掉前後空白；只有空白時存成 null，不存空字串 */
+export function normalizeNote(text: string): string | null {
+  const trimmed = text.trim();
+  return trimmed === "" ? null : trimmed;
+}
+
 /** 表單裡分攤方式的草稿：平均分攤記勾選的人，指定金額記每人輸入框的文字 */
 export type SplitDraft =
   | { readonly kind: "equal"; readonly participantIds: readonly MemberId[] }

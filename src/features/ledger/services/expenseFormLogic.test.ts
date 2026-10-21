@@ -2,6 +2,7 @@ import type { ExpenseFx } from "../../../domain/ledger";
 import {
   buildSplitRule,
   chooseExpenseFx,
+  normalizeNote,
   previewRemaining,
   resolveOccurredAt,
 } from "./expenseFormLogic";
@@ -170,5 +171,18 @@ describe("previewRemaining", () => {
   it("shows nothing until every amount is valid", () => {
     expect(previewRemaining("", { a: "100" }, order, "TWD")).toBeUndefined();
     expect(previewRemaining("300", { a: "1.5" }, order, "TWD")).toBeUndefined();
+  });
+});
+
+describe("normalizeNote", () => {
+  it("trims the text and keeps line breaks inside", () => {
+    expect(normalizeNote("  甜點 Bob 沒吃\n收據在 Alice 那  ")).toBe(
+      "甜點 Bob 沒吃\n收據在 Alice 那",
+    );
+  });
+
+  it("stores blank input as null", () => {
+    expect(normalizeNote("")).toBeNull();
+    expect(normalizeNote(" \n ")).toBeNull();
   });
 });

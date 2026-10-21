@@ -94,8 +94,8 @@ export function EditExpenseScreen({
         occurredAt: expense.occurredAt,
         recordedAt: new Date(expense.createdAt),
         fx: expense.fx,
+        note: expense.note,
         extras: {
-          note: expense.note,
           placeName: expense.placeName,
           location: expense.location,
         },
