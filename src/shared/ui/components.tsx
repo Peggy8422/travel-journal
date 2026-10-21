@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 import {
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,17 +13,30 @@ import {
 
 import { spacing, useTheme } from "./theme";
 
-/** 可捲動的畫面容器，鍵盤出現時點擊空白處不會吃掉按鈕的點擊 */
+/**
+ * 可捲動的畫面容器，鍵盤展開時不會蓋住正在輸入的欄位：
+ * - iOS：由 ScrollView 自動把內容區延伸到鍵盤上方，並把輸入中的欄位捲進畫面
+ * - Android：狀態列透明時系統的 resize 不可靠，改由 KeyboardAvoidingView 把畫面高度扣掉鍵盤，
+ *   再由 ScrollView 把輸入中的欄位捲進畫面。它依實際被遮住的高度計算，系統已縮小時不會重複扣
+ * 鍵盤展開時點擊空白處不會吃掉按鈕的點擊；往下拖動會收起鍵盤。
+ */
 export function Screen({ children }: { children: ReactNode }) {
   const theme = useTheme();
   return (
-    <ScrollView
-      style={{ backgroundColor: theme.background }}
-      contentContainerStyle={styles.screen}
-      keyboardShouldPersistTaps="handled"
+    <KeyboardAvoidingView
+      style={[styles.fill, { backgroundColor: theme.background }]}
+      behavior={Platform.OS === "android" ? "height" : undefined}
     >
-      {children}
-    </ScrollView>
+      <ScrollView
+        style={styles.fill}
+        contentContainerStyle={styles.screen}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
+        keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+      >
+        {children}
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -184,6 +199,9 @@ export function ErrorText({ message }: { message: string | null }) {
 }
 
 const styles = StyleSheet.create({
+  fill: {
+    flex: 1,
+  },
   screen: {
     padding: spacing.lg,
     gap: spacing.xl,
