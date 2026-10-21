@@ -41,6 +41,7 @@ src/app/  →  src/features/  →  src/domain/
 - id 與時間戳記由呼叫端（features）產生後傳入，repository 不自行產生。
 - migration 只能新增，不可修改已發佈的；版本記在 `PRAGMA user_version`。
 - 分攤規則存在 `expenses.split` JSON 欄位，裡面的成員 ID 沒有外鍵保護；查「成員是否被引用」要用 `json_each`（見 `memberRepository.isReferenced`）。
+- 備份檔格式在 `data/backup/backupFile.ts`。`*Record` 新增或修改欄位（通常伴隨 migration）時，要同步更新它的解析，必要時提高 `BACKUP_VERSION`，並確認舊版備份仍能還原；備份還原會保留原本的 id，同一份備份重複還原會被略過。
 - `occurred_at_ms`、`settled_at_ms` 是排序用欄位，由 repository 從帶時區的時間字串算出，不要直接用 `occurred_at` 文字排序（不同時區的字串順序不等於時間順序）。
 
 ## 臺銀匯率來源
