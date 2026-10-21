@@ -1,4 +1,8 @@
-import { describeAllocationGap, describeError } from "./messages";
+import {
+  describeAllocationGap,
+  describeError,
+  describeRestoreReport,
+} from "./messages";
 
 describe("describeAllocationGap", () => {
   it("returns nothing when fully allocated", () => {
@@ -37,5 +41,37 @@ describe("describeError", () => {
         cause: { code: "UNKNOWN_MEMBER", memberId: "x" },
       }),
     ).toContain("有成員不在這本帳本中");
+  });
+});
+
+describe("describeRestoreReport", () => {
+  const ledger = (name: string) => ({
+    id: name,
+    name,
+    baseCurrency: "TWD",
+    createdAt: "",
+    updatedAt: "",
+  });
+
+  it("lists restored, skipped and failed ledgers on separate lines", () => {
+    expect(
+      describeRestoreReport({
+        restored: [ledger("東京"), ledger("大阪")],
+        skipped: [ledger("首爾")],
+        failed: [{ ledger: ledger("壞掉的"), reason: "FOREIGN KEY" }],
+      }),
+    ).toBe(
+      [
+        "已還原 2 本：「東京」、「大阪」",
+        "手機上已經有 1 本，沒有變動：「首爾」",
+        "1 本資料有誤，沒有還原：「壞掉的」",
+      ].join("\n"),
+    );
+  });
+
+  it("explains an empty backup", () => {
+    expect(
+      describeRestoreReport({ restored: [], skipped: [], failed: [] }),
+    ).toBe("備份裡沒有任何帳本");
   });
 });

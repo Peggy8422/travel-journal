@@ -28,6 +28,8 @@ import {
   unarchiveMember,
 } from "../services/memberCommands";
 import type { Result } from "../../../domain/common/result";
+import { shareExpensesCsv } from "../services/fileExports";
+import { categoryLabel } from "./categories";
 import { describeError } from "./messages";
 
 export function LedgerSettingsScreen({ ledgerId }: { ledgerId: string }) {
@@ -117,6 +119,24 @@ export function LedgerSettingsScreen({ ledgerId }: { ledgerId: string }) {
       { text: "取消", style: "cancel" },
       { text: "刪除", style: "destructive", onPress: () => remove(member) },
     ]);
+  }
+
+  async function exportCsv() {
+    if (!data?.ok) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      const result = await shareExpensesCsv(
+        data.value,
+        categoryLabel,
+        new Date(),
+      );
+      if (!result.ok) setMessage(describeError(result.error));
+    } catch {
+      setMessage("匯出失敗，請再試一次");
+    } finally {
+      setBusy(false);
+    }
   }
 
   function confirmDeleteLedger() {
@@ -212,6 +232,19 @@ export function LedgerSettingsScreen({ ledgerId }: { ledgerId: string }) {
       </Section>
 
       <ErrorText message={message} />
+
+      <Section title="匯出">
+        <Label muted>
+          把消費明細匯出成 CSV，可以用 Excel 或 Google
+          試算表開啟，包含每個人分攤的新台幣金額。
+        </Label>
+        <Button
+          title="匯出消費明細（CSV）"
+          variant="secondary"
+          onPress={exportCsv}
+          disabled={busy || expenses.length === 0}
+        />
+      </Section>
 
       <Section title="危險操作">
         <Button

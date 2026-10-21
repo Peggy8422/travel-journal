@@ -12,6 +12,7 @@ export default function RootLayout() {
         <Stack screenOptions={{ headerBackTitle: "返回" }}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="ledger/new" options={{ title: "建立帳本" }} />
+          <Stack.Screen name="backup" options={{ title: "備份與還原" }} />
           <Stack.Screen name="ledger/[id]/index" options={{ title: "帳本" }} />
           <Stack.Screen
             name="ledger/[id]/settings"

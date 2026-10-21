@@ -17,6 +17,11 @@ export function LedgerListScreen() {
   return (
     <Screen>
       <Button title="建立帳本" onPress={() => router.push("/ledger/new")} />
+      <Button
+        title="備份與還原"
+        variant="secondary"
+        onPress={() => router.push("/backup")}
+      />
       <ErrorText message={error ? "讀取帳本失敗" : null} />
       {ledgers && ledgers.length === 0 && (
         <Label muted>還沒有帳本，建立一本開始記帳吧。</Label>

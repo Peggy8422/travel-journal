@@ -1,4 +1,6 @@
 import { formatMinorAmount, type CurrencyCode } from "../../../domain/ledger";
+import type { BackupFileError } from "../../../data/backup/backupFile";
+import type { RestoreReport } from "../services/backupCommands";
 import type { LedgerCommandError } from "../services/ledgerCommands";
 import type { LedgerSummaryError } from "../services/ledgerSummary";
 import type {
@@ -7,7 +9,10 @@ import type {
 } from "../services/resolveFxRate";
 
 type DisplayableError =
-  LedgerCommandError | LedgerSummaryError | ResolveFxRateError;
+  | LedgerCommandError
+  | LedgerSummaryError
+  | ResolveFxRateError
+  | BackupFileError;
 
 /** 錯誤代碼轉成給使用者看的訊息 */
 export function describeError(error: DisplayableError): string {
@@ -52,6 +57,10 @@ export function describeError(error: DisplayableError): string {
       return `有一筆消費資料有誤（${describeError(error.cause)}），請編輯或刪除該筆消費`;
     case "INVALID_SETTLEMENT":
       return `有一筆還款資料有誤（${describeError(error.cause)}）`;
+    case "INVALID_BACKUP":
+      return "這不是有效的備份檔，或檔案已損壞";
+    case "UNSUPPORTED_BACKUP_VERSION":
+      return "這份備份是較新版本的 App 匯出的，請先更新 App";
     case "NO_PARTICIPANTS":
       return "請至少選一位分攤的人";
     case "UNKNOWN_MEMBER":
@@ -108,4 +117,27 @@ export function describeAllocationGap(
   return remainingMinor > 0
     ? `還有 ${amount} 沒有分配，請調整每個人的金額，讓加總等於消費金額。`
     : `分配的金額超出 ${amount}，請調整每個人的金額，讓加總等於消費金額。`;
+}
+
+/** 還原結果的說明，分成還原、略過、失敗三段 */
+export function describeRestoreReport(report: RestoreReport): string {
+  const names = (ledgers: readonly { readonly name: string }[]) =>
+    ledgers.map((l) => `「${l.name}」`).join("、");
+  const lines: string[] = [];
+  if (report.restored.length > 0) {
+    lines.push(
+      `已還原 ${report.restored.length} 本：${names(report.restored)}`,
+    );
+  }
+  if (report.skipped.length > 0) {
+    lines.push(
+      `手機上已經有 ${report.skipped.length} 本，沒有變動：${names(report.skipped)}`,
+    );
+  }
+  if (report.failed.length > 0) {
+    lines.push(
+      `${report.failed.length} 本資料有誤，沒有還原：${names(report.failed.map((f) => f.ledger))}`,
+    );
+  }
+  return lines.length > 0 ? lines.join("\n") : "備份裡沒有任何帳本";
 }
