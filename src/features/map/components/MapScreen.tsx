@@ -90,7 +90,7 @@ export function MapScreen() {
   );
 }
 
-const ALL_LEDGERS: MapLedger = { id: "", name: "全部帳本" };
+const ALL_LEDGERS: MapLedger = { id: "", name: "全部帳本", kind: "shared" };
 
 function LedgerDropdown({
   ledgers,
@@ -186,8 +186,7 @@ function PinGroupCard({
   onClose: () => void;
 }) {
   const theme = useTheme();
-  const ledgerName = (id: string) =>
-    ledgers.find((l) => l.id === id)?.name ?? "";
+  const ledgerOf = (id: string) => ledgers.find((l) => l.id === id);
 
   return (
     <View
@@ -218,10 +217,15 @@ function PinGroupCard({
             accessibilityRole="button"
             accessibilityHint="編輯或刪除這筆消費"
             onPress={() =>
-              router.push({
-                pathname: "/ledger/[id]/expense/[expenseId]",
-                params: { id: pin.ledgerId, expenseId: pin.id },
-              })
+              ledgerOf(pin.ledgerId)?.kind === "personal"
+                ? router.push({
+                    pathname: "/personal/expense/[expenseId]",
+                    params: { expenseId: pin.id },
+                  })
+                : router.push({
+                    pathname: "/ledger/[id]/expense/[expenseId]",
+                    params: { id: pin.ledgerId, expenseId: pin.id },
+                  })
             }
             style={({ pressed }) => [
               styles.cardItem,
@@ -232,7 +236,7 @@ function PinGroupCard({
             {pin.subtitle !== null && <Label muted>{pin.subtitle}</Label>}
             <Label muted>
               {formatLocalDateTime(pin.occurredAt)}
-              {showLedger && ` · ${ledgerName(pin.ledgerId)}`}
+              {showLedger && ` · ${ledgerOf(pin.ledgerId)?.name ?? ""}`}
             </Label>
           </Pressable>
         ))}

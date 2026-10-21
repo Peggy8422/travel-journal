@@ -2,6 +2,7 @@ import type { SqlExecutor } from "../../../data/db/sqlDatabase";
 import { createRepositories } from "../../../data/repositories";
 import {
   formatMinorAmount,
+  type LedgerKind,
   type LedgerRecord,
   type LocatedExpenseRecord,
 } from "../../../domain/ledger";
@@ -10,6 +11,8 @@ import type { MapPin } from "../../../domain/map";
 export interface MapLedger {
   readonly id: string;
   readonly name: string;
+  /** 個人帳本的消費要用個人分頁的畫面編輯 */
+  readonly kind: LedgerKind;
 }
 
 export interface MapData {
@@ -38,7 +41,7 @@ export function buildMapData(
     pins: expenses.map(toExpensePin),
     ledgers: ledgers
       .filter((l) => usedLedgerIds.has(l.id))
-      .map((l) => ({ id: l.id, name: l.name })),
+      .map((l) => ({ id: l.id, name: l.name, kind: l.kind })),
   };
 }
 

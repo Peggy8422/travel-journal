@@ -94,8 +94,33 @@ describe("loadMapData", () => {
     );
 
     expect((await loadMapData(db)).ledgers).toEqual([
-      { id: "ledger-2", name: "京都" },
-      { id: "ledger-1", name: "東京五日遊" },
+      { id: "ledger-2", name: "京都", kind: "shared" },
+      { id: "ledger-1", name: "東京五日遊", kind: "shared" },
+    ]);
+  });
+  it("marks the personal ledger so its pins open the personal editor", async () => {
+    const { db, repos } = await setupLedger();
+    await repos.ledgers.insert(
+      makeLedgerRecord({ id: "personal", name: "個人", kind: "personal" }),
+    );
+    await repos.members.insert({
+      id: "me",
+      ledgerId: "personal",
+      name: "我",
+      createdAt: T0,
+    });
+    await repos.expenses.insert(
+      makeExpenseRecord({
+        id: "coffee",
+        ledgerId: "personal",
+        payerId: "me",
+        split: { kind: "equal", participantIds: ["me"] },
+        location: shinjuku,
+      }),
+    );
+
+    expect((await loadMapData(db)).ledgers).toEqual([
+      { id: "personal", name: "個人", kind: "personal" },
     ]);
   });
 });
