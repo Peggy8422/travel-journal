@@ -34,6 +34,8 @@ export interface RestoreReport {
     readonly ledger: LedgerRecord;
     readonly reason: string;
   }[];
+  /** 手機上已經有個人帳本時，從備份補進來的個人消費筆數 */
+  readonly personalExpensesAdded: number;
 }
 
 /**
@@ -48,8 +50,27 @@ export async function restoreBackup(
   const restored: LedgerRecord[] = [];
   const skipped: LedgerRecord[] = [];
   const failed: { ledger: LedgerRecord; reason: string }[] = [];
+  let personalExpensesAdded = 0;
 
   for (const backup of backups) {
+    const localPersonal =
+      backup.ledger.kind === "personal"
+        ? await createRepositories(db).ledgers.findPersonal()
+        : undefined;
+    if (localPersonal) {
+      // 每支手機只有一本個人帳本：不略過，而是補進手機上還沒有的個人消費
+      try {
+        personalExpensesAdded += await db.transaction((tx) =>
+          mergePersonalExpenses(tx, localPersonal, backup),
+        );
+      } catch (error) {
+        failed.push({
+          ledger: backup.ledger,
+          reason: error instanceof Error ? error.message : String(error),
+        });
+      }
+      continue;
+    }
     if (await createRepositories(db).ledgers.findById(backup.ledger.id)) {
       skipped.push(backup.ledger);
       continue;
@@ -64,7 +85,36 @@ export async function restoreBackup(
       });
     }
   }
-  return { restored, skipped, failed };
+  return { restored, skipped, failed, personalExpensesAdded };
+}
+
+/**
+ * 把備份裡的個人消費補進手機上的個人帳本：已經有的（同一個 id）不動，
+ * 付款人與分攤改成手機上的「我」。回傳新增的筆數。
+ */
+async function mergePersonalExpenses(
+  tx: SqlExecutor,
+  local: LedgerRecord,
+  backup: LedgerBackup,
+): Promise<number> {
+  const repos = createRepositories(tx);
+  const self = (await repos.members.listByLedger(local.id)).find(
+    (m) => m.isSelf,
+  );
+  if (!self) throw new Error(`Personal ledger ${local.id} has no self member`);
+
+  let added = 0;
+  for (const expense of backup.expenses) {
+    if (await repos.expenses.findById(expense.id)) continue;
+    await repos.expenses.insert({
+      ...expense,
+      ledgerId: local.id,
+      payerId: self.id,
+      split: { kind: "equal", participantIds: [self.id] },
+    });
+    added += 1;
+  }
+  return added;
 }
 
 async function insertLedgerBackup(
@@ -86,6 +136,7 @@ async function insertLedgerBackup(
     if (member.archivedAt !== null) {
       await repos.members.setArchived(member.id, member.archivedAt);
     }
+    if (member.isSelf) await repos.members.setSelf(ledger.id, member.id);
   }
   for (const expense of expenses) {
     await repos.expenses.insert({ ...expense, ledgerId: ledger.id });

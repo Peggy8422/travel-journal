@@ -139,5 +139,8 @@ export function describeRestoreReport(report: RestoreReport): string {
       `${report.failed.length} 本資料有誤，沒有還原：${names(report.failed.map((f) => f.ledger))}`,
     );
   }
+  if (report.personalExpensesAdded > 0) {
+    lines.push(`個人消費補進 ${report.personalExpensesAdded} 筆`);
+  }
   return lines.length > 0 ? lines.join("\n") : "備份裡沒有任何帳本";
 }

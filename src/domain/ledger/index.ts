@@ -66,3 +66,11 @@ export {
   type ExpenseCategory,
 } from "./categories";
 export type { LedgerBackup } from "./backup";
+export {
+  collectPersonalEntries,
+  shiftMonth,
+  summarizePersonalMonth,
+  type LedgerSnapshot,
+  type PersonalEntry,
+  type PersonalMonth,
+} from "./personalSpending";

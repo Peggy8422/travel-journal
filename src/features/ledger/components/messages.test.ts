@@ -60,19 +60,26 @@ describe("describeRestoreReport", () => {
         restored: [ledger("東京"), ledger("大阪")],
         skipped: [ledger("首爾")],
         failed: [{ ledger: ledger("壞掉的"), reason: "FOREIGN KEY" }],
+        personalExpensesAdded: 2,
       }),
     ).toBe(
       [
         "已還原 2 本：「東京」、「大阪」",
         "手機上已經有 1 本，沒有變動：「首爾」",
         "1 本資料有誤，沒有還原：「壞掉的」",
+        "個人消費補進 2 筆",
       ].join("\n"),
     );
   });
 
   it("explains an empty backup", () => {
     expect(
-      describeRestoreReport({ restored: [], skipped: [], failed: [] }),
+      describeRestoreReport({
+        restored: [],
+        skipped: [],
+        failed: [],
+        personalExpensesAdded: 0,
+      }),
     ).toBe("備份裡沒有任何帳本");
   });
 });

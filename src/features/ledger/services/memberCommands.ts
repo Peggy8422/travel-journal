@@ -81,6 +81,31 @@ export async function removeMember(
   });
 }
 
+/**
+ * 指定帳本裡哪一位成員是「我」，用來計算個人分頁的花費；memberId 為 null 代表取消。
+ * 每本帳本最多一位，指定新的會取代原本的。
+ */
+export async function setSelfMember(
+  deps: LedgerCommandDeps,
+  ledgerId: string,
+  memberId: MemberId | null,
+): CommandResult<void> {
+  return deps.db.transaction(async (tx) => {
+    const repos = createRepositories(tx);
+    if (!(await repos.ledgers.findById(ledgerId))) {
+      return err({ code: "LEDGER_NOT_FOUND", ledgerId });
+    }
+    if (memberId !== null) {
+      const member = await repos.members.findById(memberId);
+      if (!member || member.ledgerId !== ledgerId) {
+        return err({ code: "MEMBER_NOT_FOUND", memberId });
+      }
+    }
+    await repos.members.setSelf(ledgerId, memberId);
+    return ok(undefined);
+  });
+}
+
 async function isLastActiveMember(
   repos: Repositories,
   member: MemberRecord,

@@ -20,11 +20,12 @@ export type LedgerOverview =
   /** 這本帳本的資料有誤，算不出摘要；只影響這一本，不影響整個列表 */
   | { readonly kind: "invalid"; readonly ledger: LedgerRecord };
 
-/** 所有帳本的摘要，依建立時間由新到舊 */
+/** 所有分帳帳本的摘要，依建立時間由新到舊 */
 export async function loadLedgerOverviews(
   db: SqlExecutor,
 ): Promise<LedgerOverview[]> {
-  const ledgers = await createRepositories(db).ledgers.list();
+  // 個人帳本不出現在帳本列表
+  const ledgers = await createRepositories(db).ledgers.list({ kind: "shared" });
   const overviews: LedgerOverview[] = [];
   for (const ledger of ledgers) {
     const summary = await loadLedgerSummary(db, ledger.id);
