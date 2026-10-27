@@ -9,20 +9,29 @@ import {
   Text,
   View,
 } from "react-native";
-import MapView, { Marker } from "react-native-maps";
+import MapView, { Marker, Polyline } from "react-native-maps";
 
 import {
   groupByLocation,
+  pinDates,
   regionForPoints,
+  routeOf,
   type PinGroup,
 } from "../../../domain/map";
-import { Label, MessageScreen, Row } from "../../../shared/ui/components";
+import { Chip, Label, MessageScreen, Row } from "../../../shared/ui/components";
 import { spacing, useTheme } from "../../../shared/ui/theme";
 import { describeMapLocateError } from "../../ledger/components/messages";
-import { formatLocalDateTime } from "../../ledger/services/localTimestamp";
+import {
+  formatLocalDate,
+  formatLocalDateTime,
+} from "../../ledger/services/localTimestamp";
 import { useMapData } from "../hooks/useMapData";
 import { useUserLocation } from "../hooks/useUserLocation";
-import { filterPins, type MapLedger } from "../services/mapData";
+import {
+  filterPins,
+  type MapLedger,
+  type PinFilter,
+} from "../services/mapData";
 
 export function MapScreen() {
   const theme = useTheme();
@@ -30,6 +39,8 @@ export function MapScreen() {
   const mapRef = useRef<MapView>(null);
   /** null 代表全部帳本 */
   const [ledgerId, setLedgerId] = useState<string | null>(null);
+  /** 當地日期 YYYY-MM-DD；null 代表全部日期 */
+  const [date, setDate] = useState<string | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const userLocation = useUserLocation();
 
@@ -41,20 +52,40 @@ export function MapScreen() {
     );
   }
 
-  // 篩選的帳本被刪除或已沒有地點時，回到全部帳本
-  const activeLedgerId = data.ledgers.some((l) => l.id === ledgerId)
+  const { pins, ledgers } = data;
+  // 篩選的帳本被刪除或已沒有地點時，回到全部帳本；日期同理
+  const activeLedgerId = ledgers.some((l) => l.id === ledgerId)
     ? ledgerId
     : null;
-  const groups = groupByLocation(filterPins(data.pins, activeLedgerId));
+  const dates = pinDates(
+    filterPins(pins, { ledgerId: activeLedgerId, date: null }),
+  );
+  const activeDate = date !== null && dates.includes(date) ? date : null;
+  const visiblePins = filterPins(pins, {
+    ledgerId: activeLedgerId,
+    date: activeDate,
+  });
+  const groups = groupByLocation(visiblePins);
   const selected = groups.find((g) => g.key === selectedKey);
+  // 只有選了某一天才畫路線，全部日期連在一起沒有意義
+  const route = activeDate === null ? [] : routeOf(visiblePins);
 
-  function selectLedger(id: string | null) {
-    setLedgerId(id);
+  function applyFilter(filter: PinFilter) {
+    setLedgerId(filter.ledgerId);
+    setDate(filter.date);
     setSelectedKey(null);
     const region = regionForPoints(
-      filterPins(data?.pins ?? [], id).map((p) => p.point),
+      filterPins(pins, filter).map((p) => p.point),
     );
     if (region) mapRef.current?.animateToRegion(region, 300);
+  }
+
+  function selectLedger(id: string | null) {
+    // Keep the chosen day only if the new ledger has pins on it
+    const keepsDate =
+      activeDate !== null &&
+      filterPins(pins, { ledgerId: id, date: activeDate }).length > 0;
+    applyFilter({ ledgerId: id, date: keepsDate ? activeDate : null });
   }
 
   async function showUserLocation() {
@@ -73,7 +104,7 @@ export function MapScreen() {
       <MapView
         ref={mapRef}
         style={StyleSheet.absoluteFill}
-        initialRegion={regionForPoints(data.pins.map((p) => p.point))}
+        initialRegion={regionForPoints(pins.map((p) => p.point))}
         userInterfaceStyle={theme.isDark ? "dark" : "light"}
         toolbarEnabled={false}
         // Only after the button got permission, so opening the tab never prompts
@@ -84,6 +115,13 @@ export function MapScreen() {
           if (event.nativeEvent.action !== "marker-press") setSelectedKey(null);
         }}
       >
+        {route.length > 0 && (
+          <Polyline
+            coordinates={route}
+            strokeColor={theme.primary}
+            strokeWidth={3}
+          />
+        )}
         {groups.map((group) => (
           <Marker
             key={group.key}
@@ -113,24 +151,66 @@ export function MapScreen() {
         )}
       </Pressable>
 
+      {dates.length > 1 && (
+        <DateStrip
+          dates={dates}
+          selectedDate={activeDate}
+          onSelect={(d) => applyFilter({ ledgerId: activeLedgerId, date: d })}
+        />
+      )}
+
       {selected && (
         <PinGroupCard
           group={selected}
-          ledgers={data.ledgers}
-          showLedger={activeLedgerId === null && data.ledgers.length > 1}
+          ledgers={ledgers}
+          showLedger={activeLedgerId === null && ledgers.length > 1}
           onClose={() => setSelectedKey(null)}
         />
       )}
 
       {/* Rendered last so the open menu and its backdrop sit above the card */}
-      {data.ledgers.length > 1 && (
+      {ledgers.length > 1 && (
         <LedgerDropdown
-          ledgers={data.ledgers}
+          ledgers={ledgers}
           selectedId={activeLedgerId}
           onSelect={selectLedger}
         />
       )}
     </View>
+  );
+}
+
+/** 日期篩選，橫向捲動；選了某一天時地圖會畫出當天的路線 */
+function DateStrip({
+  dates,
+  selectedDate,
+  onSelect,
+}: {
+  dates: readonly string[];
+  selectedDate: string | null;
+  onSelect: (date: string | null) => void;
+}) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.dateStrip}
+      contentContainerStyle={styles.dateStripContent}
+    >
+      <Chip
+        label="全部日期"
+        selected={selectedDate === null}
+        onPress={() => onSelect(null)}
+      />
+      {dates.map((d) => (
+        <Chip
+          key={d}
+          label={formatLocalDate(d)}
+          selected={d === selectedDate}
+          onPress={() => onSelect(d)}
+        />
+      ))}
+    </ScrollView>
   );
 }
 
@@ -313,6 +393,18 @@ const styles = StyleSheet.create({
   },
   locateIcon: {
     fontSize: 22,
+  },
+  dateStrip: {
+    position: "absolute",
+    // Below the ledger dropdown and the locate button
+    top: spacing.sm * 2 + 44,
+    left: 0,
+    right: 0,
+    flexGrow: 0,
+  },
+  dateStripContent: {
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
   },
   dropdownTrigger: {
     flexDirection: "row",

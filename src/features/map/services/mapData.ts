@@ -6,7 +6,7 @@ import {
   type LedgerRecord,
   type LocatedExpenseRecord,
 } from "../../../domain/ledger";
-import type { MapPin } from "../../../domain/map";
+import { localDateOf, type MapPin } from "../../../domain/map";
 
 export interface MapLedger {
   readonly id: string;
@@ -45,12 +45,23 @@ export function buildMapData(
   };
 }
 
-/** ledgerId 為 null 代表全部帳本 */
+export interface PinFilter {
+  /** null 代表全部帳本 */
+  readonly ledgerId: string | null;
+  /** 當地日期 YYYY-MM-DD；null 代表全部日期 */
+  readonly date: string | null;
+}
+
 export function filterPins(
   pins: readonly MapPin[],
-  ledgerId: string | null,
+  { ledgerId, date }: PinFilter,
 ): readonly MapPin[] {
-  return ledgerId === null ? pins : pins.filter((p) => p.ledgerId === ledgerId);
+  if (ledgerId === null && date === null) return pins;
+  return pins.filter(
+    (p) =>
+      (ledgerId === null || p.ledgerId === ledgerId) &&
+      (date === null || localDateOf(p) === date),
+  );
 }
 
 function toExpensePin(expense: LocatedExpenseRecord): MapPin {

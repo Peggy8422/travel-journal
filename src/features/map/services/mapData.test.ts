@@ -145,13 +145,38 @@ describe("filterPins", () => {
       point: kyoto,
       occurredAt: "2026-10-12T12:00:00+09:00",
     },
+    {
+      kind: "expense" as const,
+      id: "c",
+      ledgerId: "ledger-2",
+      title: "c",
+      subtitle: null,
+      point: kyoto,
+      occurredAt: "2026-10-13T09:00:00+09:00",
+    },
   ];
+  const ids = (filtered: readonly { id: string }[]) =>
+    filtered.map((p) => p.id);
 
-  it("keeps every pin for all ledgers", () => {
-    expect(filterPins(pins, null)).toBe(pins);
+  it("keeps every pin for all ledgers and dates", () => {
+    expect(filterPins(pins, { ledgerId: null, date: null })).toBe(pins);
   });
 
   it("keeps only the chosen ledger", () => {
-    expect(filterPins(pins, "ledger-2").map((p) => p.id)).toEqual(["b"]);
+    expect(ids(filterPins(pins, { ledgerId: "ledger-2", date: null }))).toEqual(
+      ["b", "c"],
+    );
+  });
+
+  it("keeps only the chosen local date", () => {
+    expect(
+      ids(filterPins(pins, { ledgerId: null, date: "2026-10-12" })),
+    ).toEqual(["a", "b"]);
+  });
+
+  it("combines the ledger and the date", () => {
+    expect(
+      ids(filterPins(pins, { ledgerId: "ledger-2", date: "2026-10-12" })),
+    ).toEqual(["b"]);
   });
 });

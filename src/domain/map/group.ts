@@ -22,7 +22,7 @@ export function groupByLocation(pins: readonly MapPin[]): PinGroup[] {
   return [...groups].map(([key, group]) => ({ key, ...group }));
 }
 
-function locationKey(point: MapPin["point"]): string {
+export function locationKey(point: MapPin["point"]): string {
   return `${round(point.latitude)},${round(point.longitude)}`;
 }
 
