@@ -23,7 +23,7 @@ export async function shareFile(file: ShareableFile): Promise<void> {
   }
   const target = new File(Paths.cache, file.name);
   target.create({ overwrite: true });
-  target.write(file.content);
+  await target.write(file.content);
   await Sharing.shareAsync(target.uri, {
     mimeType: file.mimeType,
     UTI: file.uti,

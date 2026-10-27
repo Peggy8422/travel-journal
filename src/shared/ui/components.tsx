@@ -19,6 +19,7 @@ import { spacing, useTheme } from "./theme";
  * - Android：狀態列透明時系統的 resize 不可靠，改由 KeyboardAvoidingView 把畫面高度扣掉鍵盤，
  *   再由 ScrollView 把輸入中的欄位捲進畫面。它依實際被遮住的高度計算，系統已縮小時不會重複扣
  * 鍵盤展開時點擊空白處不會吃掉按鈕的點擊；往下拖動會收起鍵盤。
+ * iOS 26 起 Stack 的 header 是透明的（Liquid Glass），由 contentInsetAdjustmentBehavior 讓內容從 header 下方開始。
  */
 export function Screen({ children }: { children: ReactNode }) {
   const theme = useTheme();
@@ -30,6 +31,7 @@ export function Screen({ children }: { children: ReactNode }) {
       <ScrollView
         style={styles.fill}
         contentContainerStyle={styles.screen}
+        contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
