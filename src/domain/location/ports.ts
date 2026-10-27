@@ -8,6 +8,8 @@ import type { GeoPoint } from "../ledger";
 export interface DeviceLocator {
   /** 要求前景定位權限；回傳是否取得 */
   requestPermission(): Promise<boolean>;
+  /** 是否已經有前景定位權限；只查詢，不會跳出權限詢問 */
+  hasPermission(): Promise<boolean>;
   /** 目前位置。定位服務關閉、逾時時應 throw，呼叫端會改用最近一次已知位置 */
   currentPosition(): Promise<GeoPoint>;
   /** 最近一次已知位置（可能是幾分鐘前的）；沒有時回傳 null */

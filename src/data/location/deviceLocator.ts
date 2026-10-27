@@ -17,6 +17,10 @@ export function createDeviceLocator(): DeviceLocator {
       const { granted } = await Location.requestForegroundPermissionsAsync();
       return granted;
     },
+    async hasPermission() {
+      const { granted } = await Location.getForegroundPermissionsAsync();
+      return granted;
+    },
     async currentPosition() {
       const location = await withTimeout(
         Location.getCurrentPositionAsync({

@@ -93,6 +93,16 @@ export function describeError(error: DisplayableError): string {
   }
 }
 
+/** 地圖上「顯示目前位置」失敗的訊息；表單的訊息會提示輸入地名，這裡不適用 */
+export function describeMapLocateError(error: LocateError): string {
+  switch (error.code) {
+    case "LOCATION_PERMISSION_DENIED":
+      return "沒有定位權限，請到系統設定開啟";
+    case "LOCATION_UNAVAILABLE":
+      return "目前無法定位，請確認定位服務已開啟";
+  }
+}
+
 /** 需要手動輸入匯率的原因 */
 export function describeManualReason(reason: ManualReason): string {
   switch (reason) {

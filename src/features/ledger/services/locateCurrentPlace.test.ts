@@ -1,5 +1,8 @@
 import type { DeviceLocator } from "../../../domain/location";
-import { locateCurrentPlace } from "./locateCurrentPlace";
+import {
+  locateCurrentPlace,
+  locateCurrentPosition,
+} from "./locateCurrentPlace";
 
 const shibuya = { latitude: 35.6595, longitude: 139.7005 };
 const lastKnown = { latitude: 35.66, longitude: 139.7 };
@@ -7,6 +10,7 @@ const lastKnown = { latitude: 35.66, longitude: 139.7 };
 function fakeLocator(overrides: Partial<DeviceLocator> = {}): DeviceLocator {
   return {
     requestPermission: jest.fn().mockResolvedValue(true),
+    hasPermission: jest.fn().mockResolvedValue(true),
     currentPosition: jest.fn().mockResolvedValue(shibuya),
     lastKnownPosition: jest.fn().mockResolvedValue(lastKnown),
     placeNameAt: jest.fn().mockResolvedValue("渋谷駅"),
@@ -115,5 +119,39 @@ describe("locateCurrentPlace", () => {
 
     expect(result.ok && result.value.placeName).toBeNull();
     expect(result.ok && result.value.placeNameLookupFailed).toBe(false);
+  });
+});
+
+describe("locateCurrentPosition", () => {
+  it("returns the current position without looking up its place name", async () => {
+    const locator = fakeLocator();
+
+    expect(await locateCurrentPosition(locator)).toEqual({
+      ok: true,
+      value: { location: shibuya, approximate: false },
+    });
+    expect(locator.placeNameAt).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the last known position when locating fails", async () => {
+    const locator = fakeLocator({
+      currentPosition: jest.fn().mockRejectedValue(new Error("timeout")),
+    });
+
+    expect(await locateCurrentPosition(locator)).toEqual({
+      ok: true,
+      value: { location: lastKnown, approximate: true },
+    });
+  });
+
+  it("reports permission denied", async () => {
+    const locator = fakeLocator({
+      requestPermission: jest.fn().mockResolvedValue(false),
+    });
+
+    expect(await locateCurrentPosition(locator)).toEqual({
+      ok: false,
+      error: { code: "LOCATION_PERMISSION_DENIED" },
+    });
   });
 });

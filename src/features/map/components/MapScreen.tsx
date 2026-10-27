@@ -1,6 +1,14 @@
 import { router } from "expo-router";
 import { useRef, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import MapView, { Marker } from "react-native-maps";
 
 import {
@@ -10,8 +18,10 @@ import {
 } from "../../../domain/map";
 import { Label, MessageScreen, Row } from "../../../shared/ui/components";
 import { spacing, useTheme } from "../../../shared/ui/theme";
+import { describeMapLocateError } from "../../ledger/components/messages";
 import { formatLocalDateTime } from "../../ledger/services/localTimestamp";
 import { useMapData } from "../hooks/useMapData";
+import { useUserLocation } from "../hooks/useUserLocation";
 import { filterPins, type MapLedger } from "../services/mapData";
 
 export function MapScreen() {
@@ -21,6 +31,7 @@ export function MapScreen() {
   /** null 代表全部帳本 */
   const [ledgerId, setLedgerId] = useState<string | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const userLocation = useUserLocation();
 
   if (error) return <MessageScreen text="讀取地圖資料失敗" />;
   if (!data) return null;
@@ -46,6 +57,17 @@ export function MapScreen() {
     if (region) mapRef.current?.animateToRegion(region, 300);
   }
 
+  async function showUserLocation() {
+    const result = await userLocation.locate();
+    if (!result) return;
+    if (!result.ok) {
+      Alert.alert("無法顯示目前位置", describeMapLocateError(result.error));
+      return;
+    }
+    const region = regionForPoints([result.value.location]);
+    if (region) mapRef.current?.animateToRegion(region, 300);
+  }
+
   return (
     <View style={styles.container}>
       <MapView
@@ -54,6 +76,9 @@ export function MapScreen() {
         initialRegion={regionForPoints(data.pins.map((p) => p.point))}
         userInterfaceStyle={theme.isDark ? "dark" : "light"}
         toolbarEnabled={false}
+        // Only after the button got permission, so opening the tab never prompts
+        showsUserLocation={userLocation.showsUser}
+        showsMyLocationButton={false}
         onPress={(event) => {
           // Android also reports marker taps here; keep the selection then
           if (event.nativeEvent.action !== "marker-press") setSelectedKey(null);
@@ -68,6 +93,25 @@ export function MapScreen() {
           />
         ))}
       </MapView>
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="顯示目前位置"
+        accessibilityState={{ busy: userLocation.locating }}
+        disabled={userLocation.locating}
+        onPress={showUserLocation}
+        style={({ pressed }) => [
+          styles.locateButton,
+          { backgroundColor: theme.surface, borderColor: theme.border },
+          pressed && { backgroundColor: theme.chip },
+        ]}
+      >
+        {userLocation.locating ? (
+          <ActivityIndicator color={theme.primary} />
+        ) : (
+          <Text style={[styles.locateIcon, { color: theme.primary }]}>◎</Text>
+        )}
+      </Pressable>
 
       {selected && (
         <PinGroupCard
@@ -255,6 +299,20 @@ const styles = StyleSheet.create({
     left: spacing.md,
     maxWidth: "70%",
     gap: spacing.xs,
+  },
+  locateButton: {
+    position: "absolute",
+    top: spacing.sm,
+    right: spacing.md,
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 22,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  locateIcon: {
+    fontSize: 22,
   },
   dropdownTrigger: {
     flexDirection: "row",
