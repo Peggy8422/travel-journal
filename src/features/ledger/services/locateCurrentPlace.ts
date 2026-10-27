@@ -29,17 +29,37 @@ export async function locateCurrentPlace(
 ): Promise<Result<LocatedPlace, LocateError>> {
   const position = await locateCurrentPosition(locator);
   if (!position.ok) return position;
-  const { location } = position.value;
+  return ok(await describePosition(locator, position.value));
+}
 
+/**
+ * 替座標反查預設地名，給在地圖上選的地點用（也是 locateCurrentPlace 的後半段）。
+ * 查不到或查詢失敗時地名為 null，座標仍可使用。不會 throw。
+ */
+export async function describePosition(
+  locator: DeviceLocator,
+  position: LocatedPosition,
+): Promise<LocatedPlace> {
   try {
-    const placeName = await locator.placeNameAt(location);
-    return ok({ ...position.value, placeName, placeNameLookupFailed: false });
+    const placeName = await locator.placeNameAt(position.location);
+    return { ...position, placeName, placeNameLookupFailed: false };
   } catch {
-    return ok({
-      ...position.value,
-      placeName: null,
-      placeNameLookupFailed: true,
-    });
+    return { ...position, placeName: null, placeNameLookupFailed: true };
+  }
+}
+
+/**
+ * 在地圖上選地點時一開始要看哪裡：已經有定位權限就用最近一次已知位置，
+ * 沒有權限時不詢問、直接回傳 null（由畫面改用預設範圍）。不會 throw。
+ */
+export async function lastKnownPositionIfAllowed(
+  locator: DeviceLocator,
+): Promise<GeoPoint | null> {
+  try {
+    if (!(await locator.hasPermission())) return null;
+    return await locator.lastKnownPosition();
+  } catch {
+    return null;
   }
 }
 

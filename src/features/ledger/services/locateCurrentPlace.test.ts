@@ -1,5 +1,7 @@
 import type { DeviceLocator } from "../../../domain/location";
 import {
+  describePosition,
+  lastKnownPositionIfAllowed,
   locateCurrentPlace,
   locateCurrentPosition,
 } from "./locateCurrentPlace";
@@ -153,5 +155,70 @@ describe("locateCurrentPosition", () => {
       ok: false,
       error: { code: "LOCATION_PERMISSION_DENIED" },
     });
+  });
+});
+
+describe("describePosition", () => {
+  it("looks up the place name of a point picked on the map", async () => {
+    const locator = fakeLocator();
+
+    expect(
+      await describePosition(locator, {
+        location: lastKnown,
+        approximate: false,
+      }),
+    ).toEqual({
+      location: lastKnown,
+      placeName: "渋谷駅",
+      approximate: false,
+      placeNameLookupFailed: false,
+    });
+    expect(locator.placeNameAt).toHaveBeenCalledWith(lastKnown);
+    expect(locator.requestPermission).not.toHaveBeenCalled();
+  });
+
+  it("keeps the point when the lookup fails", async () => {
+    const locator = fakeLocator({
+      placeNameAt: jest.fn().mockRejectedValue(new Error("offline")),
+    });
+
+    expect(
+      await describePosition(locator, {
+        location: lastKnown,
+        approximate: false,
+      }),
+    ).toEqual({
+      location: lastKnown,
+      placeName: null,
+      approximate: false,
+      placeNameLookupFailed: true,
+    });
+  });
+});
+
+describe("lastKnownPositionIfAllowed", () => {
+  it("returns the last known position when already allowed", async () => {
+    const locator = fakeLocator();
+
+    expect(await lastKnownPositionIfAllowed(locator)).toEqual(lastKnown);
+    expect(locator.requestPermission).not.toHaveBeenCalled();
+  });
+
+  it("never asks for permission", async () => {
+    const locator = fakeLocator({
+      hasPermission: jest.fn().mockResolvedValue(false),
+    });
+
+    expect(await lastKnownPositionIfAllowed(locator)).toBeNull();
+    expect(locator.requestPermission).not.toHaveBeenCalled();
+    expect(locator.lastKnownPosition).not.toHaveBeenCalled();
+  });
+
+  it("returns null when the check fails", async () => {
+    const locator = fakeLocator({
+      hasPermission: jest.fn().mockRejectedValue(new Error("boom")),
+    });
+
+    expect(await lastKnownPositionIfAllowed(locator)).toBeNull();
   });
 });

@@ -53,6 +53,7 @@ import {
 } from "../services/expenseFormLogic";
 import type { ExpenseInput } from "../services/ledgerCommands";
 import { categoryLabel } from "./categories";
+import { LocationPickerModal } from "./LocationPickerModal";
 import {
   describeAllocationGap,
   describeError,
@@ -145,6 +146,7 @@ export function ExpenseForm({
     initialPlaceDraft(initial.placeName, initial.location),
   );
   const currentPlace = useCurrentPlace();
+  const [pickingPlace, setPickingPlace] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -176,6 +178,14 @@ export function ExpenseForm({
 
   async function fillCurrentPlace() {
     const result = await currentPlace.locate();
+    if (result?.ok) setPlace((draft) => applyLocatedPlace(draft, result.value));
+  }
+
+  async function fillPickedPlace(point: GeoPoint) {
+    setPickingPlace(false);
+    // Keep the point even if the name lookup is slow or fails
+    setPlace((draft) => ({ ...draft, location: point }));
+    const result = await currentPlace.describe(point);
     if (result?.ok) setPlace((draft) => applyLocatedPlace(draft, result.value));
   }
 
@@ -400,6 +410,14 @@ export function ExpenseForm({
           onClear={() => setPlace(initialPlaceDraft(null, null))}
           locateState={currentPlace.state}
           onLocate={fillCurrentPlace}
+          onPickOnMap={() => setPickingPlace(true)}
+        />
+        <LocationPickerModal
+          visible={pickingPlace}
+          initialPoint={place.location}
+          loadStartPoint={currentPlace.startPoint}
+          onCancel={() => setPickingPlace(false)}
+          onConfirm={fillPickedPlace}
         />
       </Section>
 
@@ -426,12 +444,14 @@ function PlaceFields({
   onClear,
   locateState,
   onLocate,
+  onPickOnMap,
 }: {
   place: PlaceDraft;
   onChangeName: (name: string) => void;
   onClear: () => void;
   locateState: CurrentPlaceState;
   onLocate: () => void;
+  onPickOnMap: () => void;
 }) {
   const locating = locateState.status === "locating";
   const located =
@@ -455,7 +475,7 @@ function PlaceFields({
       ) : (
         <Label muted>記錄座標後，這筆消費會出現在地圖上</Label>
       )}
-      {locating && <Label muted>定位中…</Label>}
+      {locating && <Label muted>取得地點中…</Label>}
       {locateState.status === "done" && !locateState.result.ok && (
         <ErrorText message={describeError(locateState.result.error)} />
       )}
@@ -469,6 +489,12 @@ function PlaceFields({
         title={place.location ? "重新定位" : "使用目前位置"}
         variant="secondary"
         onPress={onLocate}
+        disabled={locating}
+      />
+      <Button
+        title={place.location ? "在地圖上調整" : "在地圖上選擇"}
+        variant="secondary"
+        onPress={onPickOnMap}
         disabled={locating}
       />
       {(place.location !== null || place.placeName !== "") && (
