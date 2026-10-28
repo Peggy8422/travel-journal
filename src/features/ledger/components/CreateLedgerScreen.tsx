@@ -15,6 +15,7 @@ import {
   TextField,
 } from "../../../shared/ui/components";
 import { spacing } from "../../../shared/ui/theme";
+import { useToast } from "../../../shared/ui/Toast";
 import { useLedgerCommandDeps } from "../../database/DatabaseProvider";
 import { createLedger } from "../services/ledgerCommands";
 import { toLocalIsoString } from "../services/localTimestamp";
@@ -24,6 +25,7 @@ import { NotebookCover } from "./NotebookCover";
 
 export function CreateLedgerScreen() {
   const deps = useLedgerCommandDeps();
+  const toast = useToast();
   const [name, setName] = useState("");
   const [memberNames, setMemberNames] = useState(["", ""]);
   /** 哪一個成員欄位是「我」（memberNames 的索引），null 代表不指定 */
@@ -71,6 +73,7 @@ export function CreateLedgerScreen() {
         pathname: "/ledger/[id]",
         params: { id: result.value.ledger.id },
       });
+      toast(`建立了「${result.value.ledger.name}」`);
     } catch {
       setError("建立失敗，請再試一次");
     } finally {
