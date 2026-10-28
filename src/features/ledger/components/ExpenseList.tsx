@@ -1,19 +1,15 @@
 import { router } from "expo-router";
 import { useState } from "react";
-import { Pressable, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import {
   formatMinorAmount,
   type ExpenseRecord,
   type ExpenseStatus,
 } from "../../../domain/ledger";
-import {
-  Chip,
-  ChipGroup,
-  Label,
-  Row,
-  Section,
-} from "../../../shared/ui/components";
+import { Chip } from "../../../shared/ui/components";
+import { fonts } from "../../../shared/ui/fonts";
+import { DashedLine } from "../../../shared/ui/handDrawn";
 import { useTheme } from "../../../shared/ui/theme";
 import {
   filterExpenses,
@@ -27,29 +23,30 @@ import {
   formatLocalDate,
   formatLocalDateTime,
 } from "../services/localTimestamp";
-import { categoryLabel, orderForChart } from "./categories";
+import { SettledTag } from "./badges";
+import { categoryColor, categoryLabel, orderForChart } from "./categories";
+import { CategoryIcon } from "./CategoryIcon";
 
-/** 帳本明細的消費列表：上方可依成員、分類篩選，下方依消費當地的日期分組 */
+/**
+ * 帳本內頁的「消費」索引籤：上方固定成員、分類篩選，下方依消費當地的日期分組捲動。
+ * 再點一次選中的篩選會取消。
+ */
 export function ExpenseList({
   ledgerId,
   summary,
+  bottomInset,
 }: {
   ledgerId: string;
   summary: LedgerSummary;
+  /** 底部安全區域，列表最後要留空間給右下角的「新增消費」 */
+  bottomInset: number;
 }) {
+  const theme = useTheme();
   const [filter, setFilter] = useState<ExpenseFilter>(NO_FILTER);
   const { members, expenses, expenseBaseAmounts } = summary;
   const base = summary.ledger.baseCurrency;
   const money = (minor: number) => `${base} ${formatMinorAmount(minor, base)}`;
   const nameOf = (id: string) => members.find((m) => m.id === id)?.name ?? "?";
-
-  if (expenses.length === 0) {
-    return (
-      <Section title="消費">
-        <Label muted>還沒有消費</Label>
-      </Section>
-    );
-  }
 
   // 只列出這本帳本用得到的分類，順序與統計圖一致
   const categories = orderForChart(
@@ -65,75 +62,122 @@ export function ExpenseList({
   );
 
   return (
-    <>
-      <Section title="篩選消費">
-        <ChipGroup>
-          <Chip
-            label="所有成員"
-            selected={filter.memberId === null}
-            onPress={() => setFilter({ ...filter, memberId: null })}
-          />
-          {members.map((m) => (
+    <View style={styles.fill}>
+      {expenses.length > 0 && (
+        <View style={styles.filters}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            accessibilityLabel="依成員篩選"
+            contentContainerStyle={styles.chipRow}
+          >
             <Chip
-              key={m.id}
-              label={m.name}
-              selected={filter.memberId === m.id}
-              onPress={() => setFilter({ ...filter, memberId: m.id })}
+              label="所有成員"
+              selected={filter.memberId === null}
+              onPress={() => setFilter({ ...filter, memberId: null })}
             />
-          ))}
-        </ChipGroup>
-        {categories.length > 1 && (
-          <ChipGroup>
-            <Chip
-              label="所有分類"
-              selected={filter.category === null}
-              onPress={() => setFilter({ ...filter, category: null })}
-            />
-            {categories.map((category) => (
+            {members.map((m) => (
               <Chip
-                key={category ?? "__uncategorized__"}
-                label={categoryLabel(category)}
-                selected={
-                  filter.category !== null &&
-                  filter.category.category === category
+                key={m.id}
+                label={m.name}
+                selected={filter.memberId === m.id}
+                onPress={() =>
+                  setFilter({
+                    ...filter,
+                    memberId: filter.memberId === m.id ? null : m.id,
+                  })
                 }
-                onPress={() => setFilter({ ...filter, category: { category } })}
               />
             ))}
-          </ChipGroup>
-        )}
-        {isFiltering(filter) && (
-          <Label muted>
-            符合 {visible.length} 筆，共 {money(visibleTotal)}
-          </Label>
-        )}
-      </Section>
+          </ScrollView>
+          {categories.length > 1 && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              accessibilityLabel="依分類篩選"
+              contentContainerStyle={styles.chipRow}
+            >
+              <Chip
+                label="所有分類"
+                selected={filter.category === null}
+                onPress={() => setFilter({ ...filter, category: null })}
+              />
+              {categories.map((category) => {
+                const selected =
+                  filter.category !== null &&
+                  filter.category.category === category;
+                return (
+                  <Chip
+                    key={category ?? "__uncategorized__"}
+                    label={categoryLabel(category)}
+                    dot={categoryColor(category, theme)}
+                    selected={selected}
+                    onPress={() =>
+                      setFilter({
+                        ...filter,
+                        category: selected ? null : { category },
+                      })
+                    }
+                  />
+                );
+              })}
+            </ScrollView>
+          )}
+          {isFiltering(filter) && (
+            <Text style={[styles.summary, { color: theme.textMuted }]}>
+              符合 {visible.length} 筆，共 {money(visibleTotal)}
+            </Text>
+          )}
+          <View style={styles.filterRule}>
+            <DashedLine />
+          </View>
+        </View>
+      )}
 
-      {days.length === 0 && <Label muted>沒有符合條件的消費</Label>}
-      {days.map((day) => (
-        <Section
-          key={day.date}
-          title={`${formatLocalDate(day.date)} · ${money(day.totalBaseMinor)}`}
-        >
-          {day.expenses.map((expense) => (
-            <ExpenseRow
-              key={expense.id}
-              expense={expense}
-              base={base}
-              baseAmount={expenseBaseAmounts.get(expense.id) ?? 0}
-              payerName={nameOf(expense.payerId)}
-              status={summary.expenseStatuses.get(expense.id)}
-              onPress={() =>
-                router.push({
-                  pathname: "/ledger/[id]/expense/[expenseId]",
-                  params: { id: ledgerId, expenseId: expense.id },
-                })
-              }
-            />
-          ))}
-        </Section>
-      ))}
-    </>
+      <ScrollView
+        contentContainerStyle={[
+          styles.list,
+          { paddingBottom: bottomInset + 110 },
+        ]}
+      >
+        {days.length === 0 && (
+          <Text style={[styles.empty, { color: theme.textMuted }]}>
+            {expenses.length > 0
+              ? "沒有符合條件的消費。"
+              : "還沒有消費，按右下角「新增消費」記下第一筆。"}
+          </Text>
+        )}
+        {days.map((day) => (
+          <View key={day.date}>
+            <View style={styles.dayHeader}>
+              <Text style={[styles.dayLabel, { color: theme.text }]}>
+                {formatLocalDate(day.date)}
+              </Text>
+              <Text style={[styles.dayTotal, { color: theme.textMuted }]}>
+                {money(day.totalBaseMinor)}
+              </Text>
+            </View>
+            <DashedLine opacity={0.28} />
+            {day.expenses.map((expense) => (
+              <ExpenseRow
+                key={expense.id}
+                expense={expense}
+                base={base}
+                baseAmount={expenseBaseAmounts.get(expense.id) ?? 0}
+                payerName={nameOf(expense.payerId)}
+                status={summary.expenseStatuses.get(expense.id)}
+                onPress={() =>
+                  router.push({
+                    pathname: "/ledger/[id]/expense/[expenseId]",
+                    params: { id: ledgerId, expenseId: expense.id },
+                  })
+                }
+              />
+            ))}
+          </View>
+        ))}
+      </ScrollView>
+    </View>
   );
 }
 
@@ -152,45 +196,140 @@ function ExpenseRow({
   status: ExpenseStatus | undefined;
   onPress: () => void;
 }) {
+  const theme = useTheme();
+  const amount = `${expense.currency} ${formatMinorAmount(expense.amountMinor, expense.currency)}`;
+  // 日期已經在分組標題，這裡只顯示時間
+  const time = formatLocalDateTime(expense.occurredAt).split(" ")[1];
+  const sub = [
+    time,
+    `${payerName} 付款`,
+    ...(expense.category !== null ? [categoryLabel(expense.category)] : []),
+  ].join(" · ");
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={`${expense.title}，${amount}，${payerName} 付款`}
       accessibilityHint="編輯或刪除這筆消費"
       onPress={onPress}
       style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
     >
-      <Row>
-        <View style={{ flex: 1 }}>
-          <Label>{expense.title}</Label>
-          <Label muted>
-            {/* 日期已經在分組標題，這裡只顯示時間 */}
-            {formatLocalDateTime(expense.occurredAt).split(" ")[1]} ·{" "}
-            {payerName} 付款
-            {expense.category !== null &&
-              ` · ${categoryLabel(expense.category)}`}
-          </Label>
-          {expense.note !== null && <Label muted>備註：{expense.note}</Label>}
-        </View>
-        <View style={{ alignItems: "flex-end" }}>
-          <Label>
-            {expense.currency}{" "}
-            {formatMinorAmount(expense.amountMinor, expense.currency)}
-          </Label>
-          {expense.currency !== base && (
-            <Label muted>
-              ≈ {base} {formatMinorAmount(baseAmount, base)}
-            </Label>
+      <View style={styles.row}>
+        <CategoryIcon category={expense.category} />
+        <View style={styles.rowMain}>
+          <Text style={[styles.rowTitle, { color: theme.text }]}>
+            {expense.title}
+          </Text>
+          <Text style={[styles.rowSub, { color: theme.textMuted }]}>{sub}</Text>
+          {expense.note !== null && (
+            <Text style={[styles.rowNote, { color: theme.textMuted }]}>
+              備註：{expense.note}
+            </Text>
           )}
-          <ExpenseStatusLabel status={status} />
         </View>
-      </Row>
+        <View style={styles.rowSide}>
+          <Text style={[styles.rowAmount, { color: theme.text }]}>
+            {amount}
+          </Text>
+          {expense.currency !== base && (
+            <Text style={[styles.rowBase, { color: theme.textMuted }]}>
+              ≈ {base} {formatMinorAmount(baseAmount, base)}
+            </Text>
+          )}
+          {status === "settled" && <SettledTag />}
+          {status === "offset" && (
+            <Text style={[styles.rowBase, { color: theme.textMuted }]}>
+              已抵銷
+            </Text>
+          )}
+        </View>
+      </View>
+      <DashedLine dotted />
     </Pressable>
   );
 }
 
-function ExpenseStatusLabel({ status }: { status?: ExpenseStatus }) {
-  const theme = useTheme();
-  if (status === "settled") return <Label color={theme.positive}>已結清</Label>;
-  if (status === "offset") return <Label muted>已抵銷</Label>;
-  return null;
-}
+const styles = StyleSheet.create({
+  fill: {
+    flex: 1,
+  },
+  filters: {
+    gap: 6,
+    paddingTop: 12,
+  },
+  chipRow: {
+    gap: 6,
+    paddingHorizontal: 10,
+  },
+  summary: {
+    fontFamily: fonts.regular,
+    fontSize: 12.5,
+    paddingHorizontal: 10,
+  },
+  filterRule: {
+    paddingTop: 2,
+  },
+  list: {
+    paddingHorizontal: 10,
+  },
+  empty: {
+    fontFamily: fonts.regular,
+    fontSize: 14,
+    lineHeight: 24,
+    marginVertical: 24,
+    marginHorizontal: 6,
+  },
+  dayHeader: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: 10,
+    paddingTop: 16,
+    paddingBottom: 6,
+    paddingHorizontal: 4,
+  },
+  dayLabel: {
+    fontFamily: fonts.bold,
+    fontSize: 14.5,
+  },
+  dayTotal: {
+    fontFamily: fonts.regular,
+    fontSize: 13,
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    minHeight: 58,
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+  },
+  rowMain: {
+    flex: 1,
+    gap: 2,
+  },
+  rowTitle: {
+    fontFamily: fonts.regular,
+    fontSize: 15,
+    lineHeight: 20,
+  },
+  rowSub: {
+    fontFamily: fonts.regular,
+    fontSize: 12.5,
+  },
+  rowNote: {
+    fontFamily: fonts.regular,
+    fontSize: 12,
+  },
+  rowSide: {
+    alignItems: "flex-end",
+    gap: 2,
+  },
+  rowAmount: {
+    fontFamily: fonts.regular,
+    fontSize: 14.5,
+  },
+  rowBase: {
+    fontFamily: fonts.regular,
+    fontSize: 11.5,
+  },
+});

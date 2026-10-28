@@ -58,7 +58,7 @@ export default function RootLayout() {
             />
             <Stack.Screen
               name="ledger/[id]/index"
-              options={{ title: "帳本" }}
+              options={{ title: "帳本", headerShown: false }}
             />
             <Stack.Screen
               name="ledger/[id]/settings"
