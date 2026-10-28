@@ -34,7 +34,12 @@ export default function TabLayout() {
       />
       <Tabs.Screen
         name="ledgers"
-        options={{ title: "帳本", tabBarIcon: tabBarIcon("notebook") }}
+        // 書架自己畫標題與篩選（固定在上方），不用導覽列的標題
+        options={{
+          title: "帳本",
+          headerShown: false,
+          tabBarIcon: tabBarIcon("notebook"),
+        }}
       />
       <Tabs.Screen
         name="personal"
