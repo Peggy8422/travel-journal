@@ -67,6 +67,19 @@ export {
   isExpenseCategory,
   type ExpenseCategory,
 } from "./categories";
+export {
+  COVER_PALETTES,
+  COVER_PATTERNS,
+  COVER_STYLES,
+  coverFromId,
+  parseCover,
+  randomCover,
+  rerollCover,
+  type CoverPalette,
+  type CoverPattern,
+  type CoverStyle,
+  type LedgerCover,
+} from "./cover";
 export type { LedgerBackup } from "./backup";
 export {
   collectPersonalEntries,
