@@ -274,6 +274,43 @@ function CoverArt({
   );
 }
 
+/**
+ * 帳本內頁頂端的色帶：和封面同一套底色與花紋，鋪滿父元件（不畫書背、鬆緊帶、紙膠帶）。
+ * 紙膠帶樣式的封面是牛皮紙，所以色帶也是牛皮紙。
+ */
+export function CoverBand({ cover }: { cover: LedgerCover }) {
+  const c = COVER_COLORS[cover.palette];
+  const fill =
+    cover.style === "pattern"
+      ? "url(#coverTile)"
+      : cover.style === "spine"
+        ? "url(#cloth)"
+        : cover.style === "tape"
+          ? "url(#kraft)"
+          : null;
+  return (
+    <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
+      <Defs>
+        {cover.style === "pattern" && (
+          <PatternTile kind={cover.pattern} base={c.base} dot={c.dot} />
+        )}
+        <Pattern id="cloth" patternUnits="userSpaceOnUse" width={5} height={8}>
+          <Rect width={2} height={8} fill="rgba(255,255,255,0.16)" />
+        </Pattern>
+        <Pattern id="kraft" patternUnits="userSpaceOnUse" width={7} height={7}>
+          <Circle cx={3.5} cy={3.5} r={1} fill="rgba(120,90,50,0.14)" />
+        </Pattern>
+      </Defs>
+      <Rect
+        width="100%"
+        height="100%"
+        fill={cover.style === "tape" ? "#D6BE98" : c.base}
+      />
+      {fill && <Rect width="100%" height="100%" fill={fill} />}
+    </Svg>
+  );
+}
+
 /** 紙膠帶的外形：長方形，兩端是撕開的鋸齒 */
 function tapePoints(x: number, y: number, w: number, h: number): string {
   return [

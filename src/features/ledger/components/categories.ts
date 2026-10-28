@@ -53,3 +53,18 @@ export function categoryColor(
   const index = EXPENSE_CATEGORIES.indexOf(category);
   return palette.categorical[index] ?? palette.neutral;
 }
+
+/** 分類色的淡色版（列表圖示、選取中的圖例底色），對應規則同 categoryColor */
+export function categoryTint(
+  category: string | null,
+  palette: {
+    readonly categoricalTint: readonly string[];
+    readonly neutralTint: string;
+  },
+): string {
+  if (category === null || !isExpenseCategory(category)) {
+    return palette.neutralTint;
+  }
+  const index = EXPENSE_CATEGORIES.indexOf(category);
+  return palette.categoricalTint[index] ?? palette.neutralTint;
+}

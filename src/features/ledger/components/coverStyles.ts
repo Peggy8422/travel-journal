@@ -4,6 +4,7 @@ import type {
   CoverStyle,
   LedgerCover,
 } from "../../../domain/ledger";
+import { seedFromString } from "../../../shared/ui/sketch";
 
 /**
  * 封面配色。base 是封面底色；deep 是書背與地圖標記，上面放紙色文字約 4.5:1 以上；
@@ -93,6 +94,11 @@ const PATTERN_NAMES: Readonly<Record<CoverPattern, string>> = {
   waves: "青海波",
   grid: "方眼",
 };
+
+/** 封面固定的小傾斜角度（-1.6° ~ 1.6°），依帳本 id 算，同一本在書架和設定頁都一樣 */
+export function coverTilt(ledgerId: string): number {
+  return ((seedFromString(ledgerId) % 33) - 16) / 10;
+}
 
 /** 例如「和柄（水玉）· 藍色」 */
 export function describeCover(cover: LedgerCover): string {

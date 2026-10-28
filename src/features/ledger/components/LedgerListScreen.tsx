@@ -21,7 +21,6 @@ import {
   WashiTape,
   WavyLine,
 } from "../../../shared/ui/handDrawn";
-import { seedFromString } from "../../../shared/ui/sketch";
 import { spacing, useTheme } from "../../../shared/ui/theme";
 import { useLedgerList } from "../hooks/useLedgerQueries";
 import type { LedgerOverview } from "../services/ledgerOverview";
@@ -33,6 +32,7 @@ import {
   shelfYears,
   type ShelfFilter,
 } from "../services/ledgerShelf";
+import { coverTilt } from "./coverStyles";
 import { NotebookCover } from "./NotebookCover";
 
 const GUTTER = 22;
@@ -186,7 +186,7 @@ function Book({
   const { meta, status, pending } = describeBook(overview);
   const month = overview.tripMonth;
   // 依 id 給每本書固定的傾斜角度（約 ±1.6 度），書架看起來像手擺的
-  const tilt = ((seedFromString(ledger.id) % 33) - 16) / 10;
+  const tilt = coverTilt(ledger.id);
   const settled =
     overview.kind === "ok" &&
     overview.expenseCount > 0 &&
