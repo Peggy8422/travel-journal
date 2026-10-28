@@ -1,15 +1,44 @@
+import { useFonts } from "expo-font";
 import { Stack, ThemeProvider } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
+import { StatusBar } from "expo-status-bar";
+import { useEffect } from "react";
 
 import { DatabaseProvider } from "../features/database/DatabaseProvider";
 import { BotQuoteCacheRefresher } from "../features/ledger/components/BotQuoteCacheRefresher";
-import { useNavigationTheme } from "../shared/ui/theme";
+import { fontAssets, fonts } from "../shared/ui/fonts";
+import { useNavigationTheme, useTheme } from "../shared/ui/theme";
+
+// 字型載入完才收起啟動畫面，避免先閃一下系統字型
+SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  const theme = useTheme();
+  const navigationTheme = useNavigationTheme();
+  const [loaded, error] = useFonts(fontAssets);
+
+  useEffect(() => {
+    if (loaded || error) SplashScreen.hideAsync();
+  }, [loaded, error]);
+
+  // 載入失敗時照常顯示，文字會退回系統字型
+  if (!loaded && !error) return null;
+
   return (
-    <ThemeProvider value={useNavigationTheme()}>
+    <ThemeProvider value={navigationTheme}>
+      <StatusBar style="dark" />
       <DatabaseProvider>
         <BotQuoteCacheRefresher />
-        <Stack screenOptions={{ headerBackTitle: "返回" }}>
+        <Stack
+          screenOptions={{
+            headerBackTitle: "返回",
+            headerShadowVisible: false,
+            headerStyle: { backgroundColor: theme.background },
+            headerTitleStyle: { fontFamily: fonts.bold, fontSize: 18 },
+            headerBackTitleStyle: { fontFamily: fonts.regular },
+            contentStyle: { backgroundColor: theme.background },
+          }}
+        >
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="ledger/new" options={{ title: "建立帳本" }} />
           <Stack.Screen name="backup" options={{ title: "備份與還原" }} />
