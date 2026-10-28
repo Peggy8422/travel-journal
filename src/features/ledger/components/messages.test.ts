@@ -1,6 +1,7 @@
 import {
   describeAllocationGap,
   describeError,
+  describeMapLocateError,
   describeRestoreReport,
 } from "./messages";
 
@@ -42,6 +43,15 @@ describe("describeError", () => {
       }),
     ).toContain("有成員不在這本帳本中");
   });
+});
+
+describe("describeMapLocateError", () => {
+  it.each(["LOCATION_PERMISSION_DENIED", "LOCATION_UNAVAILABLE"] as const)(
+    "does not suggest typing a place name for %s",
+    (code) => {
+      expect(describeMapLocateError({ code })).not.toContain("地名");
+    },
+  );
 });
 
 describe("describeRestoreReport", () => {

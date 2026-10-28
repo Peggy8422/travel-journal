@@ -12,6 +12,7 @@ import {
   toAmountInput,
   type CurrencyCode,
   type ExpenseFx,
+  type GeoPoint,
   type MemberId,
   type MemberRecord,
   type SplitRule,
@@ -32,18 +33,27 @@ import {
   formatDateTime,
 } from "../../../shared/ui/DateTimeField";
 import {
+  useCurrentPlace,
+  type CurrentPlaceState,
+} from "../hooks/useCurrentPlace";
+import {
   useFxRateResolution,
   type FxRateState,
 } from "../hooks/useFxRateResolution";
 import {
+  applyLocatedPlace,
   buildSplitRule,
   chooseExpenseFx,
+  initialPlaceDraft,
   normalizeNote,
   previewRemaining,
   resolveOccurredAt,
+  toPlaceFields,
+  type PlaceDraft,
 } from "../services/expenseFormLogic";
 import type { ExpenseInput } from "../services/ledgerCommands";
 import { categoryLabel } from "./categories";
+import { LocationPickerModal } from "./LocationPickerModal";
 import {
   describeAllocationGap,
   describeError,
@@ -64,9 +74,9 @@ export interface ExpenseFormInitial {
   readonly recordedAt?: Date;
   /** 編輯時傳入原本的匯率；幣別與時間都沒改就沿用，不重新查詢 */
   readonly fx?: ExpenseFx | null;
-  /** 表單沒有提供編輯的欄位，原樣帶回 */
+  readonly placeName: string | null;
+  readonly location: GeoPoint | null;
   readonly note: string | null;
-  readonly extras: Pick<ExpenseInput, "placeName" | "location">;
 }
 
 export function ExpenseForm({
@@ -132,6 +142,11 @@ export function ExpenseForm({
   const [manualRate, setManualRate] = useState<string | null>(
     initial.fx?.source === "manual" ? initial.fx.rateToBase : null,
   );
+  const [place, setPlace] = useState(() =>
+    initialPlaceDraft(initial.placeName, initial.location),
+  );
+  const currentPlace = useCurrentPlace();
+  const [pickingPlace, setPickingPlace] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -159,6 +174,19 @@ export function ExpenseForm({
     setParticipantIds((ids) =>
       ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id],
     );
+  }
+
+  async function fillCurrentPlace() {
+    const result = await currentPlace.locate();
+    if (result?.ok) setPlace((draft) => applyLocatedPlace(draft, result.value));
+  }
+
+  async function fillPickedPlace(point: GeoPoint) {
+    setPickingPlace(false);
+    // Keep the point even if the name lookup is slow or fails
+    setPlace((draft) => ({ ...draft, location: point }));
+    const result = await currentPlace.describe(point);
+    if (result?.ok) setPlace((draft) => applyLocatedPlace(draft, result.value));
   }
 
   async function submit() {
@@ -203,8 +231,8 @@ export function ExpenseForm({
         fx,
         split: split.value,
         title: title.trim(),
-        ...initial.extras,
         note: normalizeNote(noteText),
+        ...toPlaceFields(place),
         category,
         occurredAt,
       });
@@ -373,6 +401,26 @@ export function ExpenseForm({
         </ChipGroup>
       </Section>
 
+      <Section title="地點">
+        <PlaceFields
+          place={place}
+          onChangeName={(placeName) =>
+            setPlace((draft) => ({ ...draft, placeName }))
+          }
+          onClear={() => setPlace(initialPlaceDraft(null, null))}
+          locateState={currentPlace.state}
+          onLocate={fillCurrentPlace}
+          onPickOnMap={() => setPickingPlace(true)}
+        />
+        <LocationPickerModal
+          visible={pickingPlace}
+          initialPoint={place.location}
+          loadStartPoint={currentPlace.startPoint}
+          onCancel={() => setPickingPlace(false)}
+          onConfirm={fillPickedPlace}
+        />
+      </Section>
+
       <TextField
         label="備註"
         placeholder="例如：誰沒吃甜點、收據放在誰那裡"
@@ -387,6 +435,72 @@ export function ExpenseForm({
       <Button title="儲存" onPress={submit} disabled={saving} />
       {footer}
     </Screen>
+  );
+}
+
+function PlaceFields({
+  place,
+  onChangeName,
+  onClear,
+  locateState,
+  onLocate,
+  onPickOnMap,
+}: {
+  place: PlaceDraft;
+  onChangeName: (name: string) => void;
+  onClear: () => void;
+  locateState: CurrentPlaceState;
+  onLocate: () => void;
+  onPickOnMap: () => void;
+}) {
+  const locating = locateState.status === "locating";
+  const located =
+    locateState.status === "done" && locateState.result.ok
+      ? locateState.result.value
+      : undefined;
+
+  return (
+    <>
+      <TextField
+        label="地名"
+        placeholder="例如：一蘭 渋谷店"
+        value={place.placeName}
+        onChangeText={onChangeName}
+      />
+      {place.location ? (
+        <Label muted>
+          已記錄座標 {place.location.latitude.toFixed(5)},{" "}
+          {place.location.longitude.toFixed(5)}
+        </Label>
+      ) : (
+        <Label muted>記錄座標後，這筆消費會出現在地圖上</Label>
+      )}
+      {locating && <Label muted>取得地點中…</Label>}
+      {locateState.status === "done" && !locateState.result.ok && (
+        <ErrorText message={describeError(locateState.result.error)} />
+      )}
+      {located?.approximate && (
+        <Label muted>目前無法精確定位，使用的是最近一次的位置</Label>
+      )}
+      {located?.placeNameLookupFailed && (
+        <Label muted>查不到地名（可能沒有網路），請自行輸入</Label>
+      )}
+      <Button
+        title={place.location ? "重新定位" : "使用目前位置"}
+        variant="secondary"
+        onPress={onLocate}
+        disabled={locating}
+      />
+      <Button
+        title={place.location ? "在地圖上調整" : "在地圖上選擇"}
+        variant="secondary"
+        onPress={onPickOnMap}
+        disabled={locating}
+      />
+      {(place.location !== null || place.placeName !== "") && (
+        <Button title="清除地點" variant="secondary" onPress={onClear} />
+      )}
+    </>
   );
 }
 

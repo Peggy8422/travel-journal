@@ -25,3 +25,11 @@ export function formatLocalDateTime(timestamp: string): string {
   const time = timestamp.slice(11, 16);
   return `${Number(month)}/${Number(day)} ${time}`;
 }
+
+const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
+
+/** 顯示 YYYY-MM-DD 日期與星期，例如 "10/12（一）" */
+export function formatLocalDate(date: string): string {
+  const weekday = new Date(`${date}T00:00:00Z`).getUTCDay();
+  return `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}（${WEEKDAYS[weekday]}）`;
+}

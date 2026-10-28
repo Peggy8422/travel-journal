@@ -5,11 +5,13 @@ import {
   remainingToAllocate,
   type CurrencyCode,
   type ExpenseFx,
+  type GeoPoint,
   type LedgerError,
   type MemberId,
   type SplitRule,
 } from "../../../domain/ledger";
 import { expenseFxFromResolution, manualFx } from "./expenseFx";
+import type { LocatedPlace } from "./locateCurrentPlace";
 import { toLocalIsoString } from "./localTimestamp";
 import type { FxRateResolution, ResolveFxRateError } from "./resolveFxRate";
 
@@ -116,4 +118,49 @@ export function previewRemaining(
     currency,
   );
   return shares.ok ? remainingToAllocate(total.value, shares.value) : undefined;
+}
+
+/** 表單裡的地點草稿 */
+export interface PlaceDraft {
+  /** 地名輸入框的文字 */
+  readonly placeName: string;
+  readonly location: GeoPoint | null;
+  /** 上次定位自動帶入的地名；輸入框和它不同代表使用者自己改過 */
+  readonly suggestedName: string | null;
+}
+
+export function initialPlaceDraft(
+  placeName: string | null,
+  location: GeoPoint | null,
+): PlaceDraft {
+  return { placeName: placeName ?? "", location, suggestedName: null };
+}
+
+/**
+ * 套用定位結果：座標一律更新；地名只有在空白或還是上次自動帶入的值時才覆蓋，
+ * 不蓋掉使用者自己輸入的地名。
+ */
+export function applyLocatedPlace(
+  draft: PlaceDraft,
+  located: Pick<LocatedPlace, "location" | "placeName">,
+): PlaceDraft {
+  const typedByUser =
+    draft.placeName.trim() !== "" && draft.placeName !== draft.suggestedName;
+  return {
+    placeName: typedByUser ? draft.placeName : (located.placeName ?? ""),
+    location: located.location,
+    suggestedName: located.placeName,
+  };
+}
+
+/** 轉成要存的欄位。可以只有地名沒有座標（手動輸入），但這種消費不會出現在地圖上 */
+export function toPlaceFields(draft: PlaceDraft): {
+  placeName: string | null;
+  location: GeoPoint | null;
+} {
+  const placeName = draft.placeName.trim();
+  return {
+    placeName: placeName === "" ? null : placeName,
+    location: draft.location,
+  };
 }

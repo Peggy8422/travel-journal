@@ -1,7 +1,8 @@
-import type {
-  ExpenseFx,
-  ExpenseRecord,
-  ExpenseRepository,
+import {
+  hasLocation,
+  type ExpenseFx,
+  type ExpenseRecord,
+  type ExpenseRepository,
 } from "../../domain/ledger";
 import type { SqlExecutor, SqlValue } from "../db/sqlDatabase";
 import { decodeSplitRule, encodeSplitRule } from "../db/splitRuleJson";
@@ -94,6 +95,19 @@ export function createExpenseRepository(db: SqlExecutor): ExpenseRepository {
         [ledgerId],
       );
       return rows.map(toRecord);
+    },
+
+    async listWithLocation(options = {}) {
+      const ledgerFilter =
+        options.ledgerId === undefined ? "" : "AND ledger_id = ?";
+      const rows = await db.getAllAsync<ExpenseRow>(
+        `SELECT * FROM expenses
+         WHERE deleted_at IS NULL AND latitude IS NOT NULL ${ledgerFilter}
+         ORDER BY occurred_at_ms, created_at, id`,
+        options.ledgerId === undefined ? [] : [options.ledgerId],
+      );
+      // CHECK guarantees latitude and longitude are both set or both null
+      return rows.map(toRecord).filter(hasLocation);
     },
   };
 }

@@ -1,5 +1,9 @@
 import { toTaipeiDate } from "../../../domain/fx";
-import { formatLocalDateTime, toLocalIsoString } from "./localTimestamp";
+import {
+  formatLocalDate,
+  formatLocalDateTime,
+  toLocalIsoString,
+} from "./localTimestamp";
 
 describe("toLocalIsoString", () => {
   const instant = new Date("2026-10-12T03:00:00.000Z");
@@ -26,5 +30,12 @@ describe("toLocalIsoString", () => {
 describe("formatLocalDateTime", () => {
   it("shows the local time as written, without converting", () => {
     expect(formatLocalDateTime("2026-10-02T09:05:00+09:00")).toBe("10/2 09:05");
+  });
+});
+
+describe("formatLocalDate", () => {
+  it("shows the month, day and weekday without leading zeros", () => {
+    expect(formatLocalDate("2026-10-12")).toBe("10/12（一）");
+    expect(formatLocalDate("2026-01-04")).toBe("1/4（日）");
   });
 });

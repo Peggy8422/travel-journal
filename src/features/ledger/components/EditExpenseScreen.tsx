@@ -95,10 +95,8 @@ export function EditExpenseScreen({
         recordedAt: new Date(expense.createdAt),
         fx: expense.fx,
         note: expense.note,
-        extras: {
-          placeName: expense.placeName,
-          location: expense.location,
-        },
+        placeName: expense.placeName,
+        location: expense.location,
       }}
       notice={warning}
       onSubmit={async (input) => {
