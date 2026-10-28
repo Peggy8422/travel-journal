@@ -56,13 +56,14 @@ export default function RootLayout() {
               name="personal/expense/[expenseId]"
               options={{ title: "編輯個人消費", presentation: "modal" }}
             />
+            {/* 帳本內頁、設定、統計自己畫頁首（返回鍵、封面色帶），不用導覽列 */}
             <Stack.Screen
               name="ledger/[id]/index"
               options={{ title: "帳本", headerShown: false }}
             />
             <Stack.Screen
               name="ledger/[id]/settings"
-              options={{ title: "帳本設定" }}
+              options={{ title: "帳本設定", headerShown: false }}
             />
             <Stack.Screen
               name="ledger/[id]/stats"
