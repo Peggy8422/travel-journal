@@ -1,7 +1,8 @@
 import { router } from "expo-router";
 import { useState } from "react";
-import { View } from "react-native";
+import { StyleSheet, View } from "react-native";
 
+import { randomCover, rerollCover } from "../../../domain/ledger";
 import {
   Button,
   Chip,
@@ -13,9 +14,13 @@ import {
   Section,
   TextField,
 } from "../../../shared/ui/components";
+import { spacing } from "../../../shared/ui/theme";
 import { useLedgerCommandDeps } from "../../database/DatabaseProvider";
 import { createLedger } from "../services/ledgerCommands";
+import { toLocalIsoString } from "../services/localTimestamp";
+import { describeCover } from "./coverStyles";
 import { describeError } from "./messages";
+import { NotebookCover } from "./NotebookCover";
 
 export function CreateLedgerScreen() {
   const deps = useLedgerCommandDeps();
@@ -23,6 +28,8 @@ export function CreateLedgerScreen() {
   const [memberNames, setMemberNames] = useState(["", ""]);
   /** 哪一個成員欄位是「我」（memberNames 的索引），null 代表不指定 */
   const [selfField, setSelfField] = useState<number | null>(null);
+  // 一打開就隨機抽一個封面；之後會開放自訂
+  const [cover, setCover] = useState(() => randomCover());
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -54,6 +61,7 @@ export function CreateLedgerScreen() {
         name,
         memberNames: filled.map(({ memberName }) => memberName),
         selfIndex: selfIndex === -1 ? undefined : selfIndex,
+        cover,
       });
       if (!result.ok) {
         setError(describeError(result.error));
@@ -72,6 +80,29 @@ export function CreateLedgerScreen() {
 
   return (
     <Screen>
+      <View style={styles.coverPreview}>
+        <NotebookCover
+          cover={cover}
+          title={name.trim() || "新的帳本"}
+          caption={toLocalIsoString(new Date()).slice(0, 7).replace("-", ".")}
+          width={150}
+          tilt={-1}
+        />
+        <Label muted>{`隨機抽到：${describeCover(cover)}`}</Label>
+        <View style={styles.coverActions}>
+          <Button
+            title="換一個封面"
+            variant="secondary"
+            onPress={() => setCover((current) => rerollCover(current))}
+          />
+          <Button
+            title="自訂 · 即將推出"
+            variant="secondary"
+            disabled
+            onPress={() => {}}
+          />
+        </View>
+      </View>
       <TextField
         label="帳本名稱"
         placeholder="例如：東京五日遊"
@@ -130,3 +161,15 @@ export function CreateLedgerScreen() {
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  coverPreview: {
+    alignItems: "center",
+    gap: spacing.md,
+    paddingTop: spacing.sm,
+  },
+  coverActions: {
+    flexDirection: "row",
+    gap: spacing.sm,
+  },
+});
