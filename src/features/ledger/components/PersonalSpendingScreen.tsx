@@ -4,7 +4,6 @@ import { Pressable, View } from "react-native";
 
 import {
   formatMinorAmount,
-  shiftMonth,
   summarizePersonalMonth,
   type PersonalEntry,
 } from "../../../domain/ledger";
@@ -16,6 +15,7 @@ import {
   Screen,
   Section,
 } from "../../../shared/ui/components";
+import { MonthSwitcher } from "../../../shared/ui/MonthPicker";
 import { usePersonalSpending } from "../hooks/usePersonalQueries";
 import { groupByLocalDay } from "../services/expenseListView";
 import {
@@ -55,21 +55,12 @@ export function PersonalSpendingScreen() {
 
   return (
     <Screen>
-      <Row>
-        <Button
-          title="‹"
-          variant="secondary"
-          onPress={() => setMonth(shiftMonth(month, -1))}
-        />
-        <Label>
-          {month.slice(0, 4)} 年 {Number(month.slice(5, 7))} 月
-        </Label>
-        <Button
-          title="›"
-          variant="secondary"
-          onPress={() => setMonth(shiftMonth(month, 1))}
-        />
-      </Row>
+      <MonthSwitcher
+        value={month}
+        onChange={setMonth}
+        label="查看月份"
+        pickerTitle="選擇要查看的月份"
+      />
 
       <Section title="本月花費">
         <Label>{money(summary.totalMinor)}</Label>
