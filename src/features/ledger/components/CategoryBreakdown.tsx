@@ -1,24 +1,30 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import Svg, { Circle } from "react-native-svg";
 
 import {
   formatMinorAmount,
   type CategoryTotal,
   type CurrencyCode,
 } from "../../../domain/ledger";
-import { Label, Row, Section } from "../../../shared/ui/components";
+import { Card, CardTitle } from "../../../shared/ui/components";
 import { DonutChart } from "../../../shared/ui/DonutChart";
+import { accentOverhang, fonts } from "../../../shared/ui/fonts";
 import { useTheme } from "../../../shared/ui/theme";
 import {
   categoryColor,
   categoryLabel,
+  categoryTint,
   orderForChart,
   UNCATEGORIZED_KEY,
 } from "./categories";
 
+const SIZE = 220;
+const THICKNESS = 32;
+
 /**
- * 分類甜甜圈圖與圖例（統計頁與個人分頁共用）。
- * 依分類清單的固定順序排列、顏色跟著分類走；點一段或一列圖例可查看該分類。
+ * 分類甜甜圈圖與圖例的卡片（統計頁與個人分頁共用）。
+ * 依分類清單的固定順序排列、顏色跟著分類走；點一段或一列圖例可查看該分類，再點一次取消。
  */
 export function CategoryBreakdown({
   categories: totals,
@@ -42,15 +48,19 @@ export function CategoryBreakdown({
     key: c.category ?? UNCATEGORIZED_KEY,
     label: categoryLabel(c.category),
     color: categoryColor(c.category, theme),
+    tint: categoryTint(c.category, theme),
     percent:
       totalMinor === 0 ? 0 : Math.round((c.totalMinor / totalMinor) * 100),
   }));
   const selected = categories.find((c) => c.key === selectedKey);
 
   return (
-    <Section title="分類（點一下可查看）">
+    <Card style={styles.card}>
+      <CardTitle title="分類" hint="點圓環或分類可以查看" />
       <View style={styles.chart}>
         <DonutChart
+          size={SIZE}
+          thickness={THICKNESS}
           segments={categories.map((c) => ({
             key: c.key,
             value: c.totalMinor,
@@ -62,60 +72,124 @@ export function CategoryBreakdown({
             .map((c) => `${c.label} ${c.percent}%`)
             .join("，")}`}
         >
-          {selected ? (
-            <>
-              <Label>{selected.label}</Label>
-              <Label>{money(selected.totalMinor)}</Label>
-              <Label muted>{selected.percent}%</Label>
-            </>
-          ) : (
-            <>
-              <Label muted>{centerLabel}</Label>
-              <Label>{money(totalMinor)}</Label>
-            </>
+          {/* 鏤空處的鉛筆虛線圈，只是裝飾 */}
+          <Svg width={SIZE} height={SIZE} style={StyleSheet.absoluteFill}>
+            <Circle
+              cx={SIZE / 2}
+              cy={SIZE / 2}
+              r={SIZE / 2 - THICKNESS - 18}
+              fill="none"
+              stroke={theme.text}
+              strokeOpacity={0.25}
+              strokeDasharray="2 4"
+            />
+          </Svg>
+          <Text style={[styles.centerLabel, { color: theme.textMuted }]}>
+            {selected ? selected.label : centerLabel}
+          </Text>
+          <Text style={[styles.centerValue, { color: theme.text }]}>
+            {money(selected ? selected.totalMinor : totalMinor)}
+          </Text>
+          {selected && (
+            <Text style={[styles.centerPercent, { color: theme.textMuted }]}>
+              {selected.percent}%
+            </Text>
           )}
         </DonutChart>
       </View>
-      {categories.map((c) => (
-        <Pressable
-          key={c.key}
-          accessibilityRole="button"
-          accessibilityState={{ selected: c.key === selectedKey }}
-          onPress={() => setSelectedKey(c.key === selectedKey ? null : c.key)}
-          style={{ opacity: selectedKey && selectedKey !== c.key ? 0.5 : 1 }}
-        >
-          <Row>
-            <View style={styles.legendName}>
+      <View>
+        {categories.map((c) => {
+          const isSelected = c.key === selectedKey;
+          return (
+            <Pressable
+              key={c.key}
+              accessibilityRole="button"
+              accessibilityState={{ selected: isSelected }}
+              onPress={() => setSelectedKey(isSelected ? null : c.key)}
+              style={[
+                styles.legendRow,
+                {
+                  backgroundColor: isSelected ? c.tint : "transparent",
+                  opacity: selectedKey && !isSelected ? 0.5 : 1,
+                },
+              ]}
+            >
               <View style={[styles.swatch, { backgroundColor: c.color }]} />
-              <View style={{ flex: 1 }}>
-                <Label>{c.label}</Label>
-              </View>
-            </View>
-            <Label>
-              {money(c.totalMinor)}
-              <Label muted> {c.percent}%</Label>
-            </Label>
-          </Row>
-        </Pressable>
-      ))}
-    </Section>
+              <Text style={[styles.legendLabel, { color: theme.text }]}>
+                {c.label}
+              </Text>
+              <Text style={[styles.legendAmount, { color: theme.text }]}>
+                {money(c.totalMinor)}
+              </Text>
+              <Text style={[styles.legendPercent, { color: theme.textMuted }]}>
+                {c.percent}%
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </Card>
   );
 }
 
 const styles = StyleSheet.create({
+  card: {
+    gap: 12,
+    paddingVertical: 16,
+  },
   chart: {
     alignItems: "center",
-    paddingVertical: 8,
   },
-  legendName: {
-    flex: 1,
+  centerLabel: {
+    fontFamily: fonts.regular,
+    fontSize: 13,
+    textAlign: "center",
+  },
+  centerValue: {
+    fontFamily: fonts.bold,
+    fontSize: 17,
+    lineHeight: 22,
+    textAlign: "center",
+  },
+  centerPercent: {
+    fontFamily: fonts.accent,
+    fontSize: 20,
+    lineHeight: 22,
+    paddingRight: accentOverhang(20),
+  },
+  legendRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 10,
+    minHeight: 44,
+    paddingHorizontal: 8,
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 12,
+    borderBottomRightRadius: 9,
+    borderBottomLeftRadius: 13,
   },
   swatch: {
-    width: 12,
-    height: 12,
-    borderRadius: 3,
+    width: 14,
+    height: 14,
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 5,
+    borderBottomRightRadius: 3,
+    borderBottomLeftRadius: 6,
+    transform: [{ rotate: "-6deg" }],
+  },
+  legendLabel: {
+    flex: 1,
+    fontFamily: fonts.regular,
+    fontSize: 14.5,
+  },
+  legendAmount: {
+    fontFamily: fonts.regular,
+    fontSize: 14,
+  },
+  legendPercent: {
+    width: 40,
+    textAlign: "right",
+    fontFamily: fonts.regular,
+    fontSize: 13,
   },
 });

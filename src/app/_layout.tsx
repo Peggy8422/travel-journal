@@ -66,7 +66,7 @@ export default function RootLayout() {
             />
             <Stack.Screen
               name="ledger/[id]/stats"
-              options={{ title: "統計" }}
+              options={{ title: "統計", headerShown: false }}
             />
             <Stack.Screen
               name="ledger/[id]/add-expense"
