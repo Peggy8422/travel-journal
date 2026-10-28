@@ -11,6 +11,8 @@ import {
   type TextInputProps,
 } from "react-native";
 
+import { fonts } from "./fonts";
+import { PaperBackground, SketchFrame } from "./handDrawn";
 import { spacing, useTheme } from "./theme";
 
 /**
@@ -20,6 +22,7 @@ import { spacing, useTheme } from "./theme";
  *   再由 ScrollView 把輸入中的欄位捲進畫面。它依實際被遮住的高度計算，系統已縮小時不會重複扣
  * 鍵盤展開時點擊空白處不會吃掉按鈕的點擊；往下拖動會收起鍵盤。
  * iOS 26 起 Stack 的 header 是透明的（Liquid Glass），由 contentInsetAdjustmentBehavior 讓內容從 header 下方開始。
+ * 底層鋪和紙的方眼點陣，內容在上面捲動。
  */
 export function Screen({ children }: { children: ReactNode }) {
   const theme = useTheme();
@@ -28,6 +31,7 @@ export function Screen({ children }: { children: ReactNode }) {
       style={[styles.fill, { backgroundColor: theme.background }]}
       behavior={Platform.OS === "android" ? "height" : undefined}
     >
+      <PaperBackground />
       <ScrollView
         style={styles.fill}
         contentContainerStyle={styles.screen}
@@ -52,15 +56,9 @@ export function Section({
   const theme = useTheme();
   return (
     <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>
-        {title}
-      </Text>
-      <View
-        style={[
-          styles.card,
-          { backgroundColor: theme.surface, borderColor: theme.border },
-        ]}
-      >
+      <Text style={[styles.sectionTitle, { color: theme.text }]}>{title}</Text>
+      <View style={[styles.card, { backgroundColor: theme.surface }]}>
+        <SketchFrame radius={14} />
         {children}
       </View>
     </View>
@@ -107,6 +105,12 @@ export function Button({
 }) {
   const theme = useTheme();
   const primary = variant === "primary";
+  // 主要按鈕是朱色實心；次要與危險按鈕是紙色加鉛筆框，危險用深朱色的框和字
+  const color = primary
+    ? theme.onPrimary
+    : variant === "danger"
+      ? theme.negative
+      : theme.text;
   return (
     <Pressable
       accessibilityRole="button"
@@ -114,26 +118,20 @@ export function Button({
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
+        primary && styles.buttonRaised,
         {
-          backgroundColor: primary ? theme.primary : theme.chip,
-          opacity: disabled ? 0.4 : pressed ? 0.7 : 1,
+          backgroundColor: primary ? theme.primary : theme.surface,
+          opacity: disabled ? 0.4 : pressed ? 0.75 : 1,
         },
       ]}
     >
-      <Text
-        style={[
-          styles.buttonText,
-          {
-            color: primary
-              ? theme.onPrimary
-              : variant === "danger"
-                ? theme.negative
-                : theme.text,
-          },
-        ]}
-      >
-        {title}
-      </Text>
+      {!primary && (
+        <SketchFrame
+          radius={14}
+          color={variant === "danger" ? theme.negative : theme.pencil}
+        />
+      )}
+      <Text style={[styles.buttonText, { color }]}>{title}</Text>
     </Pressable>
   );
 }
@@ -151,11 +149,7 @@ export function TextField({
         {...props}
         style={[
           styles.input,
-          {
-            color: theme.text,
-            backgroundColor: theme.surface,
-            borderColor: theme.border,
-          },
+          { color: theme.text, borderColor: theme.pencil },
           props.style,
         ]}
       />
@@ -180,10 +174,19 @@ export function Chip({
       onPress={onPress}
       style={[
         styles.chip,
-        { backgroundColor: selected ? theme.primary : theme.chip },
+        selected
+          ? { backgroundColor: theme.text, borderColor: theme.text }
+          : { backgroundColor: "transparent", borderColor: theme.pencil },
       ]}
     >
-      <Text style={{ color: selected ? theme.onPrimary : theme.text }}>
+      <Text
+        style={[
+          styles.chipText,
+          selected
+            ? { color: theme.surface, fontFamily: fonts.bold }
+            : { color: theme.text },
+        ]}
+      >
         {label}
       </Text>
     </Pressable>
@@ -197,7 +200,9 @@ export function ChipGroup({ children }: { children: ReactNode }) {
 export function ErrorText({ message }: { message: string | null }) {
   const theme = useTheme();
   if (!message) return null;
-  return <Text style={{ color: theme.negative }}>{message}</Text>;
+  return (
+    <Text style={[styles.label, { color: theme.negative }]}>{message}</Text>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -212,15 +217,20 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   sectionTitle: {
-    fontSize: 13,
-    fontWeight: "600",
+    fontFamily: fonts.bold,
+    fontSize: 16,
   },
+  // 四個角半徑不同，加上鉛筆框，像手撕的紙片
   card: {
-    borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    borderTopLeftRadius: 6,
+    borderTopRightRadius: 14,
+    borderBottomRightRadius: 8,
+    borderBottomLeftRadius: 16,
+    paddingHorizontal: spacing.md + 2,
+    paddingVertical: spacing.md,
     gap: spacing.sm,
+    boxShadow:
+      "0px 2px 0px rgba(58,51,45,0.07), 0px 8px 18px rgba(58,51,45,0.08)",
   },
   row: {
     flexDirection: "row",
@@ -230,33 +240,52 @@ const styles = StyleSheet.create({
     minHeight: 36,
   },
   label: {
+    fontFamily: fonts.regular,
     fontSize: 15,
   },
   button: {
-    borderRadius: 10,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 16,
+    borderBottomRightRadius: 13,
+    borderBottomLeftRadius: 17,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
+    minHeight: 48,
     alignItems: "center",
+    justifyContent: "center",
+  },
+  buttonRaised: {
+    boxShadow: "2px 3px 0px rgba(58,51,45,0.22)",
   },
   buttonText: {
+    fontFamily: fonts.bold,
     fontSize: 16,
-    fontWeight: "600",
   },
   field: {
     gap: spacing.xs,
   },
+  // 只有底線，像寫在筆記本的橫線上
   input: {
-    borderRadius: 10,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: spacing.md,
+    borderBottomWidth: 1.5,
+    paddingHorizontal: 2,
     paddingVertical: spacing.sm,
-    fontSize: 16,
+    fontFamily: fonts.regular,
+    fontSize: 17,
     minHeight: 44,
   },
   chip: {
-    borderRadius: 16,
+    borderWidth: 1.2,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 15,
+    borderBottomRightRadius: 17,
+    borderBottomLeftRadius: 16,
     paddingHorizontal: spacing.md,
-    paddingVertical: 6,
+    minHeight: 36,
+    justifyContent: "center",
+  },
+  chipText: {
+    fontFamily: fonts.regular,
+    fontSize: 14,
   },
   chipGroup: {
     flexDirection: "row",

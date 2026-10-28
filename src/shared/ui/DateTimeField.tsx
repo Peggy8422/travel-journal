@@ -4,6 +4,7 @@ import DateTimePicker, {
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Label } from "./components";
+import { fonts } from "./fonts";
 import { spacing, useTheme } from "./theme";
 
 /**
@@ -70,7 +71,9 @@ export function DateTimeField({
         onPress={openAndroidPicker}
         style={[styles.androidValue, { backgroundColor: theme.chip }]}
       >
-        <Text style={{ color: theme.text }}>{formatDateTime(value)}</Text>
+        <Text style={[styles.androidText, { color: theme.text }]}>
+          {formatDateTime(value)}
+        </Text>
       </Pressable>
     </View>
   );
@@ -94,8 +97,12 @@ const styles = StyleSheet.create({
     minHeight: 44,
   },
   androidValue: {
-    borderRadius: 8,
+    borderRadius: 16,
     paddingHorizontal: spacing.md,
-    paddingVertical: 6,
+    paddingVertical: 8,
+  },
+  androidText: {
+    fontFamily: fonts.regular,
+    fontSize: 15,
   },
 });

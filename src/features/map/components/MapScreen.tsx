@@ -19,6 +19,7 @@ import {
   type PinGroup,
 } from "../../../domain/map";
 import { Chip, Label, MessageScreen, Row } from "../../../shared/ui/components";
+import { fonts } from "../../../shared/ui/fonts";
 import { spacing, useTheme } from "../../../shared/ui/theme";
 import { describeMapLocateError } from "../../ledger/components/messages";
 import {
@@ -430,6 +431,7 @@ const styles = StyleSheet.create({
   },
   dropdownText: {
     flexShrink: 1,
+    fontFamily: fonts.regular,
     fontSize: 15,
   },
   card: {
