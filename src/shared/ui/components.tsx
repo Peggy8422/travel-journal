@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -147,17 +148,32 @@ export function Label({
   );
 }
 
+/**
+ * 按鈕按下時先收起鍵盤再執行動作：Screen 的 keyboardShouldPersistTaps 是 "handled"，
+ * 點按鈕不會自動收鍵盤，儲存後鍵盤會一直留著，錯誤訊息也可能被擋住。
+ */
+function dismissKeyboardThen(onPress: () => void) {
+  return () => {
+    Keyboard.dismiss();
+    onPress();
+  };
+}
+
+/** 整列寬的按鈕；按下時會先收起鍵盤（keepKeyboard 除外） */
 export function Button({
   title,
   onPress,
   disabled,
   variant = "primary",
+  keepKeyboard = false,
 }: {
   title: string;
   onPress: () => void;
   disabled?: boolean;
   /** danger：刪除這類無法輕易復原的操作 */
   variant?: "primary" | "secondary" | "danger";
+  /** 按下後會冒出新的輸入欄位、要接著打字時設 true（例如「新增成員」），不收鍵盤 */
+  keepKeyboard?: boolean;
 }) {
   const theme = useTheme();
   const primary = variant === "primary";
@@ -171,7 +187,7 @@ export function Button({
     <Pressable
       accessibilityRole="button"
       disabled={disabled}
-      onPress={onPress}
+      onPress={keepKeyboard ? onPress : dismissKeyboardThen(onPress)}
       style={({ pressed }) => [
         styles.button,
         primary && styles.buttonRaised,
@@ -194,7 +210,7 @@ export function Button({
 
 /**
  * 卡片裡的小按鈕（記錄還款、換一個封面、新增…）：outline 是紙色加細框，primary 是朱色實心。
- * icon 放在文字左邊。
+ * icon 放在文字左邊；按下時會先收起鍵盤。
  */
 export function SmallButton({
   title,
@@ -219,7 +235,7 @@ export function SmallButton({
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled }}
       disabled={disabled}
-      onPress={onPress}
+      onPress={dismissKeyboardThen(onPress)}
       style={({ pressed }) => [
         styles.smallButton,
         primary ? null : styles.smallButtonOutline,

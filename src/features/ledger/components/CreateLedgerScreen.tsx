@@ -28,6 +28,8 @@ export function CreateLedgerScreen() {
   const toast = useToast();
   const [name, setName] = useState("");
   const [memberNames, setMemberNames] = useState(["", ""]);
+  /** 按「新增成員」後要自動聚焦的欄位（memberNames 的索引） */
+  const [focusField, setFocusField] = useState<number | null>(null);
   /** 哪一個成員欄位是「我」（memberNames 的索引），null 代表不指定 */
   const [selfField, setSelfField] = useState<number | null>(null);
   // 一打開就隨機抽一個封面；之後會開放自訂
@@ -120,6 +122,8 @@ export function CreateLedgerScreen() {
                 placeholder={`成員 ${index + 1}`}
                 value={memberName}
                 onChangeText={(value) => setMemberName(index, value)}
+                // 只在剛新增、第一次掛上時生效，之後重繪不會搶走焦點
+                autoFocus={index === focusField}
               />
             </View>
             {memberNames.length > 1 && (
@@ -134,7 +138,11 @@ export function CreateLedgerScreen() {
         <Button
           title="新增成員"
           variant="secondary"
-          onPress={() => setMemberNames((names) => [...names, ""])}
+          keepKeyboard
+          onPress={() => {
+            setFocusField(memberNames.length);
+            setMemberNames((names) => [...names, ""]);
+          }}
         />
       </Section>
       {memberNames.some((n) => n.trim() !== "") && (

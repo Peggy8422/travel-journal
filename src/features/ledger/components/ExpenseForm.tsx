@@ -541,6 +541,12 @@ function FxRateInfo({
   manualRate: string | null;
   onManualRateChange: (rate: string | null) => void;
 }) {
+  // 按「手動修改匯率」才自動聚焦；查詢失敗時直接出現的欄位不搶焦點，免得一打開表單就跳鍵盤
+  const [focusManual, setFocusManual] = useState(false);
+  const editManually = (rate: string) => {
+    setFocusManual(true);
+    onManualRateChange(rate);
+  };
   const manualField = (
     <TextField
       label={`1 ${currency} = ? ${baseCurrency}`}
@@ -548,6 +554,7 @@ function FxRateInfo({
       keyboardType="decimal-pad"
       value={manualRate ?? ""}
       onChangeText={onManualRateChange}
+      autoFocus={focusManual}
     />
   );
 
@@ -568,7 +575,10 @@ function FxRateInfo({
           <Button
             title={`改回臺銀匯率 ${botRate}`}
             variant="secondary"
-            onPress={() => onManualRateChange(null)}
+            onPress={() => {
+              setFocusManual(false);
+              onManualRateChange(null);
+            }}
           />
         )}
       </>
@@ -587,7 +597,8 @@ function FxRateInfo({
         <Button
           title="手動修改匯率"
           variant="secondary"
-          onPress={() => onManualRateChange(storedFx.rateToBase)}
+          keepKeyboard
+          onPress={() => editManually(storedFx.rateToBase)}
         />
         <Button
           title="重新查詢臺銀匯率"
@@ -635,7 +646,8 @@ function FxRateInfo({
       <Button
         title="手動修改匯率"
         variant="secondary"
-        onPress={() => onManualRateChange(resolution.rate)}
+        keepKeyboard
+        onPress={() => editManually(resolution.rate)}
       />
     </>
   );
