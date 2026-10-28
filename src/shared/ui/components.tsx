@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Keyboard,
   KeyboardAvoidingView,
@@ -260,23 +260,67 @@ export function SmallButton({
   );
 }
 
+/**
+ * 底線輸入框。有 maxLength 時，聚焦中或寫到八成以上會在右邊顯示「12 / 20」。
+ * 舊資料（例如還原的備份）已經超過上限時，maxLength 放寬到目前長度，
+ * 否則 Android 會把顯示的文字截掉；這時字數變成朱色，存檔時由指令擋下並說明上限。
+ */
 export function TextField({
   label,
+  maxLength,
+  onFocus,
+  onBlur,
   ...props
 }: TextInputProps & { label?: string }) {
   const theme = useTheme();
+  const [focused, setFocused] = useState(false);
+  const length = props.value?.length ?? 0;
+  const limited = maxLength !== undefined;
+  const over = limited && length > maxLength;
+  const showCount = limited && (focused || length >= maxLength * 0.8);
+  const input = (
+    <TextInput
+      placeholderTextColor={theme.textMuted}
+      {...props}
+      maxLength={limited ? Math.max(maxLength, length) : undefined}
+      onFocus={(event) => {
+        setFocused(true);
+        onFocus?.(event);
+      }}
+      onBlur={(event) => {
+        setFocused(false);
+        onBlur?.(event);
+      }}
+      style={[
+        styles.input,
+        limited ? styles.inputInRow : { borderColor: theme.pencil },
+        { color: theme.text },
+        props.style,
+      ]}
+    />
+  );
   return (
     <View style={styles.field}>
       {label && <Label muted>{label}</Label>}
-      <TextInput
-        placeholderTextColor={theme.textMuted}
-        {...props}
-        style={[
-          styles.input,
-          { color: theme.text, borderColor: theme.pencil },
-          props.style,
-        ]}
-      />
+      {limited ? (
+        // 底線畫在外層，字數才會在底線上方、輸入框的右邊
+        <View style={[styles.inputRow, { borderColor: theme.pencil }]}>
+          {input}
+          {showCount && (
+            <Text
+              accessibilityLabel={`已輸入 ${length} 字，上限 ${maxLength} 字`}
+              style={[
+                styles.count,
+                { color: over ? theme.negative : theme.textMuted },
+              ]}
+            >
+              {length} / {maxLength}
+            </Text>
+          )}
+        </View>
+      ) : (
+        input
+      )}
     </View>
   );
 }
@@ -437,6 +481,21 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     fontSize: 17,
     minHeight: 44,
+  },
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 6,
+    borderBottomWidth: 1.5,
+  },
+  inputInRow: {
+    flex: 1,
+    borderBottomWidth: 0,
+  },
+  count: {
+    fontFamily: fonts.regular,
+    fontSize: 12,
+    paddingBottom: spacing.sm + 2,
   },
   chip: {
     flexDirection: "row",

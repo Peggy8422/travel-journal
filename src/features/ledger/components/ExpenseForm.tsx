@@ -9,6 +9,7 @@ import {
   parseAmountInput,
   remainingToAllocate,
   SUPPORTED_CURRENCIES,
+  TEXT_LIMITS,
   toAmountInput,
   type CurrencyCode,
   type ExpenseFx,
@@ -272,6 +273,7 @@ export function ExpenseForm({
         placeholder="例如：午餐拉麵"
         value={title}
         onChangeText={setTitle}
+        maxLength={TEXT_LIMITS.expenseTitle}
       />
       <TextField
         label={`金額（${currency}）`}
@@ -426,6 +428,7 @@ export function ExpenseForm({
         placeholder="例如：誰沒吃甜點、收據放在誰那裡"
         value={noteText}
         onChangeText={setNoteText}
+        maxLength={TEXT_LIMITS.note}
         multiline
         style={{ minHeight: 72, textAlignVertical: "top" }}
       />
@@ -466,6 +469,7 @@ function PlaceFields({
         placeholder="例如：一蘭 渋谷店"
         value={place.placeName}
         onChangeText={onChangeName}
+        maxLength={TEXT_LIMITS.placeName}
       />
       {place.location ? (
         <Label muted>

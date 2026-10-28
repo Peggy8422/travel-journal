@@ -2,7 +2,7 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 
-import { randomCover, rerollCover } from "../../../domain/ledger";
+import { randomCover, rerollCover, TEXT_LIMITS } from "../../../domain/ledger";
 import {
   Button,
   Chip,
@@ -113,6 +113,7 @@ export function CreateLedgerScreen() {
         placeholder="例如：東京五日遊"
         value={name}
         onChangeText={setName}
+        maxLength={TEXT_LIMITS.ledgerName}
       />
       <Section title="成員（依加入順序）">
         {memberNames.map((memberName, index) => (
@@ -122,6 +123,7 @@ export function CreateLedgerScreen() {
                 placeholder={`成員 ${index + 1}`}
                 value={memberName}
                 onChangeText={(value) => setMemberName(index, value)}
+                maxLength={TEXT_LIMITS.memberName}
                 // 只在剛新增、第一次掛上時生效，之後重繪不會搶走焦點
                 autoFocus={index === focusField}
               />

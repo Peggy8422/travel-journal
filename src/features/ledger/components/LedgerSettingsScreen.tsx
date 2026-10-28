@@ -7,6 +7,7 @@ import type { Result } from "../../../domain/common/result";
 import {
   coverFromId,
   rerollCover,
+  TEXT_LIMITS,
   type MemberRecord,
 } from "../../../domain/ledger";
 import {
@@ -260,6 +261,7 @@ export function LedgerSettingsScreen({ ledgerId }: { ledgerId: string }) {
           accessibilityLabel="帳本名稱"
           value={nameDraft}
           onChangeText={setLedgerName}
+          maxLength={TEXT_LIMITS.ledgerName}
         />
         {nameChanged && (
           <View style={styles.end}>
@@ -370,6 +372,7 @@ export function LedgerSettingsScreen({ ledgerId }: { ledgerId: string }) {
               placeholder="新成員的名字"
               value={newMemberName}
               onChangeText={setNewMemberName}
+              maxLength={TEXT_LIMITS.memberName}
               onSubmitEditing={saveNewMember}
               returnKeyType="done"
             />
@@ -439,6 +442,7 @@ function MemberEditor({
             accessibilityLabel="名字"
             value={name}
             onChangeText={setName}
+            maxLength={TEXT_LIMITS.memberName}
           />
         </View>
         <SmallButton
