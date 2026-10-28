@@ -231,6 +231,17 @@ describe("place draft", () => {
     expect(second.location).toEqual(shinjuku);
   });
 
+  it("cuts a long located name down to the place name limit", () => {
+    const longName = "東京都渋谷区道玄坂二丁目".repeat(5);
+    const draft = applyLocatedPlace(initialPlaceDraft(null, null), {
+      location: shibuya,
+      placeName: longName,
+    });
+
+    expect(draft.placeName).toBe(longName.slice(0, 40));
+    expect(draft.suggestedName).toBe(draft.placeName);
+  });
+
   it("clears a previously suggested name when the new spot has none", () => {
     const first = applyLocatedPlace(initialPlaceDraft(null, null), {
       location: shibuya,

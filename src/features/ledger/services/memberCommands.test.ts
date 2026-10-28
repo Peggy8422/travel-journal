@@ -57,6 +57,13 @@ describe("renameMember", () => {
     expect((await list())[1]?.name).toBe("Bobby");
   });
 
+  it("rejects a name over the member name limit", async () => {
+    const { deps, ids } = await setup();
+    expect(
+      unwrapErr(await renameMember(deps, ids[0]!, "一二三四五六七八九十一")),
+    ).toEqual({ code: "TEXT_TOO_LONG", field: "memberName", max: 10 });
+  });
+
   it("rejects an empty name and a missing member", async () => {
     const { deps, ids } = await setup();
     expect(unwrapErr(await renameMember(deps, ids[0]!, " ")).code).toBe(

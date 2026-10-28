@@ -3,6 +3,7 @@ import {
   parseAmountInput,
   parseShareInputs,
   remainingToAllocate,
+  TEXT_LIMITS,
   type CurrencyCode,
   type ExpenseFx,
   type GeoPoint,
@@ -138,7 +139,7 @@ export function initialPlaceDraft(
 
 /**
  * 套用定位結果：座標一律更新；地名只有在空白或還是上次自動帶入的值時才覆蓋，
- * 不蓋掉使用者自己輸入的地名。
+ * 不蓋掉使用者自己輸入的地名。自動帶入的地名截到地名的字數上限，免得存檔時被擋。
  */
 export function applyLocatedPlace(
   draft: PlaceDraft,
@@ -146,10 +147,12 @@ export function applyLocatedPlace(
 ): PlaceDraft {
   const typedByUser =
     draft.placeName.trim() !== "" && draft.placeName !== draft.suggestedName;
+  const suggested =
+    located.placeName?.slice(0, TEXT_LIMITS.placeName).trim() ?? null;
   return {
-    placeName: typedByUser ? draft.placeName : (located.placeName ?? ""),
+    placeName: typedByUser ? draft.placeName : (suggested ?? ""),
     location: located.location,
-    suggestedName: located.placeName,
+    suggestedName: suggested,
   };
 }
 

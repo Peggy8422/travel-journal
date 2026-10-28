@@ -80,6 +80,12 @@ export {
   type CoverStyle,
   type LedgerCover,
 } from "./cover";
+export {
+  checkTextLength,
+  TEXT_LIMITS,
+  type LimitedTextField,
+  type TextTooLongError,
+} from "./textLimits";
 export type { LedgerBackup } from "./backup";
 export {
   collectPersonalEntries,

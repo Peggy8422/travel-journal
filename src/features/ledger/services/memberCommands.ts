@@ -1,5 +1,9 @@
 import { err, ok } from "../../../domain/common/result";
-import type { MemberId, MemberRecord } from "../../../domain/ledger";
+import {
+  checkTextLength,
+  type MemberId,
+  type MemberRecord,
+} from "../../../domain/ledger";
 import {
   createRepositories,
   type Repositories,
@@ -19,6 +23,8 @@ export async function renameMember(
 ): CommandResult<MemberRecord> {
   const trimmed = name.trim();
   if (trimmed === "") return err({ code: "EMPTY_NAME" });
+  const length = checkTextLength("memberName", trimmed);
+  if (!length.ok) return length;
   const repos = createRepositories(deps.db);
   const member = await repos.members.findById(memberId);
   if (!member) return err({ code: "MEMBER_NOT_FOUND", memberId });

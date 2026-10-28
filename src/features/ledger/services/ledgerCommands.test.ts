@@ -58,6 +58,65 @@ function ramen(payerId: string, participantIds: string[]): ExpenseInput {
   };
 }
 
+describe("text limits", () => {
+  const tooLong = (n: number) => "字".repeat(n + 1);
+
+  it("rejects a ledger or member name over the limit when creating", async () => {
+    const { deps } = await setup();
+    expect(
+      unwrapErr(
+        await createLedger(deps, { name: tooLong(20), memberNames: ["A"] }),
+      ),
+    ).toEqual({ code: "TEXT_TOO_LONG", field: "ledgerName", max: 20 });
+    expect(
+      unwrapErr(
+        await createLedger(deps, { name: "花東", memberNames: [tooLong(10)] }),
+      ),
+    ).toEqual({ code: "TEXT_TOO_LONG", field: "memberName", max: 10 });
+  });
+
+  it("checks the trimmed name, so surrounding spaces do not count", async () => {
+    const { deps } = await setup();
+    const name = `  ${"字".repeat(20)}  `;
+    const { ledger } = unwrap(
+      await createLedger(deps, { name, memberNames: ["A"] }),
+    );
+    expect(ledger.name).toHaveLength(20);
+  });
+
+  it("rejects renaming a ledger and adding a member over the limit", async () => {
+    const { deps, ledgerId } = await setup();
+    expect(
+      unwrapErr(await renameLedger(deps, ledgerId, tooLong(20))).code,
+    ).toBe("TEXT_TOO_LONG");
+    expect(unwrapErr(await addMember(deps, ledgerId, tooLong(10))).code).toBe(
+      "TEXT_TOO_LONG",
+    );
+  });
+
+  it("rejects an expense whose title, place or note is too long", async () => {
+    const { deps, ledgerId, a } = await setup();
+    const base = ramen(a, [a]);
+    expect(
+      unwrapErr(
+        await addExpense(deps, ledgerId, { ...base, title: tooLong(30) }),
+      ),
+    ).toEqual({ code: "TEXT_TOO_LONG", field: "expenseTitle", max: 30 });
+    expect(
+      unwrapErr(
+        await addExpense(deps, ledgerId, { ...base, placeName: tooLong(40) }),
+      ),
+    ).toEqual({ code: "TEXT_TOO_LONG", field: "placeName", max: 40 });
+
+    const saved = unwrap(await addExpense(deps, ledgerId, base));
+    expect(
+      unwrapErr(
+        await updateExpense(deps, saved.id, { ...base, note: tooLong(200) }),
+      ),
+    ).toEqual({ code: "TEXT_TOO_LONG", field: "note", max: 200 });
+  });
+});
+
 describe("createLedger", () => {
   it("creates the ledger and its members in join order", async () => {
     const { db, ledgerId } = await setup();

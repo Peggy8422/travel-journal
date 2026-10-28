@@ -24,6 +24,12 @@ describe("describeAllocationGap", () => {
 });
 
 describe("describeError", () => {
+  it("names the field and its limit for text that is too long", () => {
+    expect(
+      describeError({ code: "TEXT_TOO_LONG", field: "memberName", max: 10 }),
+    ).toBe("成員名字最多 10 個字");
+  });
+
   it("explains a share sum mismatch in Chinese instead of showing the code", () => {
     expect(
       describeError({

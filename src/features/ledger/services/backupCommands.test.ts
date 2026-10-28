@@ -106,6 +106,26 @@ describe("backup and restore", () => {
     );
   });
 
+  it("restores text longer than today's input limits as it is", async () => {
+    const source = await seededDatabase();
+    const [backup] = await collectBackup(source.db);
+    const longName = "很長的帳本名稱".repeat(5);
+    const longTitle = "很長的消費名稱".repeat(6);
+    const old = {
+      ...backup!,
+      ledger: { ...backup!.ledger, name: longName },
+      expenses: backup!.expenses.map((e) => ({ ...e, title: longTitle })),
+    };
+
+    const target = await createTestDatabase();
+    const report = await restoreBackup(target, [old]);
+
+    expect(report.restored.map((l) => l.name)).toEqual([longName]);
+    const summary = unwrap(await loadLedgerSummary(target, source.ledgerId));
+    expect(summary.ledger.name).toBe(longName);
+    expect(summary.expenses.map((e) => e.title)).toEqual([longTitle]);
+  });
+
   it("includes deleted expenses in the backup", async () => {
     const { db } = await seededDatabase();
     const [backup] = await collectBackup(db);

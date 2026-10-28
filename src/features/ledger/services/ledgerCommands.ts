@@ -1,6 +1,7 @@
 import { err, ok, type Result } from "../../../domain/common/result";
 import { toTaipeiDate } from "../../../domain/fx";
 import {
+  checkTextLength,
   computeShares,
   expenseMemberIds,
   toExpense,
@@ -15,6 +16,7 @@ import {
   type MemberId,
   type MemberRecord,
   type SettlementRecord,
+  type TextTooLongError,
 } from "../../../domain/ledger";
 import type { SqlDatabase } from "../../../data/db/sqlDatabase";
 import {
@@ -39,6 +41,7 @@ export interface LedgerCommandDeps {
 
 export type LedgerCommandError =
   | LedgerError
+  | TextTooLongError
   | { readonly code: "EMPTY_NAME" }
   | { readonly code: "NO_MEMBERS" }
   | { readonly code: "INVALID_TIMESTAMP"; readonly value: string }
@@ -80,9 +83,15 @@ export async function createLedger(
 ): CommandResult<{ ledger: LedgerRecord; members: MemberRecord[] }> {
   const name = input.name.trim();
   if (name === "") return err({ code: "EMPTY_NAME" });
+  const nameLength = checkTextLength("ledgerName", name);
+  if (!nameLength.ok) return nameLength;
   const memberNames = input.memberNames.map((n) => n.trim());
   if (memberNames.length === 0) return err({ code: "NO_MEMBERS" });
   if (memberNames.some((n) => n === "")) return err({ code: "EMPTY_NAME" });
+  for (const memberName of memberNames) {
+    const memberLength = checkTextLength("memberName", memberName);
+    if (!memberLength.ok) return memberLength;
+  }
 
   const timestamp = deps.now().toISOString();
   const ledger: LedgerRecord = {
@@ -127,6 +136,8 @@ export async function renameLedger(
 ): CommandResult<LedgerRecord> {
   const trimmed = name.trim();
   if (trimmed === "") return err({ code: "EMPTY_NAME" });
+  const length = checkTextLength("ledgerName", trimmed);
+  if (!length.ok) return length;
   const repos = createRepositories(deps.db);
   const ledger = await repos.ledgers.findById(ledgerId);
   if (!ledger) return err({ code: "LEDGER_NOT_FOUND", ledgerId });
@@ -179,6 +190,8 @@ export async function addMember(
 ): CommandResult<MemberRecord> {
   const trimmed = name.trim();
   if (trimmed === "") return err({ code: "EMPTY_NAME" });
+  const length = checkTextLength("memberName", trimmed);
+  if (!length.ok) return length;
   const repos = createRepositories(deps.db);
   if (!(await repos.ledgers.findById(ledgerId))) {
     return err({ code: "LEDGER_NOT_FOUND", ledgerId });
@@ -358,6 +371,14 @@ async function validateExpense(
 ): CommandResult<void> {
   if (!toTaipeiDate(expense.occurredAt).ok) {
     return err({ code: "INVALID_TIMESTAMP", value: expense.occurredAt });
+  }
+  for (const [field, text] of [
+    ["expenseTitle", expense.title],
+    ["placeName", expense.placeName],
+    ["note", expense.note],
+  ] as const) {
+    const length = checkTextLength(field, text);
+    if (!length.ok) return length;
   }
   const loaded = await loadLedger(repos, expense.ledgerId);
   if (!loaded.ok) return loaded;

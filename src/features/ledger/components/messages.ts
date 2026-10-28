@@ -1,4 +1,8 @@
-import { formatMinorAmount, type CurrencyCode } from "../../../domain/ledger";
+import {
+  formatMinorAmount,
+  type CurrencyCode,
+  type LimitedTextField,
+} from "../../../domain/ledger";
 import type { BackupFileError } from "../../../data/backup/backupFile";
 import type { RestoreReport } from "../services/backupCommands";
 import type { LedgerCommandError } from "../services/ledgerCommands";
@@ -16,11 +20,21 @@ type DisplayableError =
   | BackupFileError
   | LocateError;
 
+const TEXT_FIELD_LABELS: Readonly<Record<LimitedTextField, string>> = {
+  ledgerName: "帳本名稱",
+  memberName: "成員名字",
+  expenseTitle: "消費名稱",
+  placeName: "地名",
+  note: "備註",
+};
+
 /** 錯誤代碼轉成給使用者看的訊息 */
 export function describeError(error: DisplayableError): string {
   switch (error.code) {
     case "EMPTY_NAME":
       return "名稱不能空白";
+    case "TEXT_TOO_LONG":
+      return `${TEXT_FIELD_LABELS[error.field]}最多 ${error.max} 個字`;
     case "NO_MEMBERS":
       return "至少要有一位成員";
     case "LEDGER_NOT_FOUND":
