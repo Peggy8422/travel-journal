@@ -19,6 +19,7 @@ src/app/  →  src/features/  →  src/domain/
 - 介面文字一律繁體中文，錯誤代碼轉成訊息集中在 `features/ledger/components/messages.ts`，新增錯誤代碼時要一起補。
 - 消費分類：代碼在 `domain/ledger/categories.ts`（存進資料庫的是代碼，只能新增不能改名或刪除），中文名稱在 `features/ledger/components/categories.ts`；清單以外的舊分類文字會原樣顯示。
 - 文字欄位的字數上限在 `domain/ledger/textLimits.ts`（`TEXT_LIMITS`），輸入框的 `maxLength` 和建立／修改指令的檢查共用同一份；還原備份不檢查，舊資料超過上限也照常還原，`TextField` 會放寬 `maxLength` 避免 Android 截掉顯示的舊文字。新增文字欄位時要一起補上限。
+- 書架的年月分組用 `tripMonthOf`（`features/ledger/services/ledgerOverview.ts`）：帳本設定手動指定的 `tripMonth` 優先，否則取最早一筆消費的當地月份，沒有消費時用建立帳本的月份。旅行月份不另外存自動算出的值，所以記帳、刪消費後會自動重新歸類。
 - 帳本封面：存三個代碼（`domain/ledger/cover.ts`，和分類一樣只能新增、不能改名或刪除），顏色與名稱在 `features/ledger/components/coverStyles.ts`。`cover` 是 null 或代碼讀不回來的帳本，畫面一律用 `coverFromId(id)` 補一個固定的封面。
 - 共用 UI 元件與主題色在 `src/shared/ui/`（只用 React Native 內建元件，不用 `@expo/ui`）。
 - 日系手繪風格（設計稿：https://claude.ai/artifact/Bq5DkRzceSM8V5rzqG2HPD）：
@@ -28,6 +29,7 @@ src/app/  →  src/features/  →  src/domain/
 - 帳本內頁、統計、帳本設定隱藏導覽列（`src/app/_layout.tsx`），頁首自己畫（`shared/ui/PageHeader.tsx`）；這類畫面讀取失敗時要用 `PageMessage`，不然沒有返回鍵可以離開。
 - 操作成功的短提示用 `useToast()`（`shared/ui/Toast.tsx`，掛在最外層 layout，換頁後仍看得到）；錯誤訊息照舊放在畫面上（`ErrorText`），不要只用提示。
 - `Screen` 的捲動區設了 `keyboardShouldPersistTaps="handled"`，點按鈕不會自動收鍵盤；`Button`、`SmallButton` 已經會先收，自己用 `Pressable` 做送出按鈕時要呼叫 `Keyboard.dismiss()`；按下後會冒出新輸入欄位、要接著打字的按鈕（「新增成員」「手動修改匯率」）用 `Button` 的 `keepKeyboard`，新欄位用 `autoFocus` 接手。
+- 選年月的設定（旅行月份、個人記帳的月份…）一律用 `MonthSwitcher`（`shared/ui/MonthPicker.tsx`）：左右箭頭一次移一個月，點中間的年月打開選單直接挑；之後新增類似的時間設定也用它，不要另外做。月份加減用 `shiftMonth`（`domain/ledger`）。
 - 單邊的虛線、點線用 `DashedLine`（`handDrawn.tsx`）：React Native 的 `borderStyle: "dashed"` 在 iOS 只有四邊同寬時才有效。
 - 畫面讀資料用 `useFocusedQuery`（`src/shared/hooks/`），每次回到畫面都會重新讀取，寫入後不用另外通知其他畫面。
 - 新增路由後，`tsc` 會因為 typed routes 型別過期而報錯，要先跑一次 `npx expo start` 重新產生 `.expo/types/router.d.ts`。
