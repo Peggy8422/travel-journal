@@ -18,6 +18,7 @@ src/app/  →  src/features/  →  src/domain/
 
 - 介面文字一律繁體中文，錯誤代碼轉成訊息集中在 `features/ledger/components/messages.ts`，新增錯誤代碼時要一起補。
 - 消費分類：代碼在 `domain/ledger/categories.ts`（存進資料庫的是代碼，只能新增不能改名或刪除），中文名稱在 `features/ledger/components/categories.ts`；清單以外的舊分類文字會原樣顯示。
+- 文字欄位的字數上限在 `domain/ledger/textLimits.ts`（`TEXT_LIMITS`），輸入框的 `maxLength` 和建立／修改指令的檢查共用同一份；還原備份不檢查，舊資料超過上限也照常還原，`TextField` 會放寬 `maxLength` 避免 Android 截掉顯示的舊文字。新增文字欄位時要一起補上限。
 - 帳本封面：存三個代碼（`domain/ledger/cover.ts`，和分類一樣只能新增、不能改名或刪除），顏色與名稱在 `features/ledger/components/coverStyles.ts`。`cover` 是 null 或代碼讀不回來的帳本，畫面一律用 `coverFromId(id)` 補一個固定的封面。
 - 共用 UI 元件與主題色在 `src/shared/ui/`（只用 React Native 內建元件，不用 `@expo/ui`）。
 - 日系手繪風格（設計稿：https://claude.ai/artifact/Bq5DkRzceSM8V5rzqG2HPD）：
