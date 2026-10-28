@@ -140,6 +140,25 @@ export async function renameLedger(
   return ok(updated);
 }
 
+/** 換封面（設定頁的「換一個封面」），其他欄位不變 */
+export async function changeLedgerCover(
+  deps: LedgerCommandDeps,
+  ledgerId: string,
+  cover: LedgerCover,
+): CommandResult<LedgerRecord> {
+  const repos = createRepositories(deps.db);
+  const ledger = await repos.ledgers.findById(ledgerId);
+  if (!ledger) return err({ code: "LEDGER_NOT_FOUND", ledgerId });
+
+  const updated: LedgerRecord = {
+    ...ledger,
+    cover,
+    updatedAt: deps.now().toISOString(),
+  };
+  await repos.ledgers.update(updated);
+  return ok(updated);
+}
+
 /** 永久刪除帳本，連同成員、消費與還款一起刪除，無法復原 */
 export async function deleteLedger(
   deps: LedgerCommandDeps,

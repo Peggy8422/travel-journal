@@ -41,8 +41,17 @@ export function createLedgerRepository(db: SqlExecutor): LedgerRepository {
 
     async update(ledger) {
       await db.runAsync(
-        "UPDATE ledgers SET name = ?, updated_at = ? WHERE id = ?",
-        [ledger.name, ledger.updatedAt, ledger.id],
+        `UPDATE ledgers SET name = ?, cover_style = ?, cover_palette = ?,
+           cover_pattern = ?, updated_at = ?
+         WHERE id = ?`,
+        [
+          ledger.name,
+          ledger.cover?.style ?? null,
+          ledger.cover?.palette ?? null,
+          ledger.cover?.pattern ?? null,
+          ledger.updatedAt,
+          ledger.id,
+        ],
       );
     },
 

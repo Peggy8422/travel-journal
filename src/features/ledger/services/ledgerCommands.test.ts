@@ -4,6 +4,7 @@ import {
   addExpense,
   addMember,
   addSettlement,
+  changeLedgerCover,
   createLedger,
   deleteExpense,
   deleteLedger,
@@ -141,6 +142,34 @@ describe("renameLedger", () => {
     expect(unwrapErr(await renameLedger(deps, "missing", "X")).code).toBe(
       "LEDGER_NOT_FOUND",
     );
+  });
+});
+
+describe("changeLedgerCover", () => {
+  it("replaces the cover and keeps the name", async () => {
+    const { db, deps, ledgerId } = await setup();
+    const cover = { style: "spine", palette: "ai", pattern: "grid" } as const;
+    unwrap(await changeLedgerCover(deps, ledgerId, cover));
+    const { ledger } = unwrap(await loadLedgerSummary(db, ledgerId));
+    expect(ledger).toMatchObject({ name: "東京五日遊", cover });
+  });
+
+  it("keeps the cover when the ledger is renamed", async () => {
+    const { db, deps, ledgerId } = await setup();
+    const cover = { style: "tape", palette: "kraft", pattern: "dots" } as const;
+    unwrap(await changeLedgerCover(deps, ledgerId, cover));
+    unwrap(await renameLedger(deps, ledgerId, "大阪"));
+    expect(unwrap(await loadLedgerSummary(db, ledgerId)).ledger.cover).toEqual(
+      cover,
+    );
+  });
+
+  it("rejects a missing ledger", async () => {
+    const { deps } = await setup();
+    const cover = { style: "band", palette: "shu", pattern: "dots" } as const;
+    expect(
+      unwrapErr(await changeLedgerCover(deps, "missing", cover)).code,
+    ).toBe("LEDGER_NOT_FOUND");
   });
 });
 

@@ -29,6 +29,17 @@ describe("LedgerRepository", () => {
     expect((await repos.ledgers.findById("ledger-1"))?.cover).toBeNull();
   });
 
+  it("updates the cover together with the name", async () => {
+    const { repos } = await setupLedger();
+    const cover = {
+      style: "band",
+      palette: "fuji",
+      pattern: "dots",
+    } as const;
+    await repos.ledgers.update(makeLedgerRecord({ cover }));
+    expect((await repos.ledgers.findById("ledger-1"))?.cover).toEqual(cover);
+  });
+
   it("reads unknown cover codes as no cover", async () => {
     const { db, repos } = await setupLedger();
     await db.runAsync(

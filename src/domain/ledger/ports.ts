@@ -20,7 +20,7 @@ import type { MemberId } from "./types";
 
 export interface LedgerRepository {
   insert(ledger: LedgerRecord): Promise<void>;
-  /** 只更新 name 與 updatedAt */
+  /** 更新 name、cover 與 updatedAt（種類、基準幣、建立時間不會變） */
   update(ledger: LedgerRecord): Promise<void>;
   findById(id: string): Promise<LedgerRecord | undefined>;
   /** 依建立時間由新到舊；指定 kind 時只列出該種帳本 */
