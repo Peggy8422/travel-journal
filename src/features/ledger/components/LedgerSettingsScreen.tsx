@@ -21,6 +21,7 @@ import {
 } from "../../../shared/ui/components";
 import { fonts } from "../../../shared/ui/fonts";
 import { DashedLine } from "../../../shared/ui/handDrawn";
+import { MonthSwitcher } from "../../../shared/ui/MonthPicker";
 import { PageHeader, PageMessage } from "../../../shared/ui/PageHeader";
 import { useTheme } from "../../../shared/ui/theme";
 import { useToast } from "../../../shared/ui/Toast";
@@ -29,6 +30,7 @@ import { useLedgerSummary } from "../hooks/useLedgerQueries";
 import {
   addMember,
   changeLedgerCover,
+  setLedgerTripMonth,
   deleteLedger,
   renameLedger,
   type LedgerCommandError,
@@ -208,6 +210,12 @@ export function LedgerSettingsScreen({ ledgerId }: { ledgerId: string }) {
   const nameDraft = ledgerName ?? ledger.name;
   const nameChanged =
     nameDraft.trim() !== "" && nameDraft.trim() !== ledger.name;
+  const tripMonth = tripMonthOf(ledger, expenses);
+  const autoMonth = tripMonthOf({ ...ledger, tripMonth: null }, expenses);
+  const monthLabel = (month: string) =>
+    `${month.slice(0, 4)} 年 ${Number(month.slice(5, 7))} 月`;
+  const setTripMonth = (month: string | null) =>
+    run(() => setLedgerTripMonth(deps, ledgerId, month));
 
   return (
     <Screen
@@ -269,6 +277,36 @@ export function LedgerSettingsScreen({ ledgerId }: { ledgerId: string }) {
               title="儲存名稱"
               variant="primary"
               onPress={saveLedgerName}
+              disabled={busy}
+            />
+          </View>
+        )}
+      </Card>
+
+      <Card style={styles.card}>
+        <CardTitle
+          title="旅行月份"
+          hint={ledger.tripMonth === null ? "自動判斷" : "手動指定"}
+        />
+        <MonthSwitcher
+          value={tripMonth}
+          onChange={setTripMonth}
+          label="旅行月份"
+          pickerTitle="選擇旅行月份"
+          disabled={busy}
+        />
+        <Text style={[styles.body, { color: theme.textMuted }]}>
+          {ledger.tripMonth !== null
+            ? "書架會固定把這本帳本放在這個月份。"
+            : expenses.length > 0
+              ? "依最早一筆消費的月份放在書架上。出發前先記了預付款的話，可以按左右箭頭手動指定。"
+              : "還沒有消費，先用建立帳本的月份；記下第一筆消費後會改用消費的月份。"}
+        </Text>
+        {ledger.tripMonth !== null && (
+          <View style={styles.start}>
+            <SmallButton
+              title={`改回自動判斷（${monthLabel(autoMonth)}）`}
+              onPress={() => setTripMonth(null)}
               disabled={busy}
             />
           </View>
@@ -541,6 +579,9 @@ const styles = StyleSheet.create({
   },
   end: {
     alignItems: "flex-end",
+  },
+  start: {
+    alignItems: "flex-start",
   },
   memberRow: {
     flexDirection: "row",
