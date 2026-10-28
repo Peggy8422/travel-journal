@@ -73,6 +73,24 @@ describe("createLedger", () => {
     ]);
   });
 
+  it("stores the cover picked on the create screen", async () => {
+    const { db, deps, ledgerId } = await setup();
+    const cover = {
+      style: "tape",
+      palette: "matcha",
+      pattern: "stripes",
+    } as const;
+    const created = unwrap(
+      await createLedger(deps, { name: "花東", memberNames: ["A"], cover }),
+    );
+    const summary = unwrap(await loadLedgerSummary(db, created.ledger.id));
+    expect(summary.ledger.cover).toEqual(cover);
+    // 沒有指定封面的帳本存成 null，畫面再依 id 補
+    expect(
+      unwrap(await loadLedgerSummary(db, ledgerId)).ledger.cover,
+    ).toBeNull();
+  });
+
   it.each([
     ["an empty ledger name", { name: "  ", memberNames: ["A"] }, "EMPTY_NAME"],
     ["no members", { name: "旅行", memberNames: [] }, "NO_MEMBERS"],

@@ -60,6 +60,7 @@ describe("describeRestoreReport", () => {
     kind: "shared" as const,
     name,
     baseCurrency: "TWD",
+    cover: null,
     createdAt: "",
     updatedAt: "",
   });

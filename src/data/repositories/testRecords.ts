@@ -17,6 +17,7 @@ export function makeLedgerRecord(
     kind: "shared",
     name: "東京五日遊",
     baseCurrency: "TWD",
+    cover: null,
     createdAt: T0,
     updatedAt: T0,
     ...overrides,

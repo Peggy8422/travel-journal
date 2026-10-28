@@ -134,6 +134,7 @@ describe("ExpenseRepository", () => {
         kind: "shared",
         name: "首爾",
         baseCurrency: "TWD",
+        cover: null,
         createdAt: "2026-10-01T00:00:00Z",
         updatedAt: "2026-10-01T00:00:00Z",
       });

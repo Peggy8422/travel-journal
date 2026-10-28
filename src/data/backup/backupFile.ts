@@ -1,12 +1,13 @@
 import { err, ok, type Result } from "../../domain/common/result";
-import type {
-  ExpenseFx,
-  ExpenseRecord,
-  GeoPoint,
-  LedgerBackup,
-  LedgerRecord,
-  MemberRecord,
-  SettlementRecord,
+import {
+  parseCover,
+  type ExpenseFx,
+  type ExpenseRecord,
+  type GeoPoint,
+  type LedgerBackup,
+  type LedgerRecord,
+  type MemberRecord,
+  type SettlementRecord,
 } from "../../domain/ledger";
 import { decodeSplitRule } from "../db/splitRuleJson";
 
@@ -21,10 +22,11 @@ export const BACKUP_FORMAT = "travel-journal-backup";
 /**
  * 目前寫出的版本。
  * 2：帳本加上 kind（分帳／個人）、成員加上 isSelf。讀取 1 版時這兩個欄位用預設值。
+ * 3：帳本加上 cover（封面的三個代碼，或 null）。讀取 1、2 版時當作沒有封面。
  */
-export const BACKUP_VERSION = 2;
+export const BACKUP_VERSION = 3;
 /** 可以讀取的版本 */
-const READABLE_VERSIONS: readonly unknown[] = [1, 2];
+const READABLE_VERSIONS: readonly unknown[] = [1, 2, 3];
 
 export interface BackupContents {
   /** 匯出時間，ISO 8601 UTC */
@@ -133,11 +135,18 @@ function parseLedger(value: unknown): Parsed<LedgerRecord> {
   if (kind !== "shared" && kind !== "personal") {
     return err(`unknown kind: ${String(kind)}`);
   }
+  // 1、2 版沒有封面。認不得的代碼（較新版本的 App 才有的）也當作沒有封面：
+  // 封面只影響外觀，不值得因此拒絕整份備份
+  const cover = value.cover ?? null;
+  if (cover !== null && !isObject(cover)) {
+    return err("cover must be an object or null");
+  }
   return ok({
     id: value.id as string,
     kind,
     name: value.name as string,
     baseCurrency: value.baseCurrency as string,
+    cover: cover && parseCover(cover.style, cover.palette, cover.pattern),
     createdAt: value.createdAt as string,
     updatedAt: value.updatedAt as string,
   });

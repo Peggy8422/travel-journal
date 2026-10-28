@@ -1,7 +1,8 @@
-import type {
-  LedgerKind,
-  LedgerRecord,
-  LedgerRepository,
+import {
+  parseCover,
+  type LedgerKind,
+  type LedgerRecord,
+  type LedgerRepository,
 } from "../../domain/ledger";
 import type { SqlExecutor } from "../db/sqlDatabase";
 
@@ -10,6 +11,9 @@ interface LedgerRow {
   kind: LedgerKind;
   name: string;
   base_currency: string;
+  cover_style: string | null;
+  cover_palette: string | null;
+  cover_pattern: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -18,13 +22,17 @@ export function createLedgerRepository(db: SqlExecutor): LedgerRepository {
   return {
     async insert(ledger) {
       await db.runAsync(
-        `INSERT INTO ledgers (id, kind, name, base_currency, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO ledgers (id, kind, name, base_currency,
+           cover_style, cover_palette, cover_pattern, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           ledger.id,
           ledger.kind,
           ledger.name,
           ledger.baseCurrency,
+          ledger.cover?.style ?? null,
+          ledger.cover?.palette ?? null,
+          ledger.cover?.pattern ?? null,
           ledger.createdAt,
           ledger.updatedAt,
         ],
@@ -74,6 +82,7 @@ function toRecord(row: LedgerRow): LedgerRecord {
     kind: row.kind,
     name: row.name,
     baseCurrency: row.base_currency,
+    cover: parseCover(row.cover_style, row.cover_palette, row.cover_pattern),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

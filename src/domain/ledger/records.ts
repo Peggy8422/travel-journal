@@ -1,5 +1,6 @@
 import { err, ok, type Result } from "../common/result";
 import type { RateBasis } from "../fx/types";
+import type { LedgerCover } from "./cover";
 import type { LedgerError } from "./errors";
 import type {
   CurrencyCode,
@@ -28,6 +29,8 @@ export interface LedgerRecord {
   readonly kind: LedgerKind;
   readonly name: string;
   readonly baseCurrency: CurrencyCode;
+  /** null：封面功能之前建立的帳本、個人帳本，畫面用 coverFromId(id) 補 */
+  readonly cover: LedgerCover | null;
   readonly createdAt: string;
   readonly updatedAt: string;
 }

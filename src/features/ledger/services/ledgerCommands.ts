@@ -9,6 +9,7 @@ import {
   validateNoArchivedMembers,
   validateSettlement,
   type ExpenseRecord,
+  type LedgerCover,
   type LedgerError,
   type LedgerRecord,
   type MemberId,
@@ -73,6 +74,8 @@ export async function createLedger(
     readonly name: string;
     readonly memberNames: readonly string[];
     readonly selfIndex?: number;
+    /** 建立畫面隨機抽好的封面；省略時沒有封面，畫面會依 id 補一個 */
+    readonly cover?: LedgerCover;
   },
 ): CommandResult<{ ledger: LedgerRecord; members: MemberRecord[] }> {
   const name = input.name.trim();
@@ -87,6 +90,7 @@ export async function createLedger(
     kind: "shared",
     name,
     baseCurrency: BASE_CURRENCY,
+    cover: input.cover ?? null,
     createdAt: timestamp,
     updatedAt: timestamp,
   };
