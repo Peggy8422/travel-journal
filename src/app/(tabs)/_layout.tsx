@@ -1,11 +1,45 @@
 import { Tabs } from "expo-router";
 
+import { fonts } from "../../shared/ui/fonts";
+import { TabBarBackground, TabLabel, tabBarIcon } from "../../shared/ui/tabBar";
+import { useTheme } from "../../shared/ui/theme";
+
 export default function TabLayout() {
+  const theme = useTheme();
   return (
-    <Tabs>
-      <Tabs.Screen name="index" options={{ title: "地圖" }} />
-      <Tabs.Screen name="ledgers" options={{ title: "帳本" }} />
-      <Tabs.Screen name="personal" options={{ title: "個人" }} />
+    <Tabs
+      screenOptions={{
+        headerShadowVisible: false,
+        headerStyle: { backgroundColor: theme.background },
+        headerTitleStyle: { fontFamily: fonts.bold, fontSize: 18 },
+        sceneStyle: { backgroundColor: theme.background },
+        tabBarActiveTintColor: theme.text,
+        tabBarInactiveTintColor: theme.textMuted,
+        tabBarStyle: {
+          backgroundColor: "transparent",
+          borderTopWidth: 0,
+          elevation: 0,
+        },
+        tabBarBackground: () => <TabBarBackground />,
+        tabBarLabel: ({ focused, color, children }) => (
+          <TabLabel focused={focused} color={color}>
+            {children}
+          </TabLabel>
+        ),
+      }}
+    >
+      <Tabs.Screen
+        name="index"
+        options={{ title: "地圖", tabBarIcon: tabBarIcon("globe") }}
+      />
+      <Tabs.Screen
+        name="ledgers"
+        options={{ title: "帳本", tabBarIcon: tabBarIcon("notebook") }}
+      />
+      <Tabs.Screen
+        name="personal"
+        options={{ title: "個人", tabBarIcon: tabBarIcon("person") }}
+      />
     </Tabs>
   );
 }
