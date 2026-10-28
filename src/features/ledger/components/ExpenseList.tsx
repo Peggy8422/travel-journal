@@ -23,10 +23,11 @@ import {
   type ExpenseFilter,
 } from "../services/expenseListView";
 import type { LedgerSummary } from "../services/ledgerSummary";
-import { formatLocalDateTime } from "../services/localTimestamp";
+import {
+  formatLocalDate,
+  formatLocalDateTime,
+} from "../services/localTimestamp";
 import { categoryLabel, orderForChart } from "./categories";
-
-const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
 
 /** 帳本明細的消費列表：上方可依成員、分類篩選，下方依消費當地的日期分組 */
 export function ExpenseList({
@@ -112,7 +113,7 @@ export function ExpenseList({
       {days.map((day) => (
         <Section
           key={day.date}
-          title={`${Number(day.date.slice(5, 7))}/${Number(day.date.slice(8, 10))}（${WEEKDAYS[day.weekday]}）· ${money(day.totalBaseMinor)}`}
+          title={`${formatLocalDate(day.date)} · ${money(day.totalBaseMinor)}`}
         >
           {day.expenses.map((expense) => (
             <ExpenseRow

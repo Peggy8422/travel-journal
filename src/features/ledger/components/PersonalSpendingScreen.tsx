@@ -19,6 +19,7 @@ import {
 import { usePersonalSpending } from "../hooks/usePersonalQueries";
 import { groupByLocalDay } from "../services/expenseListView";
 import {
+  formatLocalDate,
   formatLocalDateTime,
   toLocalIsoString,
 } from "../services/localTimestamp";
@@ -28,7 +29,6 @@ import { describeError } from "./messages";
 
 /** 個人花費一律以新台幣計算（所有帳本的基準幣） */
 const BASE = "TWD";
-const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
 
 /**
  * 個人記帳：「我」在個人消費與各分帳帳本裡實際負擔的花費，依月份查看。
@@ -105,7 +105,7 @@ export function PersonalSpendingScreen() {
       {days.map((day) => (
         <Section
           key={day.date}
-          title={`${Number(day.date.slice(5, 7))}/${Number(day.date.slice(8, 10))}（${WEEKDAYS[day.weekday]}）· ${money(day.totalBaseMinor)}`}
+          title={`${formatLocalDate(day.date)} · ${money(day.totalBaseMinor)}`}
         >
           {day.expenses.map((expense) => {
             const entry = entryById.get(expense.id);
