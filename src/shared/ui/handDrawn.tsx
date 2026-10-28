@@ -10,6 +10,7 @@ import Svg, {
   Circle,
   Defs,
   G,
+  Line,
   Mask,
   Path,
   Pattern,
@@ -448,6 +449,38 @@ export function InkStamp({
           {label}
         </SvgText>
       </G>
+    </Svg>
+  );
+}
+
+/**
+ * 一條橫的虛線，寬度隨父元件伸縮（分隔線、列表的列與列之間）。
+ * React Native 的 borderStyle dashed 在 iOS 只有四邊同寬才有效，單邊虛線要用這個。
+ * dotted 是圓點，否則是短線。
+ */
+export function DashedLine({
+  color,
+  opacity = 0.22,
+  dotted = false,
+}: {
+  color?: string;
+  opacity?: number;
+  dotted?: boolean;
+}) {
+  const theme = useTheme();
+  return (
+    <Svg width="100%" height={2} style={styles.noTouch}>
+      <Line
+        x1={1}
+        y1={1}
+        x2="100%"
+        y2={1}
+        stroke={color ?? theme.text}
+        strokeOpacity={opacity}
+        strokeWidth={dotted ? 1.3 : 1.2}
+        strokeDasharray={dotted ? "0.1 3.5" : "4 4"}
+        strokeLinecap={dotted ? "round" : "butt"}
+      />
     </Svg>
   );
 }

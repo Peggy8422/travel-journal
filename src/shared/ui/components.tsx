@@ -8,7 +8,9 @@ import {
   Text,
   TextInput,
   View,
+  type StyleProp,
   type TextInputProps,
+  type ViewStyle,
 } from "react-native";
 
 import { fonts } from "./fonts";
@@ -24,7 +26,16 @@ import { spacing, useTheme } from "./theme";
  * iOS 26 起 Stack 的 header 是透明的（Liquid Glass），由 contentInsetAdjustmentBehavior 讓內容從 header 下方開始。
  * 底層鋪和紙的方眼點陣，內容在上面捲動。
  */
-export function Screen({ children }: { children: ReactNode }) {
+export function Screen({
+  children,
+  header,
+  contentStyle,
+}: {
+  children: ReactNode;
+  /** 固定在捲動區上方、不跟著捲動的頁首（例如隱藏導覽列時自己畫的 PageHeader） */
+  header?: ReactNode;
+  contentStyle?: StyleProp<ViewStyle>;
+}) {
   const theme = useTheme();
   return (
     <KeyboardAvoidingView
@@ -32,9 +43,10 @@ export function Screen({ children }: { children: ReactNode }) {
       behavior={Platform.OS === "android" ? "height" : undefined}
     >
       <PaperBackground />
+      {header}
       <ScrollView
         style={styles.fill}
-        contentContainerStyle={styles.screen}
+        contentContainerStyle={[styles.screen, contentStyle]}
         contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
@@ -61,6 +73,50 @@ export function Section({
         <SketchFrame radius={14} />
         {children}
       </View>
+    </View>
+  );
+}
+
+/** 紙片卡：四角半徑不同、淡淡的影子，標題由內容自己放（不像 Section 放在卡片外） */
+export function Card({
+  children,
+  style,
+}: {
+  children: ReactNode;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const theme = useTheme();
+  return (
+    <View style={[styles.card, { backgroundColor: theme.surface }, style]}>
+      {children}
+    </View>
+  );
+}
+
+/** 卡片裡的標題列：左邊粗體標題，右邊一行小字說明（可省略） */
+export function CardTitle({
+  title,
+  hint,
+  color,
+}: {
+  title: string;
+  hint?: ReactNode;
+  color?: string;
+}) {
+  const theme = useTheme();
+  return (
+    <View style={styles.cardTitleRow}>
+      <Text
+        accessibilityRole="header"
+        style={[styles.sectionTitle, { color: color ?? theme.text }]}
+      >
+        {title}
+      </Text>
+      {typeof hint === "string" ? (
+        <Text style={[styles.hint, { color: theme.textMuted }]}>{hint}</Text>
+      ) : (
+        hint
+      )}
     </View>
   );
 }
@@ -136,6 +192,58 @@ export function Button({
   );
 }
 
+/**
+ * 卡片裡的小按鈕（記錄還款、換一個封面、新增…）：outline 是紙色加細框，primary 是朱色實心。
+ * icon 放在文字左邊。
+ */
+export function SmallButton({
+  title,
+  onPress,
+  disabled,
+  variant = "outline",
+  icon,
+  accessibilityLabel,
+}: {
+  title: string;
+  onPress: () => void;
+  disabled?: boolean;
+  variant?: "outline" | "primary";
+  icon?: ReactNode;
+  accessibilityLabel?: string;
+}) {
+  const theme = useTheme();
+  const primary = variant === "primary";
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.smallButton,
+        primary ? null : styles.smallButtonOutline,
+        {
+          backgroundColor: primary ? theme.primary : "#FFFDF8",
+          opacity: disabled ? 0.45 : pressed ? 0.75 : 1,
+        },
+      ]}
+    >
+      {icon}
+      <Text
+        style={[
+          styles.smallButtonText,
+          primary
+            ? { color: theme.onPrimary, fontFamily: fonts.bold }
+            : { color: theme.text },
+        ]}
+      >
+        {title}
+      </Text>
+    </Pressable>
+  );
+}
+
 export function TextField({
   label,
   ...props
@@ -161,10 +269,13 @@ export function Chip({
   label,
   selected,
   onPress,
+  dot,
 }: {
   label: string;
   selected: boolean;
   onPress: () => void;
+  /** 標籤前面的小圓點顏色（例如分類色） */
+  dot?: string;
 }) {
   const theme = useTheme();
   return (
@@ -179,6 +290,14 @@ export function Chip({
           : { backgroundColor: "transparent", borderColor: theme.pencil },
       ]}
     >
+      {dot && (
+        <View
+          style={[
+            styles.chipDot,
+            { backgroundColor: dot, borderColor: theme.surface },
+          ]}
+        />
+      )}
       <Text
         style={[
           styles.chipText,
@@ -232,6 +351,36 @@ const styles = StyleSheet.create({
     boxShadow:
       "0px 2px 0px rgba(58,51,45,0.07), 0px 8px 18px rgba(58,51,45,0.08)",
   },
+  cardTitleRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+  },
+  hint: {
+    fontFamily: fonts.regular,
+    fontSize: 12.5,
+  },
+  smallButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    minHeight: 40,
+    paddingHorizontal: 14,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 17,
+    borderBottomRightRadius: 19,
+    borderBottomLeftRadius: 18,
+  },
+  smallButtonOutline: {
+    boxShadow: "0px 0px 0px 1.3px rgba(58,51,45,0.6)",
+  },
+  smallButtonText: {
+    fontFamily: fonts.regular,
+    fontSize: 14,
+  },
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -274,6 +423,9 @@ const styles = StyleSheet.create({
     minHeight: 44,
   },
   chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     borderWidth: 1.2,
     borderTopLeftRadius: 18,
     borderTopRightRadius: 15,
@@ -282,6 +434,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     minHeight: 36,
     justifyContent: "center",
+  },
+  chipDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 1.5,
   },
   chipText: {
     fontFamily: fonts.regular,

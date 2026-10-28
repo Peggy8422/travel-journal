@@ -35,6 +35,9 @@ export interface Theme {
   readonly categorical: readonly string[];
   /** 圖表中「未分類」等沒有身分的項目 */
   readonly neutral: string;
+  /** 分類色的淡色版（順序同 categorical），當圖示、選取中圖例的底色，上面放墨色 */
+  readonly categoricalTint: readonly string[];
+  readonly neutralTint: string;
 }
 
 // 這一版只有和紙淺色；深色「夜間墨色」之後再設計，所以不跟系統切換
@@ -61,6 +64,15 @@ const paper: Theme = {
     "#D46A92",
   ],
   neutral: "#A39B90",
+  categoricalTint: [
+    "#F6D8CC",
+    "#D2DDEE",
+    "#D0E6D9",
+    "#F6E3BC",
+    "#E0D7F0",
+    "#F4D6E1",
+  ],
+  neutralTint: "#E6E1DA",
 };
 
 export function useTheme(): Theme {
