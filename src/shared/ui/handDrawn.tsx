@@ -6,9 +6,30 @@ import {
   type StyleProp,
   type ViewStyle,
 } from "react-native";
-import Svg, { Circle, Defs, Path, Pattern, Rect } from "react-native-svg";
+import Svg, {
+  Circle,
+  Defs,
+  G,
+  Mask,
+  Path,
+  Pattern,
+  Polygon,
+  Rect,
+  Text as SvgText,
+} from "react-native-svg";
 
-import { seedFromString, wobblyEllipsePath, wobblyRectPath } from "./sketch";
+import { fonts } from "./fonts";
+import {
+  handLoopPoints,
+  pencilGrain,
+  pencilPasses,
+  ringPoints,
+  seedFromString,
+  stampWear,
+  wobblyEllipsePath,
+  wobblyRectPath,
+  type SpeckLayer,
+} from "./sketch";
 import { useTheme } from "./theme";
 
 interface Size {
@@ -167,7 +188,309 @@ export function WatercolorBlob({
   );
 }
 
+/**
+ * 紙膠帶：半透明、兩端鋸齒、有細直紋。蓋在父元件上（絕對定位填滿），
+ * 用在選取中的標籤底色、卡片角落的裝飾；tilt 是傾斜角度。
+ */
+export function WashiTape({
+  color,
+  tilt = 0,
+  opacity = 0.88,
+}: {
+  color?: string;
+  tilt?: number;
+  opacity?: number;
+}) {
+  const theme = useTheme();
+  const [size, onLayout] = useLayoutSize();
+  const points = useMemo(() => {
+    if (!size) return "";
+    const { width: w, height: h } = size;
+    // 左右兩端是撕開的鋸齒
+    return [
+      [w * 0.02, 0],
+      [w * 0.98, 0],
+      [w, h * 0.2],
+      [w * 0.97, h * 0.4],
+      [w, h * 0.6],
+      [w * 0.97, h * 0.8],
+      [w * 0.99, h],
+      [w * 0.01, h],
+      [w * 0.03, h * 0.8],
+      [0, h * 0.6],
+      [w * 0.03, h * 0.4],
+      [0, h * 0.2],
+    ]
+      .map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`)
+      .join(" ");
+  }, [size]);
+
+  return (
+    <View
+      style={[
+        styles.overlay,
+        { opacity, transform: [{ rotate: `${tilt}deg` }] },
+      ]}
+      onLayout={onLayout}
+    >
+      {size && (
+        <Svg width={size.width} height={size.height}>
+          <Defs>
+            <Pattern
+              id="washiStripes"
+              patternUnits="userSpaceOnUse"
+              width={9}
+              height={size.height}
+            >
+              <Rect
+                width={4}
+                height={size.height}
+                fill="rgba(255,255,255,0.38)"
+              />
+            </Pattern>
+          </Defs>
+          <Polygon points={points} fill={color ?? theme.wash} />
+          <Polygon points={points} fill="url(#washiStripes)" />
+        </Svg>
+      )}
+    </View>
+  );
+}
+
+/**
+ * 用 Mask 把小點從筆跡上挖掉（紙紋顆粒、印章缺墨），
+ * 因為 react-native-svg 沒有實作 feTurbulence，顆粒要自己畫。
+ */
+function SpeckMask({
+  id,
+  width,
+  height,
+  layers,
+}: {
+  id: string;
+  width: number;
+  height: number;
+  layers: readonly SpeckLayer[];
+}) {
+  return (
+    <Mask
+      id={id}
+      maskUnits="userSpaceOnUse"
+      x={0}
+      y={0}
+      width={width}
+      height={height}
+    >
+      <Rect width={width} height={height} fill="white" />
+      {layers.map((layer, i) => {
+        const v = Math.round(layer.ink * 255);
+        return <Path key={i} d={layer.d} fill={`rgb(${v},${v},${v})`} />;
+      })}
+    </Mask>
+  );
+}
+
+/**
+ * 用鉛筆圈起來的圓（例如月曆上圈選的日期），只有線不填色：
+ * 從左上方起筆繞一圈多一點，兩端收細、錯開，筆跡上有紙紋顆粒。
+ */
+export function HandCircle({
+  width,
+  height,
+  color,
+  strokeWidth = 2.1,
+}: {
+  width: number;
+  height: number;
+  color?: string;
+  strokeWidth?: number;
+}) {
+  const theme = useTheme();
+  const seed = useSeed();
+  return (
+    <Svg
+      width={width}
+      height={height}
+      style={[styles.noTouch, { transform: [{ rotate: "-8deg" }] }]}
+    >
+      <PencilLoop
+        width={width}
+        height={height}
+        strokeWidth={strokeWidth}
+        color={color ?? theme.primary}
+        seed={seed}
+      />
+    </Svg>
+  );
+}
+
+/**
+ * 鉛筆圈的筆跡本體，放在 Svg 裡面。圈選用的是頭尾錯開的一圈；
+ * closed 是頭尾接好的正圓（印章外框）。grain 是每 px 撒幾個紙紋顆粒。
+ */
+function PencilLoop({
+  width,
+  height,
+  strokeWidth,
+  color,
+  seed,
+  closed = false,
+  grain = 3,
+}: {
+  width: number;
+  height: number;
+  strokeWidth: number;
+  color: string;
+  seed: number;
+  closed?: boolean;
+  grain?: number;
+}) {
+  const stroke = useMemo(() => {
+    const ellipse = {
+      cx: width / 2,
+      cy: height / 2,
+      rx: width / 2 - strokeWidth,
+      ry: height / 2 - strokeWidth,
+    };
+    const points = closed
+      ? ringPoints(ellipse)
+      : handLoopPoints({ ...ellipse, seed });
+    return {
+      passes: pencilPasses(points, {
+        width: strokeWidth,
+        seed: seed + 1,
+        closed,
+      }),
+      grain: pencilGrain(points, {
+        width: strokeWidth,
+        seed: seed + 2,
+        perPx: grain,
+        closed,
+      }),
+    };
+  }, [width, height, strokeWidth, seed, closed, grain]);
+  return (
+    <>
+      <Defs>
+        <SpeckMask
+          id="pencilGrain"
+          width={width}
+          height={height}
+          layers={stroke.grain}
+        />
+      </Defs>
+      <G mask="url(#pencilGrain)">
+        {stroke.passes.map((pass, i) => (
+          <Path
+            key={i}
+            d={pass.d}
+            fill="none"
+            stroke={color}
+            strokeOpacity={pass.opacity}
+            strokeWidth={pass.width}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        ))}
+      </G>
+    </>
+  );
+}
+
+/**
+ * 蓋上去的圓形印章（例如「結清」）：外框是頭尾接好的粗鉛筆正圓，顆粒比圈選密，
+ * 字有沒沾滿墨的淡區和白點。傾斜角度由外層決定。
+ */
+export function InkStamp({
+  size,
+  label,
+  color,
+}: {
+  size: number;
+  label: string;
+  color: string;
+}) {
+  const seed = useSeed();
+  const wear = useMemo(
+    () => stampWear({ width: size, height: size, seed: seed + 3, density: 3 }),
+    [size, seed],
+  );
+  const fontSize = size * 0.27;
+  return (
+    <Svg width={size} height={size} style={styles.noTouch}>
+      <Circle
+        cx={size / 2}
+        cy={size / 2}
+        r={size / 2 - 2}
+        fill="rgba(251,247,238,0.35)"
+      />
+      <PencilLoop
+        width={size}
+        height={size}
+        strokeWidth={2.4}
+        grain={5}
+        closed
+        color={color}
+        seed={seed}
+      />
+      <Defs>
+        <SpeckMask id="stampWear" width={size} height={size} layers={wear} />
+      </Defs>
+      <G mask="url(#stampWear)">
+        <SvgText
+          x={size / 2}
+          y={size / 2 + fontSize * 0.36}
+          textAnchor="middle"
+          fontFamily={fonts.bold}
+          fontSize={fontSize}
+          fill={color}
+        >
+          {label}
+        </SvgText>
+      </G>
+    </Svg>
+  );
+}
+
+/** 鉛筆畫的波浪線，寬度隨父元件伸縮（例如標題後面的分隔線） */
+export function WavyLine({ color }: { color?: string }) {
+  const theme = useTheme();
+  const [size, onLayout] = useLayoutSize();
+  const d = useMemo(() => {
+    if (!size) return "";
+    const wave = 34;
+    let path = "M1 4";
+    for (let x = 1; x + wave / 2 < size.width; x += wave / 2) {
+      const up = Math.round(x / (wave / 2)) % 2 === 0;
+      path += ` Q${(x + wave / 4).toFixed(1)} ${up ? 1 : 7} ${(x + wave / 2).toFixed(1)} 4`;
+    }
+    return path;
+  }, [size]);
+  return (
+    <View style={styles.wavy} onLayout={onLayout}>
+      {size && (
+        <Svg width={size.width} height={8}>
+          <Path
+            d={d}
+            fill="none"
+            stroke={color ?? theme.text}
+            strokeOpacity={0.32}
+            strokeWidth={1.2}
+            strokeLinecap="round"
+          />
+        </Svg>
+      )}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  wavy: {
+    flex: 1,
+    minWidth: 20,
+    height: 8,
+    pointerEvents: "none",
+  },
   overlay: {
     position: "absolute",
     left: 0,

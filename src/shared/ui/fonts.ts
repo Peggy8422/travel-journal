@@ -17,6 +17,14 @@ export const fonts = {
 } as const;
 
 /**
+ * Caveat 的字形會超出字寬（數字最多多出約 0.1em），Text 的框只包住字寬，
+ * 右邊那一截會被切掉；用 fonts.accent 的 Text 要在右邊留這麼多 padding。
+ */
+export function accentOverhang(fontSize: number): number {
+  return Math.ceil(fontSize * 0.11);
+}
+
+/**
  * 給 expo-font 的 useFonts 載入的字型檔（key 就是 fontFamily 名稱）。
  * 霞鶩文楷每個字重約 13MB，只帶 Regular 與 Bold。
  */
