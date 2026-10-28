@@ -67,6 +67,7 @@ describe("describeRestoreReport", () => {
     name,
     baseCurrency: "TWD",
     cover: null,
+    tripMonth: null,
     createdAt: "",
     updatedAt: "",
   });

@@ -10,6 +10,7 @@ import {
   deleteLedger,
   deleteSettlement,
   renameLedger,
+  setLedgerTripMonth,
   settleAll,
   updateExpense,
   type ExpenseInput,
@@ -228,6 +229,31 @@ describe("changeLedgerCover", () => {
     const cover = { style: "band", palette: "shu", pattern: "dots" } as const;
     expect(
       unwrapErr(await changeLedgerCover(deps, "missing", cover)).code,
+    ).toBe("LEDGER_NOT_FOUND");
+  });
+});
+
+describe("setLedgerTripMonth", () => {
+  it("sets a month by hand and clears it back to automatic", async () => {
+    const { db, deps, ledgerId } = await setup();
+    unwrap(await setLedgerTripMonth(deps, ledgerId, "2027-02"));
+    expect(unwrap(await loadLedgerSummary(db, ledgerId)).ledger).toMatchObject({
+      name: "東京五日遊",
+      tripMonth: "2027-02",
+    });
+    unwrap(await setLedgerTripMonth(deps, ledgerId, null));
+    expect(
+      unwrap(await loadLedgerSummary(db, ledgerId)).ledger.tripMonth,
+    ).toBeNull();
+  });
+
+  it("rejects a malformed month and a missing ledger", async () => {
+    const { deps, ledgerId } = await setup();
+    expect(
+      unwrapErr(await setLedgerTripMonth(deps, ledgerId, "2027-13")),
+    ).toEqual({ code: "INVALID_TRIP_MONTH", value: "2027-13" });
+    expect(
+      unwrapErr(await setLedgerTripMonth(deps, "missing", "2027-02")).code,
     ).toBe("LEDGER_NOT_FOUND");
   });
 });

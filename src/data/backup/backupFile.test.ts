@@ -11,6 +11,7 @@ import { BACKUP_VERSION, parseBackup, serializeBackup } from "./backupFile";
 const entry: LedgerBackup = {
   ledger: makeLedgerRecord({
     cover: { style: "spine", palette: "sakura", pattern: "dots" },
+    tripMonth: "2027-02",
   }),
   members: [
     {
@@ -166,5 +167,28 @@ describe("backup file covers", () => {
     delete raw.ledgers[0].ledger.cover;
     const parsed = unwrap(parseBackup(JSON.stringify(raw)));
     expect(parsed.ledgers[0]?.ledger.cover).toBeNull();
+  });
+});
+
+describe("backup file trip months", () => {
+  it("keeps a manual trip month", () => {
+    const parsed = unwrap(parseBackup(serializeBackup(contents)));
+    expect(parsed.ledgers[0]?.ledger.tripMonth).toBe("2027-02");
+  });
+
+  it("reads version 3 backups and malformed months as automatic", () => {
+    const raw = JSON.parse(serializeBackup(contents));
+    raw.version = 3;
+    delete raw.ledgers[0].ledger.tripMonth;
+    expect(
+      unwrap(parseBackup(JSON.stringify(raw))).ledgers[0]?.ledger.tripMonth,
+    ).toBeNull();
+    expect(
+      unwrap(
+        parseBackup(
+          corrupted((r) => (r.ledgers[0].ledger.tripMonth = "2027-13")),
+        ),
+      ).ledgers[0]?.ledger.tripMonth,
+    ).toBeNull();
   });
 });

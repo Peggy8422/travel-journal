@@ -133,4 +133,13 @@ describe("tripMonthOf", () => {
     // 10/31 17:00 UTC 是臺灣時間 11/1 凌晨
     expect(tripMonthOf(ledger, [])).toBe("2025-11");
   });
+
+  it("prefers a month set by hand over the expenses", () => {
+    const manual = { ...ledger, tripMonth: "2026-02" };
+    const prepaid = makeExpenseRecord({
+      occurredAt: "2025-11-15T20:00:00+08:00",
+    });
+    expect(tripMonthOf(manual, [prepaid])).toBe("2026-02");
+    expect(tripMonthOf(manual, [])).toBe("2026-02");
+  });
 });

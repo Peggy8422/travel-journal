@@ -26,13 +26,15 @@ export type LedgerOverview = (
 };
 
 /**
- * 旅行月份：最早一筆消費在消費當地的月份；還沒有消費時用建立帳本的月份（臺灣時間）。
- * 帳本本身沒有旅行日期，用消費推算比建立時間準（常常出發前就先建好帳本）。
+ * 旅行月份：帳本設定手動指定的月份優先；沒有指定時，用最早一筆消費在消費當地的月份，
+ * 還沒有消費時用建立帳本的月份（臺灣時間）。
+ * 用消費推算比建立時間準（常常出發前就先建好帳本），但出發前記的預付款會把月份拉早，所以可以手動指定。
  */
 export function tripMonthOf(
   ledger: LedgerRecord,
   expenses: readonly ExpenseRecord[],
 ): string {
+  if (ledger.tripMonth !== null) return ledger.tripMonth;
   const first = expenses.reduce<ExpenseRecord | undefined>(
     (earliest, e) =>
       !earliest || Date.parse(e.occurredAt) < Date.parse(earliest.occurredAt)

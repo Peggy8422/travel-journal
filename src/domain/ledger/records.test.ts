@@ -46,6 +46,7 @@ describe("toLedger", () => {
         name: "東京",
         baseCurrency: "TWD",
         cover: null,
+        tripMonth: null,
         createdAt: T0,
         updatedAt: T0,
       },

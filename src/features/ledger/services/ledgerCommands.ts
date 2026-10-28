@@ -4,6 +4,7 @@ import {
   checkTextLength,
   computeShares,
   expenseMemberIds,
+  isTripMonth,
   toExpense,
   toLedger,
   toSettlement,
@@ -45,6 +46,7 @@ export type LedgerCommandError =
   | { readonly code: "EMPTY_NAME" }
   | { readonly code: "NO_MEMBERS" }
   | { readonly code: "INVALID_TIMESTAMP"; readonly value: string }
+  | { readonly code: "INVALID_TRIP_MONTH"; readonly value: string }
   | { readonly code: "LEDGER_NOT_FOUND"; readonly ledgerId: string }
   | { readonly code: "EXPENSE_NOT_FOUND"; readonly expenseId: string }
   | { readonly code: "SETTLEMENT_NOT_FOUND"; readonly settlementId: string }
@@ -100,6 +102,7 @@ export async function createLedger(
     name,
     baseCurrency: BASE_CURRENCY,
     cover: input.cover ?? null,
+    tripMonth: null,
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -164,6 +167,31 @@ export async function changeLedgerCover(
   const updated: LedgerRecord = {
     ...ledger,
     cover,
+    updatedAt: deps.now().toISOString(),
+  };
+  await repos.ledgers.update(updated);
+  return ok(updated);
+}
+
+/**
+ * 手動指定旅行月份（YYYY-MM），決定書架上歸在哪個年月；
+ * 傳 null 改回自動（最早一筆消費的月份，沒有消費時用建立的月份）
+ */
+export async function setLedgerTripMonth(
+  deps: LedgerCommandDeps,
+  ledgerId: string,
+  tripMonth: string | null,
+): CommandResult<LedgerRecord> {
+  if (tripMonth !== null && !isTripMonth(tripMonth)) {
+    return err({ code: "INVALID_TRIP_MONTH", value: tripMonth });
+  }
+  const repos = createRepositories(deps.db);
+  const ledger = await repos.ledgers.findById(ledgerId);
+  if (!ledger) return err({ code: "LEDGER_NOT_FOUND", ledgerId });
+
+  const updated: LedgerRecord = {
+    ...ledger,
+    tripMonth,
     updatedAt: deps.now().toISOString(),
   };
   await repos.ledgers.update(updated);

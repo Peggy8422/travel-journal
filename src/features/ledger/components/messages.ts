@@ -33,6 +33,8 @@ export function describeError(error: DisplayableError): string {
   switch (error.code) {
     case "EMPTY_NAME":
       return "名稱不能空白";
+    case "INVALID_TRIP_MONTH":
+      return "旅行月份的格式不對";
     case "TEXT_TOO_LONG":
       return `${TEXT_FIELD_LABELS[error.field]}最多 ${error.max} 個字`;
     case "NO_MEMBERS":

@@ -86,6 +86,7 @@ export {
   type LimitedTextField,
   type TextTooLongError,
 } from "./textLimits";
+export { isTripMonth } from "./tripMonth";
 export type { LedgerBackup } from "./backup";
 export {
   collectPersonalEntries,

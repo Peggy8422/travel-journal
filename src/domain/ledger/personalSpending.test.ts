@@ -16,6 +16,7 @@ function ledger(id: string, kind: LedgerRecord["kind"]): LedgerRecord {
     name: id,
     baseCurrency: "TWD",
     cover: null,
+    tripMonth: null,
     createdAt: T0,
     updatedAt: T0,
   };

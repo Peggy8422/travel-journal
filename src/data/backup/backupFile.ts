@@ -1,5 +1,6 @@
 import { err, ok, type Result } from "../../domain/common/result";
 import {
+  isTripMonth,
   parseCover,
   type ExpenseFx,
   type ExpenseRecord,
@@ -24,9 +25,9 @@ export const BACKUP_FORMAT = "travel-journal-backup";
  * 2：帳本加上 kind（分帳／個人）、成員加上 isSelf。讀取 1 版時這兩個欄位用預設值。
  * 3：帳本加上 cover（封面的三個代碼，或 null）。讀取 1、2 版時當作沒有封面。
  */
-export const BACKUP_VERSION = 3;
+export const BACKUP_VERSION = 4;
 /** 可以讀取的版本 */
-const READABLE_VERSIONS: readonly unknown[] = [1, 2, 3];
+const READABLE_VERSIONS: readonly unknown[] = [1, 2, 3, 4];
 
 export interface BackupContents {
   /** 匯出時間，ISO 8601 UTC */
@@ -141,12 +142,15 @@ function parseLedger(value: unknown): Parsed<LedgerRecord> {
   if (cover !== null && !isObject(cover)) {
     return err("cover must be an object or null");
   }
+  // 1～3 版沒有旅行月份（自動判斷）；格式不對也當作自動，理由同封面
+  const tripMonth = isTripMonth(value.tripMonth) ? value.tripMonth : null;
   return ok({
     id: value.id as string,
     kind,
     name: value.name as string,
     baseCurrency: value.baseCurrency as string,
     cover: cover && parseCover(cover.style, cover.palette, cover.pattern),
+    tripMonth,
     createdAt: value.createdAt as string,
     updatedAt: value.updatedAt as string,
   });

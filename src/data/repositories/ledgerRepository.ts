@@ -1,4 +1,5 @@
 import {
+  isTripMonth,
   parseCover,
   type LedgerKind,
   type LedgerRecord,
@@ -14,6 +15,7 @@ interface LedgerRow {
   cover_style: string | null;
   cover_palette: string | null;
   cover_pattern: string | null;
+  trip_month: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -23,8 +25,9 @@ export function createLedgerRepository(db: SqlExecutor): LedgerRepository {
     async insert(ledger) {
       await db.runAsync(
         `INSERT INTO ledgers (id, kind, name, base_currency,
-           cover_style, cover_palette, cover_pattern, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           cover_style, cover_palette, cover_pattern, trip_month,
+           created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           ledger.id,
           ledger.kind,
@@ -33,6 +36,7 @@ export function createLedgerRepository(db: SqlExecutor): LedgerRepository {
           ledger.cover?.style ?? null,
           ledger.cover?.palette ?? null,
           ledger.cover?.pattern ?? null,
+          ledger.tripMonth,
           ledger.createdAt,
           ledger.updatedAt,
         ],
@@ -42,13 +46,14 @@ export function createLedgerRepository(db: SqlExecutor): LedgerRepository {
     async update(ledger) {
       await db.runAsync(
         `UPDATE ledgers SET name = ?, cover_style = ?, cover_palette = ?,
-           cover_pattern = ?, updated_at = ?
+           cover_pattern = ?, trip_month = ?, updated_at = ?
          WHERE id = ?`,
         [
           ledger.name,
           ledger.cover?.style ?? null,
           ledger.cover?.palette ?? null,
           ledger.cover?.pattern ?? null,
+          ledger.tripMonth,
           ledger.updatedAt,
           ledger.id,
         ],
@@ -92,6 +97,7 @@ function toRecord(row: LedgerRow): LedgerRecord {
     name: row.name,
     baseCurrency: row.base_currency,
     cover: parseCover(row.cover_style, row.cover_palette, row.cover_pattern),
+    tripMonth: isTripMonth(row.trip_month) ? row.trip_month : null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

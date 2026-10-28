@@ -31,6 +31,11 @@ export interface LedgerRecord {
   readonly baseCurrency: CurrencyCode;
   /** null：封面功能之前建立的帳本、個人帳本，畫面用 coverFromId(id) 補 */
   readonly cover: LedgerCover | null;
+  /**
+   * 手動指定的旅行月份（YYYY-MM），決定書架上歸在哪個年月。
+   * null 代表自動：最早一筆消費的月份，沒有消費時用建立帳本的月份
+   */
+  readonly tripMonth: string | null;
   readonly createdAt: string;
   readonly updatedAt: string;
 }
