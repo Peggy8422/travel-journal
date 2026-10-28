@@ -19,6 +19,10 @@ src/app/  →  src/features/  →  src/domain/
 - 介面文字一律繁體中文，錯誤代碼轉成訊息集中在 `features/ledger/components/messages.ts`，新增錯誤代碼時要一起補。
 - 消費分類：代碼在 `domain/ledger/categories.ts`（存進資料庫的是代碼，只能新增不能改名或刪除），中文名稱在 `features/ledger/components/categories.ts`；清單以外的舊分類文字會原樣顯示。
 - 共用 UI 元件與主題色在 `src/shared/ui/`（只用 React Native 內建元件，不用 `@expo/ui`）。
+- 日系手繪風格（設計稿：https://claude.ai/artifact/Bq5DkRzceSM8V5rzqG2HPD）：
+  - 這一版固定和紙淺色（`app.json` 的 `userInterfaceStyle` 也是 `light`），`useTheme()` 不跟系統切換。
+  - 字型是霞鶩文楷 TC＋Caveat，在 `src/app/_layout.tsx` 用 `useFonts` 載入完才收起啟動畫面。自訂字型不會從 `View` 繼承，也不能用 `fontWeight` 切粗體：自己寫 `<Text>` 時要指定 `fonts.regular`／`fonts.bold`（`shared/ui/fonts.ts`），不要加 `fontWeight`。
+  - 手繪線條是 react-native-svg 畫的抖動路徑（`shared/ui/sketch.ts` 純函式、`handDrawn.tsx` 元件），不用 SVG 濾鏡：react-native-svg 雖然有 `FeTurbulence`、`FeDisplacementMap` 元件，但都沒有實作（只會警告、不畫任何東西），設計稿裡的鉛筆抖動要用路徑本身做出來。
 - 畫面讀資料用 `useFocusedQuery`（`src/shared/hooks/`），每次回到畫面都會重新讀取，寫入後不用另外通知其他畫面。
 - 新增路由後，`tsc` 會因為 typed routes 型別過期而報錯，要先跑一次 `npx expo start` 重新產生 `.expo/types/router.d.ts`。
 
