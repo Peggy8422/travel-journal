@@ -24,6 +24,10 @@ src/app/  →  src/features/  →  src/domain/
   - 這一版固定和紙淺色（`app.json` 的 `userInterfaceStyle` 也是 `light`），`useTheme()` 不跟系統切換。
   - 字型是霞鶩文楷 TC＋Caveat，在 `src/app/_layout.tsx` 用 `useFonts` 載入完才收起啟動畫面。自訂字型不會從 `View` 繼承，也不能用 `fontWeight` 切粗體：自己寫 `<Text>` 時要指定 `fonts.regular`／`fonts.bold`（`shared/ui/fonts.ts`），不要加 `fontWeight`。Caveat（`fonts.accent`）的字形比字寬寬，右邊會被 Text 的框切掉，要加 `paddingRight: accentOverhang(fontSize)`。
   - 手繪線條是 react-native-svg 畫的抖動路徑（`shared/ui/sketch.ts` 純函式、`handDrawn.tsx` 元件），不用 SVG 濾鏡：react-native-svg 雖然有 `FeTurbulence`、`FeDisplacementMap` 元件，但都沒有實作（只會警告、不畫任何東西），設計稿裡的鉛筆抖動要用路徑本身做出來。鉛筆的顆粒與印章缺墨則是用 `Mask` 挖掉小點（`HandCircle`、`InkStamp`），小點合成一條 path，不要一點一個 `Circle`。
+- 帳本內頁、統計、帳本設定隱藏導覽列（`src/app/_layout.tsx`），頁首自己畫（`shared/ui/PageHeader.tsx`）；這類畫面讀取失敗時要用 `PageMessage`，不然沒有返回鍵可以離開。
+- 操作成功的短提示用 `useToast()`（`shared/ui/Toast.tsx`，掛在最外層 layout，換頁後仍看得到）；錯誤訊息照舊放在畫面上（`ErrorText`），不要只用提示。
+- `Screen` 的捲動區設了 `keyboardShouldPersistTaps="handled"`，點按鈕不會自動收鍵盤；`Button`、`SmallButton` 已經會先收，自己用 `Pressable` 做送出按鈕時要呼叫 `Keyboard.dismiss()`；按下後會冒出新輸入欄位、要接著打字的按鈕（「新增成員」「手動修改匯率」）用 `Button` 的 `keepKeyboard`，新欄位用 `autoFocus` 接手。
+- 單邊的虛線、點線用 `DashedLine`（`handDrawn.tsx`）：React Native 的 `borderStyle: "dashed"` 在 iOS 只有四邊同寬時才有效。
 - 畫面讀資料用 `useFocusedQuery`（`src/shared/hooks/`），每次回到畫面都會重新讀取，寫入後不用另外通知其他畫面。
 - 新增路由後，`tsc` 會因為 typed routes 型別過期而報錯，要先跑一次 `npx expo start` 重新產生 `.expo/types/router.d.ts`。
 
