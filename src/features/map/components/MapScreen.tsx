@@ -53,7 +53,11 @@ export function MapScreen() {
     );
   }
 
-  const { pins, ledgers } = data;
+  const { pins } = data;
+  // 地圖資料的帳本包含沒有地點的，篩選選單只列有地點的
+  const ledgers = data.ledgers.filter((l) =>
+    pins.some((p) => p.ledgerId === l.id),
+  );
   // 篩選的帳本被刪除或已沒有地點時，回到全部帳本；日期同理
   const activeLedgerId = ledgers.some((l) => l.id === ledgerId)
     ? ledgerId
@@ -215,7 +219,7 @@ function DateStrip({
   );
 }
 
-const ALL_LEDGERS: MapLedger = { id: "", name: "全部帳本", kind: "shared" };
+const ALL_LEDGERS = { id: "", name: "全部帳本" };
 
 function LedgerDropdown({
   ledgers,
