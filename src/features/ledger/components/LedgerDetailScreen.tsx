@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle, Path } from "react-native-svg";
 
 import { coverFromId, formatMinorAmount } from "../../../domain/ledger";
+import { FloatingAddButton } from "../../../shared/ui/components";
 import { fonts } from "../../../shared/ui/fonts";
 import { PaperBackground } from "../../../shared/ui/handDrawn";
 import { BackButton, PageMessage } from "../../../shared/ui/PageHeader";
@@ -151,36 +152,16 @@ export function LedgerDetailScreen({ ledgerId }: { ledgerId: string }) {
         )}
       </View>
 
-      <Pressable
-        accessibilityRole="button"
+      <FloatingAddButton
+        title="新增消費"
+        bottom={insets.bottom + 18}
         onPress={() =>
           router.push({
             pathname: "/ledger/[id]/add-expense",
             params: { id: ledgerId },
           })
         }
-        style={({ pressed }) => [
-          styles.add,
-          {
-            bottom: insets.bottom + 18,
-            backgroundColor: theme.primary,
-            opacity: pressed ? 0.85 : 1,
-          },
-        ]}
-      >
-        <Svg width={20} height={20} viewBox="0 0 26 26">
-          <Path
-            d="M13 4.5 C13.3 9 12.8 17 13.1 21.5 M4.5 13.2 C9 12.8 17 13.4 21.5 12.9"
-            fill="none"
-            stroke={theme.onPrimary}
-            strokeWidth={2.6}
-            strokeLinecap="round"
-          />
-        </Svg>
-        <Text style={[styles.addText, { color: theme.onPrimary }]}>
-          新增消費
-        </Text>
-      </Pressable>
+      />
     </View>
   );
 }
@@ -396,24 +377,5 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 14,
     boxShadow:
       "0px -1px 0px rgba(58,51,45,0.14), 0px 6px 18px rgba(58,51,45,0.08)",
-  },
-  add: {
-    position: "absolute",
-    right: 18,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    minHeight: 54,
-    paddingLeft: 16,
-    paddingRight: 20,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 24,
-    borderBottomRightRadius: 27,
-    borderBottomLeftRadius: 25,
-    boxShadow: "3px 4px 0px rgba(58,51,45,0.25)",
-  },
-  addText: {
-    fontFamily: fonts.bold,
-    fontSize: 16,
   },
 });

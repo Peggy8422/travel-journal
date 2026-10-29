@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import {
   formatMinorAmount,
@@ -25,7 +25,7 @@ import {
 } from "../services/localTimestamp";
 import { SettledTag } from "./badges";
 import { categoryColor, categoryLabel, orderForChart } from "./categories";
-import { CategoryIcon } from "./CategoryIcon";
+import { DayHeader, ExpenseRowView } from "./ExpenseRows";
 
 /**
  * 帳本內頁的「消費」索引籤：上方固定成員、分類篩選，下方依消費當地的日期分組捲動。
@@ -149,15 +149,10 @@ export function ExpenseList({
         )}
         {days.map((day) => (
           <View key={day.date}>
-            <View style={styles.dayHeader}>
-              <Text style={[styles.dayLabel, { color: theme.text }]}>
-                {formatLocalDate(day.date)}
-              </Text>
-              <Text style={[styles.dayTotal, { color: theme.textMuted }]}>
-                {money(day.totalBaseMinor)}
-              </Text>
-            </View>
-            <DashedLine opacity={0.28} />
+            <DayHeader
+              label={formatLocalDate(day.date)}
+              total={money(day.totalBaseMinor)}
+            />
             {day.expenses.map((expense) => (
               <ExpenseRow
                 key={expense.id}
@@ -206,49 +201,38 @@ function ExpenseRow({
     ...(expense.category !== null ? [categoryLabel(expense.category)] : []),
   ].join(" · ");
   return (
-    <Pressable
-      accessibilityRole="button"
+    <ExpenseRowView
+      category={expense.category}
+      title={expense.title}
+      sub={sub}
+      note={expense.note}
+      amount={amount}
+      secondary={
+        expense.currency !== base
+          ? `≈ ${base} ${formatMinorAmount(baseAmount, base)}`
+          : undefined
+      }
+      badge={
+        status === "settled" ? (
+          <SettledTag />
+        ) : status === "offset" ? (
+          <Text style={[styles.offset, { color: theme.textMuted }]}>
+            已抵銷
+          </Text>
+        ) : undefined
+      }
       accessibilityLabel={`${expense.title}，${amount}，${payerName} 付款`}
       accessibilityHint="編輯或刪除這筆消費"
       onPress={onPress}
-      style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
-    >
-      <View style={styles.row}>
-        <CategoryIcon category={expense.category} />
-        <View style={styles.rowMain}>
-          <Text style={[styles.rowTitle, { color: theme.text }]}>
-            {expense.title}
-          </Text>
-          <Text style={[styles.rowSub, { color: theme.textMuted }]}>{sub}</Text>
-          {expense.note !== null && (
-            <Text style={[styles.rowNote, { color: theme.textMuted }]}>
-              備註：{expense.note}
-            </Text>
-          )}
-        </View>
-        <View style={styles.rowSide}>
-          <Text style={[styles.rowAmount, { color: theme.text }]}>
-            {amount}
-          </Text>
-          {expense.currency !== base && (
-            <Text style={[styles.rowBase, { color: theme.textMuted }]}>
-              ≈ {base} {formatMinorAmount(baseAmount, base)}
-            </Text>
-          )}
-          {status === "settled" && <SettledTag />}
-          {status === "offset" && (
-            <Text style={[styles.rowBase, { color: theme.textMuted }]}>
-              已抵銷
-            </Text>
-          )}
-        </View>
-      </View>
-      <DashedLine dotted />
-    </Pressable>
+    />
   );
 }
 
 const styles = StyleSheet.create({
+  offset: {
+    fontFamily: fonts.regular,
+    fontSize: 11.5,
+  },
   fill: {
     flex: 1,
   },
@@ -277,59 +261,5 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     marginVertical: 24,
     marginHorizontal: 6,
-  },
-  dayHeader: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    justifyContent: "space-between",
-    gap: 10,
-    paddingTop: 16,
-    paddingBottom: 6,
-    paddingHorizontal: 4,
-  },
-  dayLabel: {
-    fontFamily: fonts.bold,
-    fontSize: 14.5,
-  },
-  dayTotal: {
-    fontFamily: fonts.regular,
-    fontSize: 13,
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-    minHeight: 58,
-    paddingVertical: 10,
-    paddingHorizontal: 4,
-  },
-  rowMain: {
-    flex: 1,
-    gap: 2,
-  },
-  rowTitle: {
-    fontFamily: fonts.regular,
-    fontSize: 15,
-    lineHeight: 20,
-  },
-  rowSub: {
-    fontFamily: fonts.regular,
-    fontSize: 12.5,
-  },
-  rowNote: {
-    fontFamily: fonts.regular,
-    fontSize: 12,
-  },
-  rowSide: {
-    alignItems: "flex-end",
-    gap: 2,
-  },
-  rowAmount: {
-    fontFamily: fonts.regular,
-    fontSize: 14.5,
-  },
-  rowBase: {
-    fontFamily: fonts.regular,
-    fontSize: 11.5,
   },
 });
