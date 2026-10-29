@@ -43,7 +43,12 @@ export default function TabLayout() {
       />
       <Tabs.Screen
         name="personal"
-        options={{ title: "個人", tabBarIcon: tabBarIcon("person") }}
+        // 個人分頁自己畫頁首（「我」的印章），不用導覽列的標題
+        options={{
+          title: "個人",
+          headerShown: false,
+          tabBarIcon: tabBarIcon("person"),
+        }}
       />
     </Tabs>
   );
