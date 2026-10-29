@@ -26,7 +26,11 @@ src/app/  →  src/features/  →  src/domain/
   - 這一版固定和紙淺色（`app.json` 的 `userInterfaceStyle` 也是 `light`），`useTheme()` 不跟系統切換。
   - 字型是霞鶩文楷 TC＋Caveat，在 `src/app/_layout.tsx` 用 `useFonts` 載入完才收起啟動畫面。自訂字型不會從 `View` 繼承，也不能用 `fontWeight` 切粗體：自己寫 `<Text>` 時要指定 `fonts.regular`／`fonts.bold`（`shared/ui/fonts.ts`），不要加 `fontWeight`。Caveat（`fonts.accent`）的字形比字寬寬，右邊會被 Text 的框切掉，要加 `paddingRight: accentOverhang(fontSize)`。
   - 手繪線條是 react-native-svg 畫的抖動路徑（`shared/ui/sketch.ts` 純函式、`handDrawn.tsx` 元件），不用 SVG 濾鏡：react-native-svg 雖然有 `FeTurbulence`、`FeDisplacementMap` 元件，但都沒有實作（只會警告、不畫任何東西），設計稿裡的鉛筆抖動要用路徑本身做出來。鉛筆的顆粒與印章缺墨則是用 `Mask` 挖掉小點（`HandCircle`、`InkStamp`），小點合成一條 path，不要一點一個 `Circle`。
-- 帳本內頁、統計、帳本設定、個人記帳、備份，以及「帳本」「個人」分頁都隱藏導覽列（`src/app/_layout.tsx`、`src/app/(tabs)/_layout.tsx`），頁首自己畫（`shared/ui/PageHeader.tsx`）；這類畫面讀取失敗時要用 `PageMessage`，不然沒有返回鍵可以離開。新增／編輯消費是 modal，保留原生導覽列（左右放取消、儲存）。
+- 地圖分頁是手繪地球（`features/map/components/GlobeScreen.tsx`，投影在 `domain/map/globe.ts`，海岸線在 `worldOutline.ts`），只放大到城市大小；城市裡的日期篩選、當天路線、目前位置在「詳細地圖」（`/map?ledgers=…`，react-native-maps），從地球的消費卡片進去。
+  - 地球每一格都重新投影整個世界：海岸線先用 `toSphere` 轉成球面向量，投影只剩乘法，路徑字串直接串接；改這段時注意 Hermes 沒有 JIT，比 Node 慢很多。
+  - 地圖上的線（詳細地圖的當天路線）用 SVG 疊在 `MapView` 上，地圖移動時用 `pointForCoordinate` 重新換算位置（`DayMap`）：react-native-maps 的 `Polyline`、`Polygon` 在 iOS 實機上都畫不出來（2026-10-29 確認）。
+  - 動畫與拖曳狀態放在 `useGlobeMotion` 的 class 裡，畫面只拿快照：React Compiler 的 lint 不允許 render 時讀 ref（連把 ref 傳給 `PanResponder.create` 也算）。系統開啟「減少動態效果」時不擺動、視角直接跳到目標。
+- 帳本內頁、統計、帳本設定、個人記帳、備份、詳細地圖，以及三個分頁都隱藏導覽列（`src/app/_layout.tsx`、`src/app/(tabs)/_layout.tsx`），頁首自己畫（`shared/ui/PageHeader.tsx`）；這類畫面讀取失敗時要用 `PageMessage`，不然沒有返回鍵可以離開。新增／編輯消費是 modal，保留原生導覽列（左右放取消、儲存）。
 - 操作成功的短提示用 `useToast()`（`shared/ui/Toast.tsx`，掛在最外層 layout，換頁後仍看得到）；錯誤訊息照舊放在畫面上（`ErrorText`），不要只用提示。
 - `Screen` 的捲動區設了 `keyboardShouldPersistTaps="handled"`，點按鈕不會自動收鍵盤；`Button`、`SmallButton` 已經會先收，自己用 `Pressable` 做送出按鈕時要呼叫 `Keyboard.dismiss()`；按下後會冒出新輸入欄位、要接著打字的按鈕（「新增成員」「手動修改匯率」）用 `Button` 的 `keepKeyboard`，新欄位用 `autoFocus` 接手。
 - 選年月的設定（旅行月份、個人記帳的月份…）一律用 `MonthSwitcher`（`shared/ui/MonthPicker.tsx`）：左右箭頭一次移一個月，點中間的年月打開選單直接挑；之後新增類似的時間設定也用它，不要另外做。月份加減用 `shiftMonth`（`domain/ledger`）。
