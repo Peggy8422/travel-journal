@@ -44,7 +44,7 @@ src/app/  →  src/features/  →  src/domain/
 - 金額一律存成該幣別最小單位的整數（`amountMinor`），小數位數以 `domain/ledger/currency.ts` 的對照表為準（例如 TWD、IDR 是 0 位）。
 - 匯率與臺銀報價一律用十進位字串，不要轉成 `number` 再存。
 - 日期以臺灣時間的 `YYYY-MM-DD` 判斷（`domain/fx/taipeiDate.ts`），不要用裝置的時區。
-- 新增臺銀支援的幣別時，`BOT_QUOTED_CURRENCIES`（`data/fx/botQuoteSource.ts`）和 `currency.ts` 要一起更新，測試會比對真實 CSV 檢查兩邊是否一致。
+- 新增臺銀支援的幣別時，`BOT_QUOTED_CURRENCIES`（`data/fx/botQuoteSource.ts`）和 `currency.ts` 要一起更新，測試會比對真實 CSV 檢查兩邊是否一致；幣別選單的中文名稱在 `features/ledger/components/currencies.ts`，也要補（測試會檢查每個幣別都有名稱）。
 
 ## 資料庫（`src/data/db/`、`src/data/repositories/`）
 
