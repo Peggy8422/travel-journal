@@ -52,6 +52,11 @@ export default function RootLayout() {
               name="personal/spending"
               options={{ title: "個人記帳", headerShown: false }}
             />
+            {/* 詳細地圖自己畫頁首（返回地球、帳本名稱、目前位置） */}
+            <Stack.Screen
+              name="map"
+              options={{ title: "詳細地圖", headerShown: false }}
+            />
             <Stack.Screen
               name="personal/add-expense"
               options={{ title: "新增個人消費", presentation: "modal" }}

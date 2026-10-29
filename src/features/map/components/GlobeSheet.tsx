@@ -2,6 +2,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
 
 import { formatMinorAmount } from "../../../domain/ledger";
+import { TextButton } from "../../../shared/ui/components";
 import { fonts } from "../../../shared/ui/fonts";
 import {
   DashedLine,
@@ -31,6 +32,7 @@ export function GlobeSheet({
   onClearPlace,
   focusId,
   onFocus,
+  onOpenDetail,
 }: {
   picked: readonly MapLedger[];
   content: GlobeSheetContent;
@@ -41,6 +43,7 @@ export function GlobeSheet({
   onClearPlace: () => void;
   focusId: string | null;
   onFocus: (expense: MapExpense) => void;
+  onOpenDetail: () => void;
 }) {
   const theme = useTheme();
   const multi = picked.length > 1;
@@ -115,35 +118,40 @@ export function GlobeSheet({
         </Svg>
       </Pressable>
 
-      {placeIds && (
+      {count > 0 && (
         <View style={styles.tools}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`取消只看${placeNames}，顯示全部消費`}
-            onPress={onClearPlace}
-            style={({ pressed }) => [
-              styles.placeChip,
-              { backgroundColor: theme.chip, opacity: pressed ? 0.7 : 1 },
-            ]}
-          >
-            <Text
-              numberOfLines={1}
-              style={[styles.placeText, { color: theme.text }]}
+          {placeIds ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`取消只看${placeNames}，顯示全部消費`}
+              onPress={onClearPlace}
+              style={({ pressed }) => [
+                styles.placeChip,
+                { backgroundColor: theme.chip, opacity: pressed ? 0.7 : 1 },
+              ]}
             >
-              只看 {placeNames} · {shown.length} 筆
-            </Text>
-            <Svg
-              width={14}
-              height={14}
-              viewBox="0 0 16 16"
-              fill="none"
-              stroke={theme.text}
-              strokeWidth={1.6}
-              strokeLinecap="round"
-            >
-              <Path d="M4.5 4.6l7 6.9M11.4 4.5l-6.8 7" />
-            </Svg>
-          </Pressable>
+              <Text
+                numberOfLines={1}
+                style={[styles.placeText, { color: theme.text }]}
+              >
+                只看 {placeNames} · {shown.length} 筆
+              </Text>
+              <Svg
+                width={14}
+                height={14}
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke={theme.text}
+                strokeWidth={1.6}
+                strokeLinecap="round"
+              >
+                <Path d="M4.5 4.6l7 6.9M11.4 4.5l-6.8 7" />
+              </Svg>
+            </Pressable>
+          ) : (
+            <View style={styles.flex} />
+          )}
+          <TextButton title="詳細地圖" onPress={onOpenDetail} />
         </View>
       )}
 
@@ -259,6 +267,9 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 14,
     paddingBottom: 6,
+  },
+  flex: {
+    flex: 1,
   },
   placeChip: {
     flex: 1,

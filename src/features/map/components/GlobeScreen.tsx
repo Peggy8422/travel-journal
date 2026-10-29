@@ -1,3 +1,4 @@
+import { router } from "expo-router";
 import { useState, type ReactNode } from "react";
 import {
   LayoutAnimation,
@@ -425,6 +426,12 @@ function GlobeStage({
           }}
           focusId={focusId}
           onFocus={focusExpense}
+          onOpenDetail={() =>
+            router.push({
+              pathname: "/map",
+              params: { ledgers: pickedIdList.join(",") },
+            })
+          }
         />
       )}
     </>
