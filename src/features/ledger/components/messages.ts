@@ -1,6 +1,7 @@
 import {
   formatMinorAmount,
   type CurrencyCode,
+  type LedgerRecord,
   type LimitedTextField,
 } from "../../../domain/ledger";
 import type { BackupFileError } from "../../../data/backup/backupFile";
@@ -151,28 +152,43 @@ export function describeAllocationGap(
     : `分配的金額超出 ${amount}，請調整每個人的金額，讓加總等於消費金額。`;
 }
 
-/** 還原結果的說明，分成還原、略過、失敗三段 */
+/**
+ * 還原結果的說明：分帳帳本分成還原、略過、失敗三段，個人記帳另外說明
+ * （個人帳本在畫面上不是一本帳本，不列成「個人」）。
+ */
 export function describeRestoreReport(report: RestoreReport): string {
-  const names = (ledgers: readonly { readonly name: string }[]) =>
+  const shared = (ledgers: readonly LedgerRecord[]) =>
+    ledgers.filter((l) => l.kind === "shared");
+  const names = (ledgers: readonly LedgerRecord[]) =>
     ledgers.map((l) => `「${l.name}」`).join("、");
+  const restored = shared(report.restored);
+  const skipped = shared(report.skipped);
+  const failed = report.failed.map((f) => f.ledger);
+  const failedShared = shared(failed);
+
   const lines: string[] = [];
-  if (report.restored.length > 0) {
+  if (restored.length > 0) {
+    lines.push(`已還原 ${restored.length} 本：${names(restored)}`);
+  }
+  if (skipped.length > 0) {
     lines.push(
-      `已還原 ${report.restored.length} 本：${names(report.restored)}`,
+      `手機上已經有 ${skipped.length} 本，沒有變動：${names(skipped)}`,
     );
   }
-  if (report.skipped.length > 0) {
+  if (failedShared.length > 0) {
     lines.push(
-      `手機上已經有 ${report.skipped.length} 本，沒有變動：${names(report.skipped)}`,
+      `${failedShared.length} 本資料有誤，沒有還原：${names(failedShared)}`,
     );
   }
-  if (report.failed.length > 0) {
-    lines.push(
-      `${report.failed.length} 本資料有誤，沒有還原：${names(report.failed.map((f) => f.ledger))}`,
-    );
+  if (report.restored.some((l) => l.kind === "personal")) {
+    lines.push("個人記帳已還原");
   }
   if (report.personalExpensesAdded > 0) {
-    lines.push(`個人消費補進 ${report.personalExpensesAdded} 筆`);
+    lines.push(`個人記帳補進 ${report.personalExpensesAdded} 筆消費`);
   }
-  return lines.length > 0 ? lines.join("\n") : "備份裡沒有任何帳本";
+  if (failed.some((l) => l.kind === "personal")) {
+    lines.push("個人記帳的資料有誤，沒有還原");
+  }
+  // 備份是空的，或只有個人記帳而且消費手機上都已經有了
+  return lines.length > 0 ? lines.join("\n") : "備份裡沒有需要還原的資料";
 }

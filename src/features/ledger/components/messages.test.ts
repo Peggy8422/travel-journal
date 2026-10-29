@@ -61,9 +61,9 @@ describe("describeMapLocateError", () => {
 });
 
 describe("describeRestoreReport", () => {
-  const ledger = (name: string) => ({
+  const ledger = (name: string, kind: "shared" | "personal" = "shared") => ({
     id: name,
-    kind: "shared" as const,
+    kind,
     name,
     baseCurrency: "TWD",
     cover: null,
@@ -85,7 +85,7 @@ describe("describeRestoreReport", () => {
         "已還原 2 本：「東京」、「大阪」",
         "手機上已經有 1 本，沒有變動：「首爾」",
         "1 本資料有誤，沒有還原：「壞掉的」",
-        "個人消費補進 2 筆",
+        "個人記帳補進 2 筆消費",
       ].join("\n"),
     );
   });
@@ -98,6 +98,28 @@ describe("describeRestoreReport", () => {
         failed: [],
         personalExpensesAdded: 0,
       }),
-    ).toBe("備份裡沒有任何帳本");
+    ).toBe("備份裡沒有需要還原的資料");
+  });
+
+  it("describes the personal ledger as 個人記帳 instead of a ledger", () => {
+    expect(
+      describeRestoreReport({
+        restored: [ledger("東京"), ledger("個人", "personal")],
+        skipped: [],
+        failed: [],
+        personalExpensesAdded: 0,
+      }),
+    ).toBe(["已還原 1 本：「東京」", "個人記帳已還原"].join("\n"));
+  });
+
+  it("reports a personal ledger that could not be restored", () => {
+    expect(
+      describeRestoreReport({
+        restored: [],
+        skipped: [],
+        failed: [{ ledger: ledger("個人", "personal"), reason: "no self" }],
+        personalExpensesAdded: 0,
+      }),
+    ).toBe("個人記帳的資料有誤，沒有還原");
   });
 });
