@@ -406,17 +406,20 @@ export function InkStamp({
   size,
   label,
   color,
+  labelScale = 0.27,
 }: {
   size: number;
   label: string;
   color: string;
+  /** 字的大小相對印章直徑的比例；兩三個字用預設，單一個字可以放大 */
+  labelScale?: number;
 }) {
   const seed = useSeed();
   const wear = useMemo(
     () => stampWear({ width: size, height: size, seed: seed + 3, density: 3 }),
     [size, seed],
   );
-  const fontSize = size * 0.27;
+  const fontSize = size * labelScale;
   return (
     <Svg width={size} height={size} style={styles.noTouch}>
       <Circle
@@ -502,6 +505,69 @@ export function ReceiptPaper({
   );
 }
 
+/** 橫線筆記紙的行高與第一條線的位置 */
+const RULE_GAP = 28;
+const RULE_OFFSET = 12;
+
+/**
+ * 橫線筆記紙：藍色橫線、左邊一條朱色邊線，可以加三個活頁孔。
+ * 內容會從邊線右邊開始（paddingLeft 由呼叫端的 style 決定，要留出邊線與孔的位置）。
+ */
+export function RuledPaper({
+  children,
+  style,
+  marginLine = 32,
+  holes = false,
+}: {
+  children: ReactNode;
+  style?: StyleProp<ViewStyle>;
+  /** 朱色邊線離左邊的距離 */
+  marginLine?: number;
+  holes?: boolean;
+}) {
+  return (
+    <View style={[styles.ruled, style]}>
+      <Svg width="100%" height="100%" style={styles.overlay}>
+        <Defs>
+          <Pattern
+            id="rules"
+            patternUnits="userSpaceOnUse"
+            x={0}
+            y={RULE_OFFSET}
+            width={8}
+            height={RULE_GAP}
+          >
+            <Rect
+              y={RULE_GAP - 1}
+              width={8}
+              height={1}
+              fill="rgba(60,90,134,0.16)"
+            />
+          </Pattern>
+        </Defs>
+        <Rect width="100%" height="100%" fill="url(#rules)" />
+        <Line
+          x1={marginLine}
+          y1={0}
+          x2={marginLine}
+          y2="100%"
+          stroke="rgba(181,69,43,0.45)"
+          strokeWidth={1.5}
+        />
+      </Svg>
+      {holes && (
+        <>
+          <View style={[styles.hole, { top: 28 }]} />
+          <View style={[styles.hole, { top: "50%" }]} />
+          <View style={[styles.hole, { bottom: 28 }]} />
+        </>
+      )}
+      <SketchFrame radius={10} strokeWidth={1.2} />
+      {children}
+    </View>
+  );
+}
+
 /**
  * 一條橫的虛線，寬度隨父元件伸縮（分隔線、列表的列與列之間）。
  * React Native 的 borderStyle dashed 在 iOS 只有四邊同寬才有效，單邊虛線要用這個。
@@ -572,6 +638,24 @@ const styles = StyleSheet.create({
     minWidth: 20,
     height: 8,
     pointerEvents: "none",
+  },
+  ruled: {
+    backgroundColor: "#FFFDF8",
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 12,
+    borderBottomRightRadius: 6,
+    borderBottomLeftRadius: 14,
+    boxShadow:
+      "0px 2px 0px rgba(58,51,45,0.08), 0px 10px 22px rgba(58,51,45,0.1)",
+  },
+  hole: {
+    position: "absolute",
+    left: 11,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#F3EDE1",
+    boxShadow: "inset 1px 1px 0px rgba(58,51,45,0.25)",
   },
   receipt: {
     position: "absolute",

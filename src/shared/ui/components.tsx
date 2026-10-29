@@ -14,6 +14,8 @@ import {
   type ViewStyle,
 } from "react-native";
 
+import Svg, { Path } from "react-native-svg";
+
 import { fonts } from "./fonts";
 import { PaperBackground, SketchFrame } from "./handDrawn";
 import { spacing, useTheme } from "./theme";
@@ -304,6 +306,45 @@ export function TextButton({
   );
 }
 
+/**
+ * 右下角固定的朱色新增鈕（「新增消費」「記一筆」），bottom 由呼叫端加上安全區域。
+ * 按下時會先收起鍵盤。
+ */
+export function FloatingAddButton({
+  title,
+  onPress,
+  bottom,
+}: {
+  title: string;
+  onPress: () => void;
+  bottom: number;
+}) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={dismissKeyboardThen(onPress)}
+      style={({ pressed }) => [
+        styles.floatingAdd,
+        { bottom, backgroundColor: theme.primary, opacity: pressed ? 0.85 : 1 },
+      ]}
+    >
+      <Svg width={20} height={20} viewBox="0 0 26 26">
+        <Path
+          d="M13 4.5 C13.3 9 12.8 17 13.1 21.5 M4.5 13.2 C9 12.8 17 13.4 21.5 12.9"
+          fill="none"
+          stroke={theme.onPrimary}
+          strokeWidth={2.6}
+          strokeLinecap="round"
+        />
+      </Svg>
+      <Text style={[styles.floatingAddText, { color: theme.onPrimary }]}>
+        {title}
+      </Text>
+    </Pressable>
+  );
+}
+
 export function TextField({
   label,
   strongLabel = false,
@@ -532,6 +573,25 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     fontSize: 17,
     minHeight: 44,
+  },
+  floatingAdd: {
+    position: "absolute",
+    right: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    minHeight: 54,
+    paddingLeft: 16,
+    paddingRight: 20,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 24,
+    borderBottomRightRadius: 27,
+    borderBottomLeftRadius: 25,
+    boxShadow: "3px 4px 0px rgba(58,51,45,0.25)",
+  },
+  floatingAddText: {
+    fontFamily: fonts.bold,
+    fontSize: 16,
   },
   strongLabel: {
     fontFamily: fonts.bold,
