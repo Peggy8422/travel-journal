@@ -30,7 +30,12 @@ export default function TabLayout() {
     >
       <Tabs.Screen
         name="index"
-        options={{ title: "地圖", tabBarIcon: tabBarIcon("globe") }}
+        // 地球滿版，標題和按鈕畫在地球上，不用導覽列
+        options={{
+          title: "地圖",
+          headerShown: false,
+          tabBarIcon: tabBarIcon("globe"),
+        }}
       />
       <Tabs.Screen
         name="ledgers"
