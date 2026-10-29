@@ -43,7 +43,11 @@ export default function RootLayout() {
           >
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="ledger/new" options={{ title: "建立帳本" }} />
-            <Stack.Screen name="backup" options={{ title: "備份與還原" }} />
+            {/* 備份、個人記帳自己畫頁首，不用導覽列 */}
+            <Stack.Screen
+              name="backup"
+              options={{ title: "備份與還原", headerShown: false }}
+            />
             <Stack.Screen
               name="personal/spending"
               options={{ title: "個人記帳", headerShown: false }}
