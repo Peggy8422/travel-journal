@@ -16,18 +16,26 @@ export function DateTimeField({
   value,
   onChange,
   maximumDate,
+  strongLabel = false,
 }: {
   label: string;
   value: Date;
   onChange: (date: Date) => void;
   maximumDate?: Date;
+  /** 標籤用粗體墨色（收據表單的欄位標題），預設是淡色 */
+  strongLabel?: boolean;
 }) {
   const theme = useTheme();
+  const labelText = strongLabel ? (
+    <Text style={[styles.strongLabel, { color: theme.text }]}>{label}</Text>
+  ) : (
+    <Label muted>{label}</Label>
+  );
 
   if (Platform.OS === "ios") {
     return (
       <View style={styles.row}>
-        <Label muted>{label}</Label>
+        {labelText}
         <DateTimePicker
           value={value}
           mode="datetime"
@@ -65,7 +73,7 @@ export function DateTimeField({
 
   return (
     <View style={styles.row}>
-      <Label muted>{label}</Label>
+      {labelText}
       <Pressable
         accessibilityRole="button"
         onPress={openAndroidPicker}
@@ -95,6 +103,10 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: spacing.sm,
     minHeight: 44,
+  },
+  strongLabel: {
+    fontFamily: fonts.bold,
+    fontSize: 13.5,
   },
   androidValue: {
     borderRadius: 16,

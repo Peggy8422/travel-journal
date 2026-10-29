@@ -6,7 +6,7 @@ import {
   type ExpenseCategory,
 } from "../../../domain/ledger";
 import { useTheme } from "../../../shared/ui/theme";
-import { categoryTint } from "./categories";
+import { categoryColor, categoryTint } from "./categories";
 
 /** 各分類的手繪圖示（18 × 18），未分類與清單以外的舊分類用「其他」的三個點 */
 const ICON_PATHS: Readonly<Record<ExpenseCategory, readonly string[]>> = {
@@ -34,13 +34,20 @@ const ICON_PATHS: Readonly<Record<ExpenseCategory, readonly string[]>> = {
   other: [],
 };
 
-/** 消費列前面的分類圖示：分類淡色的圓底加手繪線條 */
+/**
+ * 分類圖示：分類淡色的圓底加手繪線條（消費列、表單的分類選擇）。
+ * background 可以換掉圓底的顏色，ring 會在外圈描一圈分類色（表單裡選中的分類）。
+ */
 export function CategoryIcon({
   category,
   size = 34,
+  background,
+  ring = false,
 }: {
   category: string | null;
   size?: number;
+  background?: string;
+  ring?: boolean;
 }) {
   const theme = useTheme();
   const known =
@@ -52,7 +59,10 @@ export function CategoryIcon({
         height: size,
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: categoryTint(category, theme),
+        backgroundColor: background ?? categoryTint(category, theme),
+        boxShadow: ring
+          ? `0px 0px 0px 2px ${categoryColor(category, theme)}`
+          : undefined,
         borderTopLeftRadius: size / 2,
         borderTopRightRadius: size * 0.46,
         borderBottomRightRadius: size * 0.52,

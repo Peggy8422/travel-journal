@@ -265,13 +265,57 @@ export function SmallButton({
  * 舊資料（例如還原的備份）已經超過上限時，maxLength 放寬到目前長度，
  * 否則 Android 會把顯示的文字截掉；這時字數變成朱色，存檔時由指令擋下並說明上限。
  */
+/**
+ * 底線文字按鈕（手動修改匯率、刪除這筆消費…），不像按鈕那麼搶眼。
+ * 按下時會先收起鍵盤；按下後要接著打字的（會冒出新輸入欄位）設 keepKeyboard。
+ */
+export function TextButton({
+  title,
+  onPress,
+  color,
+  disabled,
+  keepKeyboard = false,
+  align = "flex-start",
+}: {
+  title: string;
+  onPress: () => void;
+  color?: string;
+  disabled?: boolean;
+  keepKeyboard?: boolean;
+  align?: "flex-start" | "center";
+}) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      hitSlop={6}
+      onPress={keepKeyboard ? onPress : dismissKeyboardThen(onPress)}
+      style={({ pressed }) => [
+        styles.textButton,
+        { alignSelf: align, opacity: disabled ? 0.45 : pressed ? 0.6 : 1 },
+      ]}
+    >
+      <Text style={[styles.textButtonText, { color: color ?? theme.positive }]}>
+        {title}
+      </Text>
+    </Pressable>
+  );
+}
+
 export function TextField({
   label,
+  strongLabel = false,
   maxLength,
   onFocus,
   onBlur,
   ...props
-}: TextInputProps & { label?: string }) {
+}: TextInputProps & {
+  label?: string;
+  /** 標籤用粗體墨色（收據表單的欄位標題），預設是淡色 */
+  strongLabel?: boolean;
+}) {
   const theme = useTheme();
   const [focused, setFocused] = useState(false);
   const length = props.value?.length ?? 0;
@@ -301,7 +345,14 @@ export function TextField({
   );
   return (
     <View style={styles.field}>
-      {label && <Label muted>{label}</Label>}
+      {label &&
+        (strongLabel ? (
+          <Text style={[styles.strongLabel, { color: theme.text }]}>
+            {label}
+          </Text>
+        ) : (
+          <Label muted>{label}</Label>
+        ))}
       {limited ? (
         // 底線畫在外層，字數才會在底線上方、輸入框的右邊
         <View style={[styles.inputRow, { borderColor: theme.pencil }]}>
@@ -481,6 +532,19 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     fontSize: 17,
     minHeight: 44,
+  },
+  strongLabel: {
+    fontFamily: fonts.bold,
+    fontSize: 13.5,
+  },
+  textButton: {
+    minHeight: 36,
+    justifyContent: "center",
+  },
+  textButtonText: {
+    fontFamily: fonts.regular,
+    fontSize: 13.5,
+    textDecorationLine: "underline",
   },
   inputRow: {
     flexDirection: "row",

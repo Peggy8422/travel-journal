@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from "react";
+import { useId, useMemo, useState, type ReactNode } from "react";
 import {
   StyleSheet,
   View,
@@ -453,6 +453,55 @@ export function InkStamp({
   );
 }
 
+/** 收據紙上下鋸齒的齒數與深度 */
+const RECEIPT_TEETH = 24;
+const RECEIPT_TOOTH = 7;
+
+/**
+ * 收據紙：上下兩邊是撕下來的鋸齒，底下墊一層往下偏的淡影子。
+ * 紙和影子畫在 Svg 裡（量到大小後才畫），內容放在上面，style 用來設內距。
+ */
+export function ReceiptPaper({
+  children,
+  style,
+}: {
+  children: ReactNode;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const [size, onLayout] = useLayoutSize();
+  const points = useMemo(() => {
+    if (!size) return "";
+    const { width: w, height: h } = size;
+    const edge: string[] = [];
+    for (let i = 0; i <= RECEIPT_TEETH; i++) {
+      edge.push(
+        `${((i * w) / RECEIPT_TEETH).toFixed(1)},${i % 2 ? 0 : RECEIPT_TOOTH}`,
+      );
+    }
+    for (let i = RECEIPT_TEETH; i >= 0; i--) {
+      edge.push(
+        `${((i * w) / RECEIPT_TEETH).toFixed(1)},${i % 2 ? h : h - RECEIPT_TOOTH}`,
+      );
+    }
+    return edge.join(" ");
+  }, [size]);
+  return (
+    <View style={style} onLayout={onLayout}>
+      {size && (
+        <Svg width={size.width} height={size.height + 6} style={styles.receipt}>
+          <Polygon
+            points={points}
+            fill="rgba(58,51,45,0.1)"
+            transform="translate(0, 5)"
+          />
+          <Polygon points={points} fill="#FFFDF8" />
+        </Svg>
+      )}
+      {children}
+    </View>
+  );
+}
+
 /**
  * 一條橫的虛線，寬度隨父元件伸縮（分隔線、列表的列與列之間）。
  * React Native 的 borderStyle dashed 在 iOS 只有四邊同寬才有效，單邊虛線要用這個。
@@ -522,6 +571,12 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 20,
     height: 8,
+    pointerEvents: "none",
+  },
+  receipt: {
+    position: "absolute",
+    left: 0,
+    top: 0,
     pointerEvents: "none",
   },
   overlay: {
