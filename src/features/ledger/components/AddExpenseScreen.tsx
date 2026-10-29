@@ -1,4 +1,5 @@
 import { MessageScreen } from "../../../shared/ui/components";
+import { useToast } from "../../../shared/ui/Toast";
 import { useLedgerCommandDeps } from "../../database/DatabaseProvider";
 import { useLedgerSummary } from "../hooks/useLedgerQueries";
 import { addExpense } from "../services/ledgerCommands";
@@ -7,6 +8,7 @@ import { describeError } from "./messages";
 
 export function AddExpenseScreen({ ledgerId }: { ledgerId: string }) {
   const deps = useLedgerCommandDeps();
+  const toast = useToast();
   const { data, error } = useLedgerSummary(ledgerId);
 
   if (error) return <MessageScreen text="讀取帳本失敗" />;
@@ -20,6 +22,7 @@ export function AddExpenseScreen({ ledgerId }: { ledgerId: string }) {
     <ExpenseForm
       baseCurrency={ledger.baseCurrency}
       members={active}
+      receiptTitle={ledger.name}
       initial={{
         title: "",
         amountText: "",
@@ -34,7 +37,9 @@ export function AddExpenseScreen({ ledgerId }: { ledgerId: string }) {
       }}
       onSubmit={async (input) => {
         const result = await addExpense(deps, ledgerId, input);
-        return result.ok ? null : describeError(result.error);
+        if (!result.ok) return describeError(result.error);
+        toast(`記下「${input.title}」`);
+        return null;
       }}
     />
   );
