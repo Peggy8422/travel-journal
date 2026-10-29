@@ -8,8 +8,10 @@ const GROUP_DECIMALS = 4;
  * 組的順序依各組第一個 pin 出現的順序，組的座標用該組第一個 pin 的座標。
  * 剛好落在四捨五入邊界兩側的兩個點會分成兩組，地圖上仍然分得開，可以接受。
  */
-export function groupByLocation(pins: readonly MapPin[]): PinGroup[] {
-  const groups = new Map<string, { point: MapPin["point"]; pins: MapPin[] }>();
+export function groupByLocation<T extends MapPin>(
+  pins: readonly T[],
+): PinGroup<T>[] {
+  const groups = new Map<string, { point: MapPin["point"]; pins: T[] }>();
   for (const pin of pins) {
     const key = locationKey(pin.point);
     const group = groups.get(key);
