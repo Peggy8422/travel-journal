@@ -46,7 +46,7 @@ export default function RootLayout() {
             <Stack.Screen name="backup" options={{ title: "備份與還原" }} />
             <Stack.Screen
               name="personal/spending"
-              options={{ title: "個人記帳" }}
+              options={{ title: "個人記帳", headerShown: false }}
             />
             <Stack.Screen
               name="personal/add-expense"
