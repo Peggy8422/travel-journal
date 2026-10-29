@@ -1,5 +1,6 @@
 import { ok, type Result } from "../../../domain/common/result";
 import {
+  convertToBase,
   parseAmountInput,
   parseShareInputs,
   remainingToAllocate,
@@ -42,6 +43,41 @@ export function chooseExpenseFx(
   if (choice.storedFx) return choice.storedFx;
   if (!choice.resolution?.ok) return undefined;
   return expenseFxFromResolution(choice.resolution.value);
+}
+
+/**
+ * 收據下方「≈ TWD …」的預覽：金額或匯率還不完整（查詢中、手動匯率格式不對）時回傳 undefined。
+ * fx 是 chooseExpenseFx 的結果，null 代表本來就是基準幣。
+ */
+export function previewBaseAmount(
+  amountText: string,
+  currency: CurrencyCode,
+  baseCurrency: CurrencyCode,
+  fx: ExpenseFx | null | undefined,
+): number | undefined {
+  if (fx === undefined) return undefined;
+  const amount = parseAmountInput(amountText, currency);
+  if (!amount.ok) return undefined;
+  const base = convertToBase(
+    amount.value,
+    currency,
+    baseCurrency,
+    fx?.rateToBase,
+  );
+  return base.ok ? base.value : undefined;
+}
+
+/**
+ * 平均分攤時每人分到的金額。除不盡時有人多 1 個最小單位，
+ * 所以回傳最少和最多的金額（整除時兩者相同）；沒有人分攤時回傳 undefined。
+ */
+export function perHeadRange(
+  totalMinor: number,
+  count: number,
+): { readonly min: number; readonly max: number } | undefined {
+  if (count <= 0) return undefined;
+  const min = Math.floor(totalMinor / count);
+  return { min, max: totalMinor % count === 0 ? min : min + 1 };
 }
 
 /**

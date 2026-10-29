@@ -5,6 +5,8 @@ import {
   chooseExpenseFx,
   initialPlaceDraft,
   normalizeNote,
+  perHeadRange,
+  previewBaseAmount,
   previewRemaining,
   resolveOccurredAt,
   toPlaceFields,
@@ -281,5 +283,40 @@ describe("place draft", () => {
     expect(
       toPlaceFields({ placeName: "  ", location: null, suggestedName: null }),
     ).toEqual({ placeName: null, location: null });
+  });
+});
+
+describe("previewBaseAmount", () => {
+  it("converts a foreign amount with the chosen rate", () => {
+    expect(previewBaseAmount("3000", "JPY", "TWD", botFx)).toBe(640);
+  });
+
+  it("returns the amount itself for the base currency", () => {
+    expect(previewBaseAmount("1,200", "TWD", "TWD", null)).toBe(1200);
+  });
+
+  it("waits for a rate and a valid amount", () => {
+    expect(previewBaseAmount("3000", "JPY", "TWD", undefined)).toBeUndefined();
+    expect(previewBaseAmount("", "JPY", "TWD", botFx)).toBeUndefined();
+    expect(
+      previewBaseAmount("3000", "JPY", "TWD", {
+        rateToBase: "abc",
+        source: "manual",
+      }),
+    ).toBeUndefined();
+  });
+});
+
+describe("perHeadRange", () => {
+  it("is a single amount when it divides evenly", () => {
+    expect(perHeadRange(900, 3)).toEqual({ min: 300, max: 300 });
+  });
+
+  it("gives the low and high share when it does not", () => {
+    expect(perHeadRange(1000, 3)).toEqual({ min: 333, max: 334 });
+  });
+
+  it("has nothing to show without participants", () => {
+    expect(perHeadRange(1000, 0)).toBeUndefined();
   });
 });
