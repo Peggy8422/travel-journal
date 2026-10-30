@@ -2,6 +2,7 @@ import { useCallback } from "react";
 
 import { useFocusedQuery } from "../../../shared/hooks/useFocusedQuery";
 import { useDatabase } from "../../database/DatabaseProvider";
+import { loadExpenseDetail } from "../services/expenseDetail";
 import { loadLedgerOverviews } from "../services/ledgerOverview";
 import { loadLedgerStats, loadLedgerSummary } from "../services/ledgerSummary";
 
@@ -26,5 +27,15 @@ export function useLedgerSummary(ledgerId: string) {
 export function useLedgerStats(ledgerId: string) {
   const db = useDatabase();
   const load = useCallback(() => loadLedgerStats(db, ledgerId), [db, ledgerId]);
+  return useFocusedQuery(load);
+}
+
+/** 消費明細頁的一筆消費；data 是 Result，找不到或已刪除時為 EXPENSE_NOT_FOUND */
+export function useExpenseDetail(expenseId: string) {
+  const db = useDatabase();
+  const load = useCallback(
+    () => loadExpenseDetail(db, expenseId),
+    [db, expenseId],
+  );
   return useFocusedQuery(load);
 }
