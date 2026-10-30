@@ -156,7 +156,7 @@ export function GlobeIndex({
   );
 }
 
-/** 一張直書索引籤：名稱取前四個字直排，下面一行小字 */
+/** 一張直書索引籤：名稱取前四個字直排（更長的接一個直的「⋮」），下面一行小字 */
 function LedgerTab({
   ledger,
   label,
@@ -173,7 +173,8 @@ function LedgerTab({
   const theme = useTheme();
   const colors = ledgerColors(ledger);
   // Array.from keeps characters outside the BMP in one piece
-  const chars = Array.from(label).slice(0, 4);
+  const all = Array.from(label);
+  const chars = all.slice(0, 4);
   return (
     <Pressable
       accessibilityRole="button"
@@ -208,6 +209,17 @@ function LedgerTab({
       >
         {chars.join("\n")}
       </Text>
+      {all.length > chars.length && (
+        // Drawn as dots: the fonts have no vertical ellipsis glyph to rely on
+        <View style={styles.more}>
+          {[0, 1, 2].map((i) => (
+            <View
+              key={i}
+              style={[styles.moreDot, { backgroundColor: theme.text }]}
+            />
+          ))}
+        </View>
+      )}
       <Text style={[styles.tabSub, { color: theme.textMuted }]}>{sub}</Text>
       {selected && (
         <Svg
@@ -302,6 +314,16 @@ const styles = StyleSheet.create({
     width: 5,
     borderTopLeftRadius: 12,
     borderBottomLeftRadius: 12,
+  },
+  more: {
+    alignItems: "center",
+    gap: 2.5,
+    marginTop: -2,
+  },
+  moreDot: {
+    width: 2.5,
+    height: 2.5,
+    borderRadius: 1.25,
   },
   tabLabel: {
     fontSize: 14,
