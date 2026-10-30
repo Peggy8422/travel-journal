@@ -26,6 +26,7 @@ import {
   type MemberRecord,
   type SplitRule,
 } from "../../../domain/ledger";
+import { useFieldScroller } from "../../../shared/hooks/useFieldScroller";
 import {
   Button,
   Chip,
@@ -173,8 +174,18 @@ export function ExpenseForm({
   );
   const currentPlace = useCurrentPlace();
   const [pickingPlace, setPickingPlace] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  /** 欄位自己的錯誤，寫在那一欄下面；儲存時有錯會把那一欄捲進畫面 */
+  const [fieldError, setFieldError] = useState<{
+    field: FormField;
+    message: string;
+  } | null>(null);
   const [saving, setSaving] = useState(false);
+  const scroller = useFieldScroller();
+  const errorFor = (field: FormField) =>
+    fieldError?.field === field ? fieldError.message : null;
+  /** 改了那一欄就收起它的錯誤 */
+  const clearError = (field: FormField) =>
+    setFieldError((current) => (current?.field === field ? null : current));
 
   const isForeign = currency !== baseCurrency;
   const fxState = useFxRateResolution(
@@ -204,6 +215,7 @@ export function ExpenseForm({
   }
 
   function toggleParticipant(id: MemberId) {
+    clearError("split");
     setParticipantIds((ids) =>
       ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id],
     );
@@ -222,14 +234,20 @@ export function ExpenseForm({
     if (result?.ok) setPlace((draft) => applyLocatedPlace(draft, result.value));
   }
 
+  function fail(field: FormField, message: string) {
+    setFieldError({ field, message });
+    scroller.scrollTo(field);
+  }
+
   async function submit() {
     Keyboard.dismiss();
-    setError(null);
-    if (title.trim() === "") return setError("請輸入消費名稱");
-    if (!payerId) return setError("請選擇付款人");
+    setFieldError(null);
+    // 依畫面由上到下檢查，捲過去的是最上面那個有錯的欄位
     const amount = parseAmountInput(amountText, currency);
-    if (!amount.ok) return setError(describeError(amount.error));
-    if (fx === undefined) return setError("請輸入匯率");
+    if (!amount.ok) return fail("amount", describeError(amount.error));
+    if (fx === undefined) return fail("fx", "請輸入匯率");
+    if (title.trim() === "") return fail("title", "請輸入消費名稱");
+    if (!payerId) return fail("payer", "請選擇付款人");
     const memberOrder = members.map((m) => m.id);
     const split = buildSplitRule(
       splitKind === "equal"
@@ -238,7 +256,7 @@ export function ExpenseForm({
       memberOrder,
       currency,
     );
-    if (!split.ok) return setError(describeError(split.error));
+    if (!split.ok) return fail("split", describeError(split.error));
     if (split.value.kind === "exact") {
       const gap = describeAllocationGap(
         remainingToAllocate(amount.value, split.value.shares),
@@ -264,13 +282,14 @@ export function ExpenseForm({
         category,
         occurredAt,
       });
+      // 不屬於某一欄的錯誤用彈窗：「儲存」在頁首，寫在頁尾會看不到
       if (failure) {
-        setError(failure);
+        Alert.alert("無法儲存", failure);
         return;
       }
       router.back();
     } catch {
-      setError("儲存失敗，請再試一次");
+      Alert.alert("無法儲存", "儲存失敗，請再試一次");
     } finally {
       setSaving(false);
     }
@@ -298,7 +317,11 @@ export function ExpenseForm({
       : undefined;
 
   return (
-    <Screen contentStyle={styles.content}>
+    <Screen
+      contentStyle={styles.content}
+      scrollRef={scroller.scrollRef}
+      contentRef={scroller.contentRef}
+    >
       <Stack.Screen
         options={{
           headerLeft: () => (
@@ -326,7 +349,7 @@ export function ExpenseForm({
         </View>
         <DashedLine opacity={0.3} />
 
-        <View style={styles.block}>
+        <View ref={scroller.field("amount")} style={styles.block}>
           <FieldLabel>金額</FieldLabel>
           <View style={styles.amountRow}>
             <Pressable
@@ -347,8 +370,12 @@ export function ExpenseForm({
                 placeholder="0"
                 keyboardType="decimal-pad"
                 value={amountText}
-                onChangeText={setAmountText}
+                onChangeText={(text) => {
+                  setAmountText(text);
+                  clearError("amount");
+                }}
                 style={[styles.amountInput, { borderColor: theme.text }]}
+                error={errorFor("amount")}
               />
             </View>
           </View>
@@ -365,7 +392,10 @@ export function ExpenseForm({
             </View>
           )}
           {isForeign && (
-            <View style={[styles.fxBox, { backgroundColor: theme.background }]}>
+            <View
+              ref={scroller.field("fx")}
+              style={[styles.fxBox, { backgroundColor: theme.background }]}
+            >
               {baseTotal !== undefined && (
                 <Text style={[styles.converted, { color: theme.text }]}>
                   ≈ {money(baseTotal, baseCurrency)}
@@ -378,20 +408,30 @@ export function ExpenseForm({
                 storedFx={storedFx}
                 onRequery={() => setStoredFx(undefined)}
                 manualRate={manualRate}
-                onManualRateChange={setManualRate}
+                onManualRateChange={(rate) => {
+                  setManualRate(rate);
+                  clearError("fx");
+                }}
               />
+              <ErrorText message={errorFor("fx")} />
             </View>
           )}
         </View>
 
-        <TextField
-          label="消費名稱"
-          strongLabel
-          placeholder="例如：午餐拉麵"
-          value={title}
-          onChangeText={setTitle}
-          maxLength={TEXT_LIMITS.expenseTitle}
-        />
+        <View ref={scroller.field("title")}>
+          <TextField
+            label="消費名稱"
+            strongLabel
+            placeholder="例如：午餐拉麵"
+            value={title}
+            onChangeText={(text) => {
+              setTitle(text);
+              clearError("title");
+            }}
+            maxLength={TEXT_LIMITS.expenseTitle}
+            error={errorFor("title")}
+          />
+        </View>
 
         <DashedLine opacity={0.3} />
         <View style={styles.tight}>
@@ -451,7 +491,7 @@ export function ExpenseForm({
         {!hidePeople && (
           <>
             <DashedLine opacity={0.3} />
-            <View style={styles.block}>
+            <View ref={scroller.field("payer")} style={styles.block}>
               <FieldLabel>付款人</FieldLabel>
               <View style={styles.wrap}>
                 {members.map((m) => (
@@ -459,12 +499,16 @@ export function ExpenseForm({
                     key={m.id}
                     label={memberLabel(m)}
                     selected={m.id === payerId}
-                    onPress={() => setPayerId(m.id)}
+                    onPress={() => {
+                      setPayerId(m.id);
+                      clearError("payer");
+                    }}
                   />
                 ))}
               </View>
+              <ErrorText message={errorFor("payer")} />
             </View>
-            <View style={styles.block}>
+            <View ref={scroller.field("split")} style={styles.block}>
               <FieldLabel>分攤方式</FieldLabel>
               <View
                 style={[styles.segments, { backgroundColor: theme.background }]}
@@ -472,12 +516,18 @@ export function ExpenseForm({
                 <Segment
                   title="平均分攤"
                   selected={splitKind === "equal"}
-                  onPress={() => setSplitKind("equal")}
+                  onPress={() => {
+                    setSplitKind("equal");
+                    clearError("split");
+                  }}
                 />
                 <Segment
                   title="指定金額"
                   selected={splitKind === "exact"}
-                  onPress={() => setSplitKind("exact")}
+                  onPress={() => {
+                    setSplitKind("exact");
+                    clearError("split");
+                  }}
                 />
               </View>
               {splitKind === "equal" ? (
@@ -517,9 +567,13 @@ export function ExpenseForm({
                         placeholder="不分攤"
                         keyboardType="decimal-pad"
                         value={shareTexts[m.id] ?? ""}
-                        onChangeText={(text) =>
-                          setShareTexts((texts) => ({ ...texts, [m.id]: text }))
-                        }
+                        onChangeText={(text) => {
+                          setShareTexts((texts) => ({
+                            ...texts,
+                            [m.id]: text,
+                          }));
+                          clearError("split");
+                        }}
                         style={styles.shareInput}
                       />
                     </View>
@@ -527,6 +581,7 @@ export function ExpenseForm({
                   <RemainingLabel remaining={remaining} currency={currency} />
                 </>
               )}
+              <ErrorText message={errorFor("split")} />
             </View>
           </>
         )}
@@ -579,12 +634,14 @@ export function ExpenseForm({
       </ReceiptPaper>
 
       {notice && <Label muted>{notice}</Label>}
-      <ErrorText message={error} />
       <Button title="儲存" onPress={submit} disabled={saving} />
       {footer}
     </Screen>
   );
 }
+
+/** 儲存前檢查、錯誤寫在欄位下面的欄位 */
+type FormField = "amount" | "fx" | "title" | "payer" | "split";
 
 /** 「每人 JPY 1,000（≈ TWD 210）」；除不盡時寫成範圍，例如 333～334 */
 function perHeadText({

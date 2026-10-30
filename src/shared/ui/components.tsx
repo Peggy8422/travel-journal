@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState, type ComponentRef, type ReactNode, type Ref } from "react";
 import {
   Keyboard,
   KeyboardAvoidingView,
@@ -33,11 +33,16 @@ export function Screen({
   children,
   header,
   contentStyle,
+  scrollRef,
+  contentRef,
 }: {
   children: ReactNode;
   /** 固定在捲動區上方、不跟著捲動的頁首（例如隱藏導覽列時自己畫的 PageHeader） */
   header?: ReactNode;
   contentStyle?: StyleProp<ViewStyle>;
+  /** 要把有錯的欄位捲進畫面時用（useFieldScroller） */
+  scrollRef?: Ref<ComponentRef<typeof ScrollView>>;
+  contentRef?: Ref<ComponentRef<typeof View>>;
 }) {
   const theme = useTheme();
   return (
@@ -48,6 +53,8 @@ export function Screen({
       <PaperBackground />
       {header}
       <ScrollView
+        ref={scrollRef}
+        innerViewRef={contentRef}
         style={styles.fill}
         contentContainerStyle={[styles.screen, contentStyle]}
         contentInsetAdjustmentBehavior="automatic"
@@ -293,11 +300,6 @@ export function SmallButton({
 }
 
 /**
- * 底線輸入框。有 maxLength 時，聚焦中或寫到八成以上會在右邊顯示「12 / 20」。
- * 舊資料（例如還原的備份）已經超過上限時，maxLength 放寬到目前長度，
- * 否則 Android 會把顯示的文字截掉；這時字數變成朱色，存檔時由指令擋下並說明上限。
- */
-/**
  * 底線文字按鈕（手動修改匯率、刪除這筆消費…），不像按鈕那麼搶眼。
  * 按下時會先收起鍵盤；按下後要接著打字的（會冒出新輸入欄位）設 keepKeyboard。
  */
@@ -410,10 +412,18 @@ export function FloatingAddButton({
   );
 }
 
+/**
+ * 底線輸入框。有 maxLength 時，聚焦中或寫到八成以上會在右邊顯示「12 / 20」；
+ * 寫到上限時字數變朱色，輸入框下面也寫出上限，不然只是打不進去，很難發現原因。
+ * 舊資料（例如還原的備份）已經超過上限時，maxLength 放寬到目前長度，
+ * 否則 Android 會把顯示的文字截掉；存檔時由指令擋下並說明上限。
+ * error 是這個欄位的錯誤（例如沒填、名字重複），顯示在輸入框下面，優先於上限提示。
+ */
 export function TextField({
   label,
   strongLabel = false,
   maxLength,
+  error,
   onFocus,
   onBlur,
   ...props
@@ -421,13 +431,22 @@ export function TextField({
   label?: string;
   /** 標籤用粗體墨色（收據表單的欄位標題），預設是淡色 */
   strongLabel?: boolean;
+  error?: string | null;
 }) {
   const theme = useTheme();
   const [focused, setFocused] = useState(false);
   const length = props.value?.length ?? 0;
   const limited = maxLength !== undefined;
   const over = limited && length > maxLength;
+  const full = limited && length >= maxLength;
   const showCount = limited && (focused || length >= maxLength * 0.8);
+  const message =
+    error ||
+    (over
+      ? `超過 ${maxLength} 字上限，請刪到 ${maxLength} 字以內`
+      : full
+        ? `已達 ${maxLength} 字上限`
+        : null);
   const input = (
     <TextInput
       placeholderTextColor={theme.textMuted}
@@ -468,7 +487,7 @@ export function TextField({
               accessibilityLabel={`已輸入 ${length} 字，上限 ${maxLength} 字`}
               style={[
                 styles.count,
-                { color: over ? theme.negative : theme.textMuted },
+                { color: full ? theme.negative : theme.textMuted },
               ]}
             >
               {length} / {maxLength}
@@ -478,6 +497,7 @@ export function TextField({
       ) : (
         input
       )}
+      <ErrorText message={message} />
     </View>
   );
 }

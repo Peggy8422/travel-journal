@@ -2,7 +2,12 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 
-import { randomCover, rerollCover, TEXT_LIMITS } from "../../../domain/ledger";
+import {
+  randomCover,
+  rerollCover,
+  sameMemberName,
+  TEXT_LIMITS,
+} from "../../../domain/ledger";
 import {
   Button,
   Chip,
@@ -14,6 +19,7 @@ import {
   Section,
   TextField,
 } from "../../../shared/ui/components";
+import { useFieldScroller } from "../../../shared/hooks/useFieldScroller";
 import { spacing } from "../../../shared/ui/theme";
 import { useToast } from "../../../shared/ui/Toast";
 import { useLedgerCommandDeps } from "../../database/DatabaseProvider";
@@ -35,7 +41,22 @@ export function CreateLedgerScreen() {
   // 一打開就隨機抽一個封面；之後會開放自訂
   const [cover, setCover] = useState(() => randomCover());
   const [error, setError] = useState<string | null>(null);
+  /** 欄位自己的錯誤，寫在欄位下面；建立時有錯會把那一欄捲進畫面 */
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [membersError, setMembersError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const scroller = useFieldScroller();
+
+  /** 和前面某一格重複的名字，打字時就提示（建立時指令也會再擋一次） */
+  const repeats = (index: number) => {
+    const memberName = memberNames[index] ?? "";
+    return (
+      memberName.trim() !== "" &&
+      memberNames
+        .slice(0, index)
+        .some((other) => sameMemberName(other, memberName))
+    );
+  };
 
   const setMemberName = (index: number, value: string) =>
     setMemberNames((names) => names.map((n, i) => (i === index ? value : n)));
@@ -53,13 +74,21 @@ export function CreateLedgerScreen() {
   }
 
   async function submit() {
-    setSaving(true);
     setError(null);
+    // 沒填的欄位直接略過，「我」要換算成略過空白後的位置
+    const filled = memberNames
+      .map((memberName, field) => ({ memberName, field }))
+      .filter(({ memberName }) => memberName.trim() !== "");
+    const nameMissing = name.trim() === "";
+    setNameError(nameMissing ? "請輸入帳本名稱" : null);
+    setMembersError(
+      filled.length === 0 ? describeError({ code: "NO_MEMBERS" }) : null,
+    );
+    if (nameMissing) return scroller.scrollTo("name");
+    if (filled.length === 0) return scroller.scrollTo("members");
+
+    setSaving(true);
     try {
-      // 沒填的欄位直接略過，「我」要換算成略過空白後的位置
-      const filled = memberNames
-        .map((memberName, field) => ({ memberName, field }))
-        .filter(({ memberName }) => memberName.trim() !== "");
       const selfIndex = filled.findIndex(({ field }) => field === selfField);
       const result = await createLedger(deps, {
         name,
@@ -84,7 +113,7 @@ export function CreateLedgerScreen() {
   }
 
   return (
-    <Screen>
+    <Screen scrollRef={scroller.scrollRef} contentRef={scroller.contentRef}>
       <View style={styles.coverPreview}>
         <NotebookCover
           cover={cover}
@@ -108,45 +137,65 @@ export function CreateLedgerScreen() {
           />
         </View>
       </View>
-      <TextField
-        label="帳本名稱"
-        placeholder="例如：東京五日遊"
-        value={name}
-        onChangeText={setName}
-        maxLength={TEXT_LIMITS.ledgerName}
-      />
-      <Section title="成員（依加入順序）">
-        {memberNames.map((memberName, index) => (
-          <Row key={index}>
-            <View style={{ flex: 1 }}>
-              <TextField
-                placeholder={`成員 ${index + 1}`}
-                value={memberName}
-                onChangeText={(value) => setMemberName(index, value)}
-                maxLength={TEXT_LIMITS.memberName}
-                // 只在剛新增、第一次掛上時生效，之後重繪不會搶走焦點
-                autoFocus={index === focusField}
-              />
-            </View>
-            {memberNames.length > 1 && (
-              <Button
-                title="移除"
-                variant="secondary"
-                onPress={() => removeMemberField(index)}
-              />
-            )}
-          </Row>
-        ))}
-        <Button
-          title="新增成員"
-          variant="secondary"
-          keepKeyboard
-          onPress={() => {
-            setFocusField(memberNames.length);
-            setMemberNames((names) => [...names, ""]);
+      <View ref={scroller.field("name")}>
+        <TextField
+          label="帳本名稱"
+          placeholder="例如：東京五日遊"
+          value={name}
+          onChangeText={(value) => {
+            setName(value);
+            setNameError(null);
           }}
+          maxLength={TEXT_LIMITS.ledgerName}
+          error={nameError}
         />
-      </Section>
+      </View>
+      <View ref={scroller.field("members")}>
+        <Section title="成員（依加入順序）">
+          {memberNames.map((memberName, index) => (
+            <Row key={index}>
+              <View style={{ flex: 1 }}>
+                <TextField
+                  placeholder={`成員 ${index + 1}`}
+                  value={memberName}
+                  onChangeText={(value) => {
+                    setMemberName(index, value);
+                    setMembersError(null);
+                  }}
+                  maxLength={TEXT_LIMITS.memberName}
+                  // 只在剛新增、第一次掛上時生效，之後重繪不會搶走焦點
+                  autoFocus={index === focusField}
+                  error={
+                    repeats(index)
+                      ? describeError({
+                          code: "DUPLICATE_MEMBER_NAME",
+                          name: memberName.trim(),
+                        })
+                      : null
+                  }
+                />
+              </View>
+              {memberNames.length > 1 && (
+                <Button
+                  title="移除"
+                  variant="secondary"
+                  onPress={() => removeMemberField(index)}
+                />
+              )}
+            </Row>
+          ))}
+          <ErrorText message={membersError} />
+          <Button
+            title="新增成員"
+            variant="secondary"
+            keepKeyboard
+            onPress={() => {
+              setFocusField(memberNames.length);
+              setMemberNames((names) => [...names, ""]);
+            }}
+          />
+        </Section>
+      </View>
       {memberNames.some((n) => n.trim() !== "") && (
         <Section title="哪一位是你？">
           <Label muted>
@@ -170,7 +219,12 @@ export function CreateLedgerScreen() {
         </Section>
       )}
       <ErrorText message={error} />
-      <Button title="建立" onPress={submit} disabled={saving} />
+      <Button
+        title="建立"
+        onPress={submit}
+        // 名字重複時欄位下面已經有提示，先改好才能建立
+        disabled={saving || memberNames.some((_, index) => repeats(index))}
+      />
     </Screen>
   );
 }

@@ -7,6 +7,7 @@ import type { Result } from "../../../domain/common/result";
 import {
   coverFromId,
   rerollCover,
+  sameMemberName,
   TEXT_LIMITS,
   type MemberRecord,
 } from "../../../domain/ledger";
@@ -82,26 +83,44 @@ export function LedgerSettingsScreen({ ledgerId }: { ledgerId: string }) {
     );
   }
   const { ledger, members, expenses, settlements } = data.value;
+  /**
+   * 名字和其他成員重複時，在輸入框下面提示（和建立帳本頁一樣），按鈕也不能按；
+   * 指令還是會再檢查一次。exceptId 是正在改名的那位自己。
+   */
+  const takenMessage = (name: string, exceptId?: string) =>
+    name.trim() !== "" &&
+    members.some((m) => m.id !== exceptId && sameMemberName(m.name, name))
+      ? describeError({ code: "DUPLICATE_MEMBER_NAME", name: name.trim() })
+      : null;
+  const newMemberTaken = takenMessage(newMemberName);
   const cover = ledger.cover ?? coverFromId(ledger.id);
   const palette = COVER_COLORS[cover.palette];
 
-  /** 執行一個寫入動作；失敗時顯示訊息，成功後重新讀取（reloadAfter 為 false 時不讀取） */
+  /**
+   * 執行一個寫入動作，成功後重新讀取（reload 為 false 時不讀取）。
+   * 失敗時訊息放在頁面最上方；成員卡片在下面，訊息會被捲到看不到，所以傳 alert（彈窗標題）改用彈窗。
+   */
   async function run(
     action: () => Promise<Result<unknown, LedgerCommandError>>,
-    reloadAfter = true,
+    {
+      reload: reloadAfter = true,
+      alert,
+    }: { reload?: boolean; alert?: string } = {},
   ): Promise<boolean> {
+    const fail = (text: string) =>
+      alert ? Alert.alert(alert, text) : setMessage(text);
     setBusy(true);
     setMessage(null);
     try {
       const result = await action();
       if (!result.ok) {
-        setMessage(describeError(result.error));
+        fail(describeError(result.error));
         return false;
       }
       if (reloadAfter) reload();
       return true;
     } catch {
-      setMessage("儲存失敗，請再試一次");
+      fail("儲存失敗，請再試一次");
       return false;
     } finally {
       setBusy(false);
@@ -117,7 +136,10 @@ export function LedgerSettingsScreen({ ledgerId }: { ledgerId: string }) {
   }
 
   async function saveNewMember() {
-    const saved = await run(() => addMember(deps, ledgerId, newMemberName));
+    if (newMemberTaken) return;
+    const saved = await run(() => addMember(deps, ledgerId, newMemberName), {
+      alert: "無法新增成員",
+    });
     if (!saved) return;
     setNewMemberName("");
     toast(`加入了 ${newMemberName.trim()}`);
@@ -135,10 +157,10 @@ export function LedgerSettingsScreen({ ledgerId }: { ledgerId: string }) {
       } else if (result.error.code === "MEMBER_REFERENCED") {
         offerArchive(member);
       } else {
-        setMessage(describeError(result.error));
+        Alert.alert("無法刪除成員", describeError(result.error));
       }
     } catch {
-      setMessage("刪除失敗，請再試一次");
+      Alert.alert("無法刪除成員", "刪除失敗，請再試一次");
     } finally {
       setBusy(false);
     }
@@ -152,7 +174,10 @@ export function LedgerSettingsScreen({ ledgerId }: { ledgerId: string }) {
         { text: "取消", style: "cancel" },
         {
           text: "封存",
-          onPress: () => run(() => archiveMember(deps, member.id)),
+          onPress: () =>
+            run(() => archiveMember(deps, member.id), {
+              alert: "無法封存成員",
+            }),
         },
       ],
     );
@@ -195,10 +220,9 @@ export function LedgerSettingsScreen({ ledgerId }: { ledgerId: string }) {
           style: "destructive",
           onPress: async () => {
             // 刪除後不重新讀取，避免畫面閃過「找不到這本帳本」
-            const deleted = await run(
-              () => deleteLedger(deps, ledgerId),
-              false,
-            );
+            const deleted = await run(() => deleteLedger(deps, ledgerId), {
+              reload: false,
+            });
             if (!deleted) return;
             router.dismissTo("/ledgers");
             toast(`刪掉「${ledger.name}」了`);
@@ -376,26 +400,31 @@ export function LedgerSettingsScreen({ ledgerId }: { ledgerId: string }) {
                 <MemberEditor
                   member={member}
                   busy={busy}
+                  takenMessage={(name) => takenMessage(name, member.id)}
                   onRename={(name) =>
-                    run(() => renameMember(deps, member.id, name)).then(
-                      (saved) => saved && setEditingId(null),
-                    )
+                    run(() => renameMember(deps, member.id, name), {
+                      alert: "無法修改名字",
+                    }).then((saved) => saved && setEditingId(null))
                   }
                   onToggleArchive={() =>
-                    run(() =>
-                      archived
-                        ? unarchiveMember(deps, member.id)
-                        : archiveMember(deps, member.id),
+                    run(
+                      () =>
+                        archived
+                          ? unarchiveMember(deps, member.id)
+                          : archiveMember(deps, member.id),
+                      { alert: archived ? "無法取消封存" : "無法封存成員" },
                     )
                   }
                   onRemove={() => confirmRemove(member)}
                   onToggleSelf={() =>
-                    run(() =>
-                      setSelfMember(
-                        deps,
-                        ledgerId,
-                        member.isSelf ? null : member.id,
-                      ),
+                    run(
+                      () =>
+                        setSelfMember(
+                          deps,
+                          ledgerId,
+                          member.isSelf ? null : member.id,
+                        ),
+                      { alert: "無法設定「我」" },
                     )
                   }
                 />
@@ -414,12 +443,15 @@ export function LedgerSettingsScreen({ ledgerId }: { ledgerId: string }) {
               maxLength={TEXT_LIMITS.memberName}
               onSubmitEditing={saveNewMember}
               returnKeyType="done"
+              error={newMemberTaken}
             />
           </View>
           <SmallButton
             title="新增"
             onPress={saveNewMember}
-            disabled={busy || newMemberName.trim() === ""}
+            disabled={
+              busy || newMemberName.trim() === "" || newMemberTaken !== null
+            }
           />
         </View>
       </Card>
@@ -458,6 +490,7 @@ export function LedgerSettingsScreen({ ledgerId }: { ledgerId: string }) {
 function MemberEditor({
   member,
   busy,
+  takenMessage,
   onRename,
   onToggleArchive,
   onRemove,
@@ -465,6 +498,8 @@ function MemberEditor({
 }: {
   member: MemberRecord;
   busy: boolean;
+  /** 名字和其他成員重複時的提示，沒重複時為 null */
+  takenMessage: (name: string) => string | null;
   onRename: (name: string) => void;
   onToggleArchive: () => void;
   onRemove: () => void;
@@ -473,6 +508,7 @@ function MemberEditor({
   const theme = useTheme();
   const [name, setName] = useState(member.name);
   const archived = member.archivedAt !== null;
+  const taken = takenMessage(name);
   return (
     <View style={[styles.editor, { backgroundColor: theme.background }]}>
       <Text style={[styles.editorLabel, { color: theme.text }]}>名字</Text>
@@ -483,6 +519,9 @@ function MemberEditor({
             value={name}
             onChangeText={setName}
             maxLength={TEXT_LIMITS.memberName}
+            error={
+              name.trim() === "" ? describeError({ code: "EMPTY_NAME" }) : taken
+            }
           />
         </View>
         <SmallButton
@@ -655,7 +694,8 @@ const styles = StyleSheet.create({
   },
   addRow: {
     flexDirection: "row",
-    alignItems: "flex-end",
+    // 輸入框下面可能有錯誤提示，按鈕對齊輸入框的上緣
+    alignItems: "flex-start",
     gap: 8,
   },
   grow: {
