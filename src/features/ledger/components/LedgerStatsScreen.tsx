@@ -8,6 +8,7 @@ import { fonts } from "../../../shared/ui/fonts";
 import {
   DashedLine,
   PaperBackground,
+  WashFill,
   WashiTape,
 } from "../../../shared/ui/handDrawn";
 import { PageHeader, PageMessage } from "../../../shared/ui/PageHeader";
@@ -187,12 +188,9 @@ function AmountBar({
     <View style={styles.barRow}>
       <Text style={[styles.barLabel, { color: theme.textMuted }]}>{label}</Text>
       <View style={styles.barTrack}>
-        <View
-          style={[
-            styles.barFill,
-            { width: `${ratio * 100}%`, backgroundColor: color },
-          ]}
-        />
+        <View style={[styles.barFill, { width: `${ratio * 100}%` }]}>
+          <WashFill color={color} />
+        </View>
       </View>
       <Text style={[styles.barAmount, { color: theme.text }]}>{amount}</Text>
     </View>
@@ -304,8 +302,6 @@ const styles = StyleSheet.create({
   },
   barFill: {
     height: 10,
-    borderRadius: 5,
-    opacity: 0.85,
   },
   barAmount: {
     width: 84,

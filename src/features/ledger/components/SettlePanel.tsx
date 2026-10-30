@@ -23,7 +23,7 @@ import {
   SmallButton,
 } from "../../../shared/ui/components";
 import { fonts } from "../../../shared/ui/fonts";
-import { DashedLine, InkStamp } from "../../../shared/ui/handDrawn";
+import { DashedLine, InkStamp, WashFill } from "../../../shared/ui/handDrawn";
 import { useTheme } from "../../../shared/ui/theme";
 import { useToast } from "../../../shared/ui/Toast";
 import { useLedgerCommandDeps } from "../../database/DatabaseProvider";
@@ -226,13 +226,18 @@ export function SettlePanel({
                       {
                         left: `${balance > 0 ? 50 : 50 - width}%`,
                         width: `${width}%`,
-                        backgroundColor:
-                          balance > 0
-                            ? theme.categorical[1]
-                            : theme.categorical[0],
                       },
                     ]}
-                  />
+                  >
+                    <WashFill
+                      color={
+                        balance > 0
+                          ? theme.categorical[1]
+                          : theme.categorical[0]
+                      }
+                      radius={4}
+                    />
+                  </View>
                 )}
               </View>
               <Text style={[styles.balanceValue, { color: valueColor }]}>
@@ -386,8 +391,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 1,
     height: 12,
-    borderRadius: 4,
-    opacity: 0.85,
   },
   balanceValue: {
     width: 72,

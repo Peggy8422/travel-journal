@@ -2,6 +2,7 @@ import { StyleSheet, Text, View } from "react-native";
 
 import { formatMinorAmount } from "../../../domain/ledger";
 import { fonts } from "../../../shared/ui/fonts";
+import { WashFill } from "../../../shared/ui/handDrawn";
 import { useTheme } from "../../../shared/ui/theme";
 
 /** 個人花費的兩種來源：藍（藍色封面的深色）是個人、山吹是分帳負擔 */
@@ -33,20 +34,14 @@ export function PersonalSplit({
           style={styles.bar}
         >
           {personalMinor > 0 && (
-            <View
-              style={[
-                styles.personal,
-                { flex: personalMinor, backgroundColor: PERSONAL },
-              ]}
-            />
+            <View style={{ flex: personalMinor }}>
+              <WashFill color={PERSONAL} radius={7} />
+            </View>
           )}
           {sharedMinor > 0 && (
-            <View
-              style={[
-                styles.shared,
-                { flex: sharedMinor, backgroundColor: SHARED },
-              ]}
-            />
+            <View style={{ flex: sharedMinor }}>
+              <WashFill color={SHARED} radius={7} />
+            </View>
           )}
         </View>
       )}
@@ -73,20 +68,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 3,
     height: 14,
-  },
-  personal: {
-    opacity: 0.9,
-    borderTopLeftRadius: 7,
-    borderBottomLeftRadius: 7,
-    borderTopRightRadius: 3,
-    borderBottomRightRadius: 3,
-  },
-  shared: {
-    opacity: 0.9,
-    borderTopLeftRadius: 3,
-    borderBottomLeftRadius: 3,
-    borderTopRightRadius: 7,
-    borderBottomRightRadius: 7,
   },
   legend: {
     flexDirection: "row",

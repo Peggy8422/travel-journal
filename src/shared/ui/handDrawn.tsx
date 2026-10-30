@@ -190,6 +190,49 @@ export function WatercolorBlob({
 }
 
 /**
+ * 水彩塗的長條：蓋滿父元件（父元件決定位置與大小），邊緣微微起伏，
+ * 兩層顏料疊出深淺，邊緣再描一圈稍深的顏色（水彩乾掉時顏料積在邊上）。
+ */
+export function WashFill({
+  color,
+  radius = 5,
+}: {
+  color: string;
+  radius?: number;
+}) {
+  const seed = useSeed();
+  const [size, onLayout] = useLayoutSize();
+  const paths = useMemo(() => {
+    if (!size) return null;
+    const wobble = Math.min(1.2, size.height * 0.1);
+    const base = { ...size, radius, strokeWidth: 0 };
+    return {
+      main: wobblyRectPath({ ...base, wobble, seed }),
+      bleed: wobblyRectPath({ ...base, wobble: wobble * 1.6, seed: seed + 5 }),
+    };
+  }, [size, radius, seed]);
+
+  return (
+    <View style={styles.overlay} onLayout={onLayout}>
+      {size && paths && (
+        <Svg width={size.width} height={size.height}>
+          <Path d={paths.bleed} fill={color} opacity={0.35} />
+          <Path
+            d={paths.main}
+            fill={color}
+            fillOpacity={0.72}
+            stroke={color}
+            strokeOpacity={0.55}
+            strokeWidth={1.2}
+            strokeLinejoin="round"
+          />
+        </Svg>
+      )}
+    </View>
+  );
+}
+
+/**
  * 紙膠帶：半透明、兩端鋸齒、有細直紋。蓋在父元件上（絕對定位填滿），
  * 用在選取中的標籤底色、卡片角落的裝飾；tilt 是傾斜角度。
  */
