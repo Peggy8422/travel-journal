@@ -21,7 +21,7 @@ import {
   type PinGroup,
 } from "../../../domain/map";
 import type { GeoPoint } from "../../../domain/ledger";
-import { Chip, Label, Row } from "../../../shared/ui/components";
+import { Chip, CloseButton, Label, Row } from "../../../shared/ui/components";
 import { accentOverhang, fonts } from "../../../shared/ui/fonts";
 import { DashedLine, SketchFrame } from "../../../shared/ui/handDrawn";
 import { BackButton, PageMessage } from "../../../shared/ui/PageHeader";
@@ -444,28 +444,7 @@ function PinGroupCard({
             ? `這裡有 ${group.pins.length} 筆消費`
             : "消費"}
         </Label>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="關閉"
-          hitSlop={6}
-          onPress={onClose}
-          style={({ pressed }) => [
-            styles.close,
-            { backgroundColor: theme.chip, opacity: pressed ? 0.6 : 1 },
-          ]}
-        >
-          <Svg
-            width={14}
-            height={14}
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke={theme.text}
-            strokeWidth={1.8}
-            strokeLinecap="round"
-          >
-            <Path d="M4.5 4.6l7 6.9M11.4 4.5l-6.8 7" />
-          </Svg>
-        </Pressable>
+        <CloseButton onPress={onClose} />
       </Row>
       <ScrollView style={styles.cardList}>
         {sections.map(({ ledger, pins }) => (
@@ -553,16 +532,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: spacing.md,
     gap: spacing.sm,
-  },
-  close: {
-    width: 32,
-    height: 32,
-    alignItems: "center",
-    justifyContent: "center",
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 15,
-    borderBottomRightRadius: 16.5,
-    borderBottomLeftRadius: 15.5,
   },
   cardList: {
     flexGrow: 0,

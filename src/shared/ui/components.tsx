@@ -306,6 +306,41 @@ export function TextButton({
   );
 }
 
+/** 淡色圓底加手繪 Ｘ 的關閉鈕（卡片、明細頁右上角），可點範圍連外圍約 44 點 */
+export function CloseButton({
+  onPress,
+  accessibilityLabel = "關閉",
+}: {
+  onPress: () => void;
+  accessibilityLabel?: string;
+}) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      hitSlop={6}
+      onPress={dismissKeyboardThen(onPress)}
+      style={({ pressed }) => [
+        styles.close,
+        { backgroundColor: theme.chip, opacity: pressed ? 0.6 : 1 },
+      ]}
+    >
+      <Svg
+        width={14}
+        height={14}
+        viewBox="0 0 16 16"
+        fill="none"
+        stroke={theme.text}
+        strokeWidth={1.8}
+        strokeLinecap="round"
+      >
+        <Path d="M4.5 4.6l7 6.9M11.4 4.5l-6.8 7" />
+      </Svg>
+    </Pressable>
+  );
+}
+
 /**
  * 右下角固定的朱色新增鈕（「新增消費」「記一筆」），bottom 由呼叫端加上安全區域。
  * 按下時會先收起鍵盤。
@@ -573,6 +608,16 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     fontSize: 17,
     minHeight: 44,
+  },
+  close: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 15,
+    borderBottomRightRadius: 16.5,
+    borderBottomLeftRadius: 15.5,
   },
   floatingAdd: {
     position: "absolute",
