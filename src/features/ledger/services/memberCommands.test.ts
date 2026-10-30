@@ -57,6 +57,23 @@ describe("renameMember", () => {
     expect((await list())[1]?.name).toBe("Bobby");
   });
 
+  it("rejects a name over the member name limit", async () => {
+    const { deps, ids } = await setup();
+    expect(
+      unwrapErr(await renameMember(deps, ids[0]!, "一二三四五六七八九十一")),
+    ).toEqual({ code: "TEXT_TOO_LONG", field: "memberName", max: 10 });
+  });
+
+  it("rejects another member's name but allows changing the case", async () => {
+    const { deps, ids, list } = await setup();
+    expect(unwrapErr(await renameMember(deps, ids[0]!, "BOB"))).toEqual({
+      code: "DUPLICATE_MEMBER_NAME",
+      name: "BOB",
+    });
+    unwrap(await renameMember(deps, ids[1]!, "BOB"));
+    expect((await list())[1]?.name).toBe("BOB");
+  });
+
   it("rejects an empty name and a missing member", async () => {
     const { deps, ids } = await setup();
     expect(unwrapErr(await renameMember(deps, ids[0]!, " ")).code).toBe(

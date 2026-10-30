@@ -17,6 +17,47 @@ describe("LedgerRepository", () => {
     expect(await repos.ledgers.findById("missing")).toBeUndefined();
   });
 
+  it("stores the cover codes", async () => {
+    const { repos } = await setupLedger();
+    const cover = {
+      style: "tape",
+      palette: "matcha",
+      pattern: "waves",
+    } as const;
+    await repos.ledgers.insert(makeLedgerRecord({ id: "ledger-2", cover }));
+    expect((await repos.ledgers.findById("ledger-2"))?.cover).toEqual(cover);
+    expect((await repos.ledgers.findById("ledger-1"))?.cover).toBeNull();
+  });
+
+  it("stores a manual trip month and clears it back to automatic", async () => {
+    const { repos } = await setupLedger();
+    await repos.ledgers.update(makeLedgerRecord({ tripMonth: "2027-02" }));
+    expect((await repos.ledgers.findById("ledger-1"))?.tripMonth).toBe(
+      "2027-02",
+    );
+    await repos.ledgers.update(makeLedgerRecord({ tripMonth: null }));
+    expect((await repos.ledgers.findById("ledger-1"))?.tripMonth).toBeNull();
+  });
+
+  it("updates the cover together with the name", async () => {
+    const { repos } = await setupLedger();
+    const cover = {
+      style: "band",
+      palette: "fuji",
+      pattern: "dots",
+    } as const;
+    await repos.ledgers.update(makeLedgerRecord({ cover }));
+    expect((await repos.ledgers.findById("ledger-1"))?.cover).toEqual(cover);
+  });
+
+  it("reads unknown cover codes as no cover", async () => {
+    const { db, repos } = await setupLedger();
+    await db.runAsync(
+      "UPDATE ledgers SET cover_style = 'band', cover_palette = 'neon', cover_pattern = 'dots'",
+    );
+    expect((await repos.ledgers.findById("ledger-1"))?.cover).toBeNull();
+  });
+
   it("lists ledgers newest first", async () => {
     const { repos } = await setupLedger();
     await repos.ledgers.insert(

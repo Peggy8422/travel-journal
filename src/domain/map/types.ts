@@ -25,10 +25,10 @@ export interface MapRegion {
 }
 
 /** 同一個地點的多個 pin，在地圖上合成一個標記 */
-export interface PinGroup {
+export interface PinGroup<T extends MapPin = MapPin> {
   /** 由座標組成，同一地點每次都一樣，可當 React key */
   readonly key: string;
   readonly point: GeoPoint;
   /** 保持傳入的順序 */
-  readonly pins: readonly MapPin[];
+  readonly pins: readonly T[];
 }

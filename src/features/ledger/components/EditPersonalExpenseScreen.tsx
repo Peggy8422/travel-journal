@@ -4,10 +4,12 @@ import { Alert } from "react-native";
 
 import { toAmountInput } from "../../../domain/ledger";
 import {
-  Button,
   ErrorText,
   MessageScreen,
+  TextButton,
 } from "../../../shared/ui/components";
+import { useTheme } from "../../../shared/ui/theme";
+import { useToast } from "../../../shared/ui/Toast";
 import { useLedgerCommandDeps } from "../../database/DatabaseProvider";
 import { usePersonalExpense } from "../hooks/usePersonalQueries";
 import {
@@ -23,7 +25,9 @@ export function EditPersonalExpenseScreen({
 }: {
   expenseId: string;
 }) {
+  const theme = useTheme();
   const deps = useLedgerCommandDeps();
+  const toast = useToast();
   const { data, error } = usePersonalExpense(expenseId);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -50,6 +54,7 @@ export function EditPersonalExpenseScreen({
         return;
       }
       router.back();
+      toast(`刪掉「${expense.title}」了`);
     } catch {
       setDeleteError("刪除失敗，請再試一次");
     }
@@ -59,6 +64,7 @@ export function EditPersonalExpenseScreen({
     <ExpenseForm
       baseCurrency="TWD"
       members={[self]}
+      receiptTitle="個人記帳"
       hidePeople
       initial={{
         title: expense.title,
@@ -76,14 +82,17 @@ export function EditPersonalExpenseScreen({
       }}
       onSubmit={async ({ payerId: _payer, split: _split, ...input }) => {
         const result = await updatePersonalExpense(deps, expenseId, input);
-        return result.ok ? null : describeError(result.error);
+        if (!result.ok) return describeError(result.error);
+        toast(`改好了「${input.title}」`);
+        return null;
       }}
       footer={
         <>
           <ErrorText message={deleteError} />
-          <Button
+          <TextButton
             title="刪除這筆個人消費"
-            variant="danger"
+            color={theme.negative}
+            align="center"
             onPress={confirmDelete}
           />
         </>

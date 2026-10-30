@@ -18,7 +18,27 @@ src/app/  →  src/features/  →  src/domain/
 
 - 介面文字一律繁體中文，錯誤代碼轉成訊息集中在 `features/ledger/components/messages.ts`，新增錯誤代碼時要一起補。
 - 消費分類：代碼在 `domain/ledger/categories.ts`（存進資料庫的是代碼，只能新增不能改名或刪除），中文名稱在 `features/ledger/components/categories.ts`；清單以外的舊分類文字會原樣顯示。
+- 文字欄位的字數上限在 `domain/ledger/textLimits.ts`（`TEXT_LIMITS`），輸入框的 `maxLength` 和建立／修改指令的檢查共用同一份；還原備份不檢查，舊資料超過上限也照常還原，`TextField` 會放寬 `maxLength` 避免 Android 截掉顯示的舊文字，並在欄位下面提示超過上限。新增文字欄位時要一起補上限。
+- 書架的年月分組用 `tripMonthOf`（`features/ledger/services/ledgerOverview.ts`）：帳本設定手動指定的 `tripMonth` 優先，否則取最早一筆消費的當地月份，沒有消費時用建立帳本的月份。旅行月份不另外存自動算出的值，所以記帳、刪消費後會自動重新歸類。
+- 帳本封面：存三個代碼（`domain/ledger/cover.ts`，和分類一樣只能新增、不能改名或刪除），顏色與名稱在 `features/ledger/components/coverStyles.ts`。`cover` 是 null 或代碼讀不回來的帳本，畫面一律用 `coverFromId(id)` 補一個固定的封面。
 - 共用 UI 元件與主題色在 `src/shared/ui/`（只用 React Native 內建元件，不用 `@expo/ui`）。
+- 日系手繪風格（設計稿：https://claude.ai/artifact/Bq5DkRzceSM8V5rzqG2HPD）：
+  - 這一版固定和紙淺色（`app.json` 的 `userInterfaceStyle` 也是 `light`），`useTheme()` 不跟系統切換。
+  - 字型是霞鶩文楷 TC＋Caveat，在 `src/app/_layout.tsx` 用 `useFonts` 載入完才收起啟動畫面。自訂字型不會從 `View` 繼承，也不能用 `fontWeight` 切粗體：自己寫 `<Text>` 時要指定 `fonts.regular`／`fonts.bold`（`shared/ui/fonts.ts`），不要加 `fontWeight`。Caveat（`fonts.accent`）的字形比字寬寬，右邊會被 Text 的框切掉，要加 `paddingRight: accentOverhang(fontSize)`。
+  - 手繪線條是 react-native-svg 畫的抖動路徑（`shared/ui/sketch.ts` 純函式、`handDrawn.tsx` 元件），不用 SVG 濾鏡：react-native-svg 雖然有 `FeTurbulence`、`FeDisplacementMap` 元件，但都沒有實作（只會警告、不畫任何東西），設計稿裡的鉛筆抖動要用路徑本身做出來。鉛筆的顆粒與印章缺墨則是用 `Mask` 挖掉小點（`HandCircle`、`InkStamp`），小點合成一條 path，不要一點一個 `Circle`。
+- 地圖分頁是手繪地球（`features/map/components/GlobeScreen.tsx`，投影在 `domain/map/globe.ts`，海岸線在 `worldOutline.ts`），只放大到城市大小；城市裡的日期篩選、當天路線、目前位置在「詳細地圖」（`/map?ledgers=…`，react-native-maps），從地球的消費卡片進去。
+  - 地球每一格都重新投影整個世界：海岸線先用 `toSphere` 轉成球面向量，投影只剩乘法，路徑字串直接串接；改這段時注意 Hermes 沒有 JIT，比 Node 慢很多。
+  - 地圖上的線（詳細地圖的當天路線）用 SVG 疊在 `MapView` 上，地圖移動時用 `pointForCoordinate` 重新換算位置（`DayMap`）：react-native-maps 的 `Polyline`、`Polygon` 在 iOS 實機上都畫不出來（2026-10-29 確認）。
+  - 動畫與拖曳狀態放在 `useGlobeMotion` 的 class 裡，畫面只拿快照：React Compiler 的 lint 不允許 render 時讀 ref（連把 ref 傳給 `PanResponder.create` 也算）。系統開啟「減少動態效果」時不擺動、視角直接跳到目標。
+- 帳本內頁、統計、帳本設定、個人記帳、備份、詳細地圖，以及三個分頁都隱藏導覽列（`src/app/_layout.tsx`、`src/app/(tabs)/_layout.tsx`），頁首自己畫（`shared/ui/PageHeader.tsx`）；這類畫面讀取失敗時要用 `PageMessage`，不然沒有返回鍵可以離開。新增／編輯消費是 modal，保留原生導覽列（左右放取消、儲存）。
+- 點一筆消費一律先打開只能看的消費明細（`/expense/[expenseId]`，`ExpenseDetailScreen`，從下面升起、可停在半高的 formSheet），要改再按「編輯」進收據表單；之後新增的消費列表也要接這個路由，不要直接進表單。明細蓋上來時底下的畫面會失去焦點（`useFocusEffect` 會停），地球因此是直接跳到那筆消費（`jumpTo`），不是緩動過去。
+- 操作成功的短提示用 `useToast()`（`shared/ui/Toast.tsx`，掛在最外層 layout，換頁後仍看得到）；錯誤不要只用提示。錯誤放哪裡：
+  - 屬於某個輸入欄位的（沒填、格式不對、名字重複）寫在那一欄下面：`TextField` 用 `error`，其他區塊放 `ErrorText`；字數到上限時 `TextField` 會自己在下面提示。能即時判斷的（名字重複）打字時就顯示，按鈕同時停用。
+  - 按儲存才檢查出來的，用 `useFieldScroller`（`shared/hooks/`）把那一欄捲進畫面，欄位依畫面由上到下檢查。
+  - 欄位下面放不下、不屬於任何欄位而且顯示處離按鈕太遠（收據表單的「儲存」在頁首；帳本設定的訊息在頁首，成員卡片在下面，設定頁 `run` 的 `alert` 選項），或是危險操作，才用 `Alert` 彈窗。
+- `Screen` 的捲動區設了 `keyboardShouldPersistTaps="handled"`，點按鈕不會自動收鍵盤；`Button`、`SmallButton` 已經會先收，自己用 `Pressable` 做送出按鈕時要呼叫 `Keyboard.dismiss()`；按下後會冒出新輸入欄位、要接著打字的按鈕（「新增成員」「手動修改匯率」）用 `Button` 的 `keepKeyboard`，新欄位用 `autoFocus` 接手。
+- 選年月的設定（旅行月份、個人記帳的月份…）一律用 `MonthSwitcher`（`shared/ui/MonthPicker.tsx`）：左右箭頭一次移一個月，點中間的年月打開選單直接挑；之後新增類似的時間設定也用它，不要另外做。月份加減用 `shiftMonth`（`domain/ledger`）。
+- 單邊的虛線、點線用 `DashedLine`（`handDrawn.tsx`）：React Native 的 `borderStyle: "dashed"` 在 iOS 只有四邊同寬時才有效。
 - 畫面讀資料用 `useFocusedQuery`（`src/shared/hooks/`），每次回到畫面都會重新讀取，寫入後不用另外通知其他畫面。
 - 新增路由後，`tsc` 會因為 typed routes 型別過期而報錯，要先跑一次 `npx expo start` 重新產生 `.expo/types/router.d.ts`。
 
@@ -31,8 +51,9 @@ src/app/  →  src/features/  →  src/domain/
 
 - 金額一律存成該幣別最小單位的整數（`amountMinor`），小數位數以 `domain/ledger/currency.ts` 的對照表為準（例如 TWD、IDR 是 0 位）。
 - 匯率與臺銀報價一律用十進位字串，不要轉成 `number` 再存。
+- 畫面上的金額一律寫幣別代碼加數字（`TWD 1,064`、`JPY 4,950`），不用設計稿的 ¥、NT$ 這類貨幣符號（2026-10-30 決定）。
 - 日期以臺灣時間的 `YYYY-MM-DD` 判斷（`domain/fx/taipeiDate.ts`），不要用裝置的時區。
-- 新增臺銀支援的幣別時，`BOT_QUOTED_CURRENCIES`（`data/fx/botQuoteSource.ts`）和 `currency.ts` 要一起更新，測試會比對真實 CSV 檢查兩邊是否一致。
+- 新增臺銀支援的幣別時，`BOT_QUOTED_CURRENCIES`（`data/fx/botQuoteSource.ts`）和 `currency.ts` 要一起更新，測試會比對真實 CSV 檢查兩邊是否一致；幣別選單的中文名稱在 `features/ledger/components/currencies.ts`，也要補（測試會檢查每個幣別都有名稱）。
 
 ## 資料庫（`src/data/db/`、`src/data/repositories/`）
 

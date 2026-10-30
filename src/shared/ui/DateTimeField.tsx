@@ -4,6 +4,7 @@ import DateTimePicker, {
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Label } from "./components";
+import { fonts } from "./fonts";
 import { spacing, useTheme } from "./theme";
 
 /**
@@ -15,18 +16,26 @@ export function DateTimeField({
   value,
   onChange,
   maximumDate,
+  strongLabel = false,
 }: {
   label: string;
   value: Date;
   onChange: (date: Date) => void;
   maximumDate?: Date;
+  /** 標籤用粗體墨色（收據表單的欄位標題），預設是淡色 */
+  strongLabel?: boolean;
 }) {
   const theme = useTheme();
+  const labelText = strongLabel ? (
+    <Text style={[styles.strongLabel, { color: theme.text }]}>{label}</Text>
+  ) : (
+    <Label muted>{label}</Label>
+  );
 
   if (Platform.OS === "ios") {
     return (
       <View style={styles.row}>
-        <Label muted>{label}</Label>
+        {labelText}
         <DateTimePicker
           value={value}
           mode="datetime"
@@ -64,13 +73,15 @@ export function DateTimeField({
 
   return (
     <View style={styles.row}>
-      <Label muted>{label}</Label>
+      {labelText}
       <Pressable
         accessibilityRole="button"
         onPress={openAndroidPicker}
         style={[styles.androidValue, { backgroundColor: theme.chip }]}
       >
-        <Text style={{ color: theme.text }}>{formatDateTime(value)}</Text>
+        <Text style={[styles.androidText, { color: theme.text }]}>
+          {formatDateTime(value)}
+        </Text>
       </Pressable>
     </View>
   );
@@ -93,9 +104,17 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     minHeight: 44,
   },
+  strongLabel: {
+    fontFamily: fonts.bold,
+    fontSize: 13.5,
+  },
   androidValue: {
-    borderRadius: 8,
+    borderRadius: 16,
     paddingHorizontal: spacing.md,
-    paddingVertical: 6,
+    paddingVertical: 8,
+  },
+  androidText: {
+    fontFamily: fonts.regular,
+    fontSize: 15,
   },
 });

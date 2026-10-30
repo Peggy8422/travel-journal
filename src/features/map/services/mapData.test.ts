@@ -4,6 +4,7 @@ import {
   setupLedger,
   T0,
 } from "../../../data/repositories/testRecords";
+import { coverFromId } from "../../../domain/ledger";
 import { filterPins, loadMapData } from "./mapData";
 
 const shinjuku = { latitude: 35.6905, longitude: 139.7024 };
@@ -33,7 +34,10 @@ describe("loadMapData", () => {
     const { db, repos } = await setupLedger();
     await repos.expenses.insert(makeExpenseRecord({ placeName: "朋友家" }));
 
-    expect(await loadMapData(db)).toEqual({ pins: [], ledgers: [] });
+    expect(await loadMapData(db)).toEqual({
+      pins: [],
+      ledgers: [expect.objectContaining({ id: "ledger-1" })],
+    });
   });
 
   it("turns located expenses into pins with amount and place name", async () => {
@@ -70,15 +74,30 @@ describe("loadMapData", () => {
         subtitle: "JPY 1,200 · 一蘭 新宿店",
         point: shinjuku,
         occurredAt: "2026-10-12T12:00:00+09:00",
+        category: null,
+        placeName: "一蘭 新宿店",
+        amountMinor: 1200,
+        currency: "JPY",
+        // 1200 × 0.2134 = 256.08
+        baseMinor: 256,
       },
-      expect.objectContaining({ id: "taxi", subtitle: "TWD 450" }),
+      expect.objectContaining({
+        id: "taxi",
+        subtitle: "TWD 450",
+        baseMinor: 450,
+      }),
     ]);
   });
 
-  it("lists only ledgers that have pins, newest ledger first", async () => {
+  it("lists every ledger with its cover, newest trip month first", async () => {
     const { db, repos } = await setupTwoLedgers();
     await repos.ledgers.insert(
-      makeLedgerRecord({ id: "empty", name: "沒有地點" }),
+      makeLedgerRecord({
+        id: "empty",
+        name: "沒有地點",
+        tripMonth: "2026-12",
+        cover: { style: "tape", palette: "ai", pattern: "dots" },
+      }),
     );
     await repos.expenses.insert(
       makeExpenseRecord({ id: "tokyo", location: shinjuku }),
@@ -94,8 +113,37 @@ describe("loadMapData", () => {
     );
 
     expect((await loadMapData(db)).ledgers).toEqual([
-      { id: "ledger-2", name: "京都", kind: "shared" },
-      { id: "ledger-1", name: "東京五日遊", kind: "shared" },
+      {
+        id: "empty",
+        name: "沒有地點",
+        kind: "shared",
+        cover: { style: "tape", palette: "ai", pattern: "dots" },
+        tripMonth: "2026-12",
+      },
+      // Same trip month: the newer ledger comes first
+      expect.objectContaining({ id: "ledger-2", tripMonth: "2026-10" }),
+      expect.objectContaining({
+        id: "ledger-1",
+        tripMonth: "2026-10",
+        cover: coverFromId("ledger-1"),
+      }),
+    ]);
+  });
+
+  it("takes the trip month from the earliest expense, located or not", async () => {
+    const { db, repos } = await setupLedger();
+    await repos.expenses.insert(
+      makeExpenseRecord({
+        id: "deposit",
+        occurredAt: "2026-08-20T10:00:00+08:00",
+      }),
+    );
+    await repos.expenses.insert(
+      makeExpenseRecord({ id: "ramen", location: shinjuku }),
+    );
+
+    expect((await loadMapData(db)).ledgers).toEqual([
+      expect.objectContaining({ id: "ledger-1", tripMonth: "2026-08" }),
     ]);
   });
   it("marks the personal ledger so its pins open the personal editor", async () => {
@@ -119,8 +167,10 @@ describe("loadMapData", () => {
       }),
     );
 
+    // The personal ledger comes before the shared ones
     expect((await loadMapData(db)).ledgers).toEqual([
-      { id: "personal", name: "個人", kind: "personal" },
+      expect.objectContaining({ id: "personal", kind: "personal" }),
+      expect.objectContaining({ id: "ledger-1", kind: "shared" }),
     ]);
   });
 });

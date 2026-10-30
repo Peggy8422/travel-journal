@@ -9,7 +9,10 @@ import {
 import { BACKUP_VERSION, parseBackup, serializeBackup } from "./backupFile";
 
 const entry: LedgerBackup = {
-  ledger: makeLedgerRecord(),
+  ledger: makeLedgerRecord({
+    cover: { style: "spine", palette: "sakura", pattern: "dots" },
+    tripMonth: "2027-02",
+  }),
   members: [
     {
       id: "a",
@@ -114,6 +117,11 @@ describe("backup file", () => {
       "settlements[0]: invalid amountMinor",
     ],
     ["a missing ledger", (raw: any) => delete raw.ledgers[0].ledger, "ledger:"],
+    [
+      "a cover that is not an object",
+      (raw: any) => (raw.ledgers[0].ledger.cover = "spine"),
+      "ledger: cover",
+    ],
   ])("rejects %s and says where", (_, mutate, where) => {
     const error = unwrapErr(parseBackup(corrupted(mutate)));
     expect(error.code).toBe("INVALID_BACKUP");
@@ -131,5 +139,56 @@ describe("backup file version 1", () => {
     const parsed = unwrap(parseBackup(JSON.stringify(raw)));
     expect(parsed.ledgers[0]?.ledger.kind).toBe("shared");
     expect(parsed.ledgers[0]?.members.every((m) => !m.isSelf)).toBe(true);
+  });
+});
+
+describe("backup file covers", () => {
+  it("keeps the cover codes", () => {
+    const parsed = unwrap(parseBackup(serializeBackup(contents)));
+    expect(parsed.ledgers[0]?.ledger.cover).toEqual({
+      style: "spine",
+      palette: "sakura",
+      pattern: "dots",
+    });
+  });
+
+  it("reads codes it does not know as no cover", () => {
+    const parsed = unwrap(
+      parseBackup(
+        corrupted((raw) => (raw.ledgers[0].ledger.cover.palette = "neon")),
+      ),
+    );
+    expect(parsed.ledgers[0]?.ledger.cover).toBeNull();
+  });
+
+  it("reads version 2 backups as having no cover", () => {
+    const raw = JSON.parse(serializeBackup(contents));
+    raw.version = 2;
+    delete raw.ledgers[0].ledger.cover;
+    const parsed = unwrap(parseBackup(JSON.stringify(raw)));
+    expect(parsed.ledgers[0]?.ledger.cover).toBeNull();
+  });
+});
+
+describe("backup file trip months", () => {
+  it("keeps a manual trip month", () => {
+    const parsed = unwrap(parseBackup(serializeBackup(contents)));
+    expect(parsed.ledgers[0]?.ledger.tripMonth).toBe("2027-02");
+  });
+
+  it("reads version 3 backups and malformed months as automatic", () => {
+    const raw = JSON.parse(serializeBackup(contents));
+    raw.version = 3;
+    delete raw.ledgers[0].ledger.tripMonth;
+    expect(
+      unwrap(parseBackup(JSON.stringify(raw))).ledgers[0]?.ledger.tripMonth,
+    ).toBeNull();
+    expect(
+      unwrap(
+        parseBackup(
+          corrupted((r) => (r.ledgers[0].ledger.tripMonth = "2027-13")),
+        ),
+      ).ledgers[0]?.ledger.tripMonth,
+    ).toBeNull();
   });
 });

@@ -1,5 +1,6 @@
-import type { ReactNode } from "react";
+import { useState, type ComponentRef, type ReactNode, type Ref } from "react";
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -8,9 +9,15 @@ import {
   Text,
   TextInput,
   View,
+  type StyleProp,
   type TextInputProps,
+  type ViewStyle,
 } from "react-native";
 
+import Svg, { Path } from "react-native-svg";
+
+import { fonts } from "./fonts";
+import { PaperBackground, SketchFrame } from "./handDrawn";
 import { spacing, useTheme } from "./theme";
 
 /**
@@ -20,17 +27,36 @@ import { spacing, useTheme } from "./theme";
  *   再由 ScrollView 把輸入中的欄位捲進畫面。它依實際被遮住的高度計算，系統已縮小時不會重複扣
  * 鍵盤展開時點擊空白處不會吃掉按鈕的點擊；往下拖動會收起鍵盤。
  * iOS 26 起 Stack 的 header 是透明的（Liquid Glass），由 contentInsetAdjustmentBehavior 讓內容從 header 下方開始。
+ * 底層鋪和紙的方眼點陣，內容在上面捲動。
  */
-export function Screen({ children }: { children: ReactNode }) {
+export function Screen({
+  children,
+  header,
+  contentStyle,
+  scrollRef,
+  contentRef,
+}: {
+  children: ReactNode;
+  /** 固定在捲動區上方、不跟著捲動的頁首（例如隱藏導覽列時自己畫的 PageHeader） */
+  header?: ReactNode;
+  contentStyle?: StyleProp<ViewStyle>;
+  /** 要把有錯的欄位捲進畫面時用（useFieldScroller） */
+  scrollRef?: Ref<ComponentRef<typeof ScrollView>>;
+  contentRef?: Ref<ComponentRef<typeof View>>;
+}) {
   const theme = useTheme();
   return (
     <KeyboardAvoidingView
       style={[styles.fill, { backgroundColor: theme.background }]}
       behavior={Platform.OS === "android" ? "height" : undefined}
     >
+      <PaperBackground />
+      {header}
       <ScrollView
+        ref={scrollRef}
+        innerViewRef={contentRef}
         style={styles.fill}
-        contentContainerStyle={styles.screen}
+        contentContainerStyle={[styles.screen, contentStyle]}
         contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
@@ -52,17 +78,55 @@ export function Section({
   const theme = useTheme();
   return (
     <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>
-        {title}
-      </Text>
-      <View
-        style={[
-          styles.card,
-          { backgroundColor: theme.surface, borderColor: theme.border },
-        ]}
-      >
+      <Text style={[styles.sectionTitle, { color: theme.text }]}>{title}</Text>
+      <View style={[styles.card, { backgroundColor: theme.surface }]}>
+        <SketchFrame radius={14} />
         {children}
       </View>
+    </View>
+  );
+}
+
+/** 紙片卡：四角半徑不同、淡淡的影子，標題由內容自己放（不像 Section 放在卡片外） */
+export function Card({
+  children,
+  style,
+}: {
+  children: ReactNode;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const theme = useTheme();
+  return (
+    <View style={[styles.card, { backgroundColor: theme.surface }, style]}>
+      {children}
+    </View>
+  );
+}
+
+/** 卡片裡的標題列：左邊粗體標題，右邊一行小字說明（可省略） */
+export function CardTitle({
+  title,
+  hint,
+  color,
+}: {
+  title: string;
+  hint?: ReactNode;
+  color?: string;
+}) {
+  const theme = useTheme();
+  return (
+    <View style={styles.cardTitleRow}>
+      <Text
+        accessibilityRole="header"
+        style={[styles.sectionTitle, { color: color ?? theme.text }]}
+      >
+        {title}
+      </Text>
+      {typeof hint === "string" ? (
+        <Text style={[styles.hint, { color: theme.textMuted }]}>{hint}</Text>
+      ) : (
+        hint
+      )}
     </View>
   );
 }
@@ -93,43 +157,140 @@ export function Label({
   );
 }
 
+/**
+ * 按鈕按下時先收起鍵盤再執行動作：Screen 的 keyboardShouldPersistTaps 是 "handled"，
+ * 點按鈕不會自動收鍵盤，儲存後鍵盤會一直留著，錯誤訊息也可能被擋住。
+ */
+function dismissKeyboardThen(onPress: () => void) {
+  return () => {
+    Keyboard.dismiss();
+    onPress();
+  };
+}
+
+/** 整列寬的按鈕；按下時會先收起鍵盤（keepKeyboard 除外） */
 export function Button({
   title,
   onPress,
   disabled,
   variant = "primary",
+  keepKeyboard = false,
+  icon,
 }: {
   title: string;
   onPress: () => void;
   disabled?: boolean;
   /** danger：刪除這類無法輕易復原的操作 */
   variant?: "primary" | "secondary" | "danger";
+  /** 按下後會冒出新的輸入欄位、要接著打字時設 true（例如「新增成員」），不收鍵盤 */
+  keepKeyboard?: boolean;
+  /** 放在文字左邊的圖示（用 ButtonIcon 畫，顏色跟著按鈕的字） */
+  icon?: (color: string) => ReactNode;
+}) {
+  const theme = useTheme();
+  const primary = variant === "primary";
+  // 主要按鈕是朱色實心；次要與危險按鈕是紙色加鉛筆框，危險用深朱色的框和字
+  const color = primary
+    ? theme.onPrimary
+    : variant === "danger"
+      ? theme.negative
+      : theme.text;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      disabled={disabled}
+      onPress={keepKeyboard ? onPress : dismissKeyboardThen(onPress)}
+      style={({ pressed }) => [
+        styles.button,
+        primary && styles.buttonRaised,
+        {
+          backgroundColor: primary ? theme.primary : theme.surface,
+          opacity: disabled ? 0.4 : pressed ? 0.75 : 1,
+        },
+      ]}
+    >
+      {!primary && (
+        <SketchFrame
+          radius={14}
+          color={variant === "danger" ? theme.negative : theme.pencil}
+        />
+      )}
+      {icon?.(color)}
+      <Text style={[styles.buttonText, { color }]}>{title}</Text>
+    </Pressable>
+  );
+}
+
+/** 按鈕前的手繪線條圖示：24 格的 viewBox，傳入的 path 用按鈕文字的顏色描線 */
+export function ButtonIcon({
+  color,
+  paths,
+}: {
+  color: string;
+  paths: readonly string[];
+}) {
+  return (
+    <Svg
+      width={20}
+      height={20}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {paths.map((d) => (
+        <Path key={d} d={d} />
+      ))}
+    </Svg>
+  );
+}
+
+/**
+ * 卡片裡的小按鈕（記錄還款、換一個封面、新增…）：outline 是紙色加細框，primary 是朱色實心。
+ * icon 放在文字左邊；按下時會先收起鍵盤。
+ */
+export function SmallButton({
+  title,
+  onPress,
+  disabled,
+  variant = "outline",
+  icon,
+  accessibilityLabel,
+}: {
+  title: string;
+  onPress: () => void;
+  disabled?: boolean;
+  variant?: "outline" | "primary";
+  icon?: ReactNode;
+  accessibilityLabel?: string;
 }) {
   const theme = useTheme();
   const primary = variant === "primary";
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ disabled }}
       disabled={disabled}
-      onPress={onPress}
+      onPress={dismissKeyboardThen(onPress)}
       style={({ pressed }) => [
-        styles.button,
+        styles.smallButton,
+        primary ? null : styles.smallButtonOutline,
         {
-          backgroundColor: primary ? theme.primary : theme.chip,
-          opacity: disabled ? 0.4 : pressed ? 0.7 : 1,
+          backgroundColor: primary ? theme.primary : "#FFFDF8",
+          opacity: disabled ? 0.45 : pressed ? 0.75 : 1,
         },
       ]}
     >
+      {icon}
       <Text
         style={[
-          styles.buttonText,
-          {
-            color: primary
-              ? theme.onPrimary
-              : variant === "danger"
-                ? theme.negative
-                : theme.text,
-          },
+          styles.smallButtonText,
+          primary
+            ? { color: theme.onPrimary, fontFamily: fonts.bold }
+            : { color: theme.text },
         ]}
       >
         {title}
@@ -138,27 +299,205 @@ export function Button({
   );
 }
 
-export function TextField({
-  label,
-  ...props
-}: TextInputProps & { label?: string }) {
+/**
+ * 底線文字按鈕（手動修改匯率、刪除這筆消費…），不像按鈕那麼搶眼。
+ * 按下時會先收起鍵盤；按下後要接著打字的（會冒出新輸入欄位）設 keepKeyboard。
+ */
+export function TextButton({
+  title,
+  onPress,
+  color,
+  disabled,
+  keepKeyboard = false,
+  align = "flex-start",
+}: {
+  title: string;
+  onPress: () => void;
+  color?: string;
+  disabled?: boolean;
+  keepKeyboard?: boolean;
+  align?: "flex-start" | "center";
+}) {
   const theme = useTheme();
   return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      hitSlop={6}
+      onPress={keepKeyboard ? onPress : dismissKeyboardThen(onPress)}
+      style={({ pressed }) => [
+        styles.textButton,
+        { alignSelf: align, opacity: disabled ? 0.45 : pressed ? 0.6 : 1 },
+      ]}
+    >
+      <Text style={[styles.textButtonText, { color: color ?? theme.positive }]}>
+        {title}
+      </Text>
+    </Pressable>
+  );
+}
+
+/** 淡色圓底加手繪 Ｘ 的關閉鈕（卡片、明細頁右上角），可點範圍連外圍約 44 點 */
+export function CloseButton({
+  onPress,
+  accessibilityLabel = "關閉",
+}: {
+  onPress: () => void;
+  accessibilityLabel?: string;
+}) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      hitSlop={6}
+      onPress={dismissKeyboardThen(onPress)}
+      style={({ pressed }) => [
+        styles.close,
+        { backgroundColor: theme.chip, opacity: pressed ? 0.6 : 1 },
+      ]}
+    >
+      <Svg
+        width={14}
+        height={14}
+        viewBox="0 0 16 16"
+        fill="none"
+        stroke={theme.text}
+        strokeWidth={1.8}
+        strokeLinecap="round"
+      >
+        <Path d="M4.5 4.6l7 6.9M11.4 4.5l-6.8 7" />
+      </Svg>
+    </Pressable>
+  );
+}
+
+/**
+ * 右下角固定的朱色新增鈕（「新增消費」「記一筆」），bottom 由呼叫端加上安全區域。
+ * 按下時會先收起鍵盤。
+ */
+export function FloatingAddButton({
+  title,
+  onPress,
+  bottom,
+}: {
+  title: string;
+  onPress: () => void;
+  bottom: number;
+}) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={dismissKeyboardThen(onPress)}
+      style={({ pressed }) => [
+        styles.floatingAdd,
+        { bottom, backgroundColor: theme.primary, opacity: pressed ? 0.85 : 1 },
+      ]}
+    >
+      <Svg width={20} height={20} viewBox="0 0 26 26">
+        <Path
+          d="M13 4.5 C13.3 9 12.8 17 13.1 21.5 M4.5 13.2 C9 12.8 17 13.4 21.5 12.9"
+          fill="none"
+          stroke={theme.onPrimary}
+          strokeWidth={2.6}
+          strokeLinecap="round"
+        />
+      </Svg>
+      <Text style={[styles.floatingAddText, { color: theme.onPrimary }]}>
+        {title}
+      </Text>
+    </Pressable>
+  );
+}
+
+/**
+ * 底線輸入框。有 maxLength 時，聚焦中或寫到八成以上會在右邊顯示「12 / 20」；
+ * 寫到上限時字數變朱色，輸入框下面也寫出上限，不然只是打不進去，很難發現原因。
+ * 舊資料（例如還原的備份）已經超過上限時，maxLength 放寬到目前長度，
+ * 否則 Android 會把顯示的文字截掉；存檔時由指令擋下並說明上限。
+ * error 是這個欄位的錯誤（例如沒填、名字重複），顯示在輸入框下面，優先於上限提示。
+ */
+export function TextField({
+  label,
+  strongLabel = false,
+  maxLength,
+  error,
+  onFocus,
+  onBlur,
+  ...props
+}: TextInputProps & {
+  label?: string;
+  /** 標籤用粗體墨色（收據表單的欄位標題），預設是淡色 */
+  strongLabel?: boolean;
+  error?: string | null;
+}) {
+  const theme = useTheme();
+  const [focused, setFocused] = useState(false);
+  const length = props.value?.length ?? 0;
+  const limited = maxLength !== undefined;
+  const over = limited && length > maxLength;
+  const full = limited && length >= maxLength;
+  const showCount = limited && (focused || length >= maxLength * 0.8);
+  const message =
+    error ||
+    (over
+      ? `超過 ${maxLength} 字上限，請刪到 ${maxLength} 字以內`
+      : full
+        ? `已達 ${maxLength} 字上限`
+        : null);
+  const input = (
+    <TextInput
+      placeholderTextColor={theme.textMuted}
+      {...props}
+      maxLength={limited ? Math.max(maxLength, length) : undefined}
+      onFocus={(event) => {
+        setFocused(true);
+        onFocus?.(event);
+      }}
+      onBlur={(event) => {
+        setFocused(false);
+        onBlur?.(event);
+      }}
+      style={[
+        styles.input,
+        limited ? styles.inputInRow : { borderColor: theme.pencil },
+        { color: theme.text },
+        props.style,
+      ]}
+    />
+  );
+  return (
     <View style={styles.field}>
-      {label && <Label muted>{label}</Label>}
-      <TextInput
-        placeholderTextColor={theme.textMuted}
-        {...props}
-        style={[
-          styles.input,
-          {
-            color: theme.text,
-            backgroundColor: theme.surface,
-            borderColor: theme.border,
-          },
-          props.style,
-        ]}
-      />
+      {label &&
+        (strongLabel ? (
+          <Text style={[styles.strongLabel, { color: theme.text }]}>
+            {label}
+          </Text>
+        ) : (
+          <Label muted>{label}</Label>
+        ))}
+      {limited ? (
+        // 底線畫在外層，字數才會在底線上方、輸入框的右邊
+        <View style={[styles.inputRow, { borderColor: theme.pencil }]}>
+          {input}
+          {showCount && (
+            <Text
+              accessibilityLabel={`已輸入 ${length} 字，上限 ${maxLength} 字`}
+              style={[
+                styles.count,
+                { color: full ? theme.negative : theme.textMuted },
+              ]}
+            >
+              {length} / {maxLength}
+            </Text>
+          )}
+        </View>
+      ) : (
+        input
+      )}
+      <ErrorText message={message} />
     </View>
   );
 }
@@ -167,10 +506,13 @@ export function Chip({
   label,
   selected,
   onPress,
+  dot,
 }: {
   label: string;
   selected: boolean;
   onPress: () => void;
+  /** 標籤前面的小圓點顏色（例如分類色） */
+  dot?: string;
 }) {
   const theme = useTheme();
   return (
@@ -180,10 +522,27 @@ export function Chip({
       onPress={onPress}
       style={[
         styles.chip,
-        { backgroundColor: selected ? theme.primary : theme.chip },
+        selected
+          ? { backgroundColor: theme.text, borderColor: theme.text }
+          : { backgroundColor: "transparent", borderColor: theme.pencil },
       ]}
     >
-      <Text style={{ color: selected ? theme.onPrimary : theme.text }}>
+      {dot && (
+        <View
+          style={[
+            styles.chipDot,
+            { backgroundColor: dot, borderColor: theme.surface },
+          ]}
+        />
+      )}
+      <Text
+        style={[
+          styles.chipText,
+          selected
+            ? { color: theme.surface, fontFamily: fonts.bold }
+            : { color: theme.text },
+        ]}
+      >
         {label}
       </Text>
     </Pressable>
@@ -197,7 +556,9 @@ export function ChipGroup({ children }: { children: ReactNode }) {
 export function ErrorText({ message }: { message: string | null }) {
   const theme = useTheme();
   if (!message) return null;
-  return <Text style={{ color: theme.negative }}>{message}</Text>;
+  return (
+    <Text style={[styles.label, { color: theme.negative }]}>{message}</Text>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -212,15 +573,50 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   sectionTitle: {
-    fontSize: 13,
-    fontWeight: "600",
+    fontFamily: fonts.bold,
+    fontSize: 16,
   },
+  // 四個角半徑不同，加上鉛筆框，像手撕的紙片
   card: {
-    borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    borderTopLeftRadius: 6,
+    borderTopRightRadius: 14,
+    borderBottomRightRadius: 8,
+    borderBottomLeftRadius: 16,
+    paddingHorizontal: spacing.md + 2,
+    paddingVertical: spacing.md,
     gap: spacing.sm,
+    boxShadow:
+      "0px 2px 0px rgba(58,51,45,0.07), 0px 8px 18px rgba(58,51,45,0.08)",
+  },
+  cardTitleRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+  },
+  hint: {
+    fontFamily: fonts.regular,
+    fontSize: 12.5,
+  },
+  smallButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    minHeight: 40,
+    paddingHorizontal: 14,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 17,
+    borderBottomRightRadius: 19,
+    borderBottomLeftRadius: 18,
+  },
+  smallButtonOutline: {
+    boxShadow: "0px 0px 0px 1.3px rgba(58,51,45,0.6)",
+  },
+  smallButtonText: {
+    fontFamily: fonts.regular,
+    fontSize: 14,
   },
   row: {
     flexDirection: "row",
@@ -230,33 +626,120 @@ const styles = StyleSheet.create({
     minHeight: 36,
   },
   label: {
+    fontFamily: fonts.regular,
     fontSize: 15,
   },
   button: {
-    borderRadius: 10,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 16,
+    borderBottomRightRadius: 13,
+    borderBottomLeftRadius: 17,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
+    minHeight: 48,
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  buttonRaised: {
+    boxShadow: "2px 3px 0px rgba(58,51,45,0.22)",
   },
   buttonText: {
+    fontFamily: fonts.bold,
     fontSize: 16,
-    fontWeight: "600",
   },
   field: {
     gap: spacing.xs,
   },
+  // 只有底線，像寫在筆記本的橫線上
   input: {
-    borderRadius: 10,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: spacing.md,
+    borderBottomWidth: 1.5,
+    paddingHorizontal: 2,
     paddingVertical: spacing.sm,
-    fontSize: 16,
+    fontFamily: fonts.regular,
+    fontSize: 17,
     minHeight: 44,
   },
+  close: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 15,
+    borderBottomRightRadius: 16.5,
+    borderBottomLeftRadius: 15.5,
+  },
+  floatingAdd: {
+    position: "absolute",
+    right: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    minHeight: 54,
+    paddingLeft: 16,
+    paddingRight: 20,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 24,
+    borderBottomRightRadius: 27,
+    borderBottomLeftRadius: 25,
+    boxShadow: "3px 4px 0px rgba(58,51,45,0.25)",
+  },
+  floatingAddText: {
+    fontFamily: fonts.bold,
+    fontSize: 16,
+  },
+  strongLabel: {
+    fontFamily: fonts.bold,
+    fontSize: 13.5,
+  },
+  textButton: {
+    minHeight: 36,
+    justifyContent: "center",
+  },
+  textButtonText: {
+    fontFamily: fonts.regular,
+    fontSize: 13.5,
+    textDecorationLine: "underline",
+  },
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 6,
+    borderBottomWidth: 1.5,
+  },
+  inputInRow: {
+    flex: 1,
+    borderBottomWidth: 0,
+  },
+  count: {
+    fontFamily: fonts.regular,
+    fontSize: 12,
+    paddingBottom: spacing.sm + 2,
+  },
   chip: {
-    borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderWidth: 1.2,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 15,
+    borderBottomRightRadius: 17,
+    borderBottomLeftRadius: 16,
     paddingHorizontal: spacing.md,
-    paddingVertical: 6,
+    minHeight: 36,
+    justifyContent: "center",
+  },
+  chipDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 1.5,
+  },
+  chipText: {
+    fontFamily: fonts.regular,
+    fontSize: 14,
   },
   chipGroup: {
     flexDirection: "row",

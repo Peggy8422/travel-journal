@@ -1,19 +1,25 @@
 import { err, ok, type Result } from "../../../domain/common/result";
 import { toTaipeiDate } from "../../../domain/fx";
 import {
+  checkTextLength,
   computeShares,
   expenseMemberIds,
+  findDuplicateName,
+  isTripMonth,
+  sameMemberName,
   toExpense,
   toLedger,
   toSettlement,
   validateNoArchivedMembers,
   validateSettlement,
   type ExpenseRecord,
+  type LedgerCover,
   type LedgerError,
   type LedgerRecord,
   type MemberId,
   type MemberRecord,
   type SettlementRecord,
+  type TextTooLongError,
 } from "../../../domain/ledger";
 import type { SqlDatabase } from "../../../data/db/sqlDatabase";
 import {
@@ -38,9 +44,13 @@ export interface LedgerCommandDeps {
 
 export type LedgerCommandError =
   | LedgerError
+  | TextTooLongError
   | { readonly code: "EMPTY_NAME" }
   | { readonly code: "NO_MEMBERS" }
+  /** 同一本帳本已經有這個名字的成員（不分大小寫） */
+  | { readonly code: "DUPLICATE_MEMBER_NAME"; readonly name: string }
   | { readonly code: "INVALID_TIMESTAMP"; readonly value: string }
+  | { readonly code: "INVALID_TRIP_MONTH"; readonly value: string }
   | { readonly code: "LEDGER_NOT_FOUND"; readonly ledgerId: string }
   | { readonly code: "EXPENSE_NOT_FOUND"; readonly expenseId: string }
   | { readonly code: "SETTLEMENT_NOT_FOUND"; readonly settlementId: string }
@@ -73,13 +83,25 @@ export async function createLedger(
     readonly name: string;
     readonly memberNames: readonly string[];
     readonly selfIndex?: number;
+    /** 建立畫面隨機抽好的封面；省略時沒有封面，畫面會依 id 補一個 */
+    readonly cover?: LedgerCover;
   },
 ): CommandResult<{ ledger: LedgerRecord; members: MemberRecord[] }> {
   const name = input.name.trim();
   if (name === "") return err({ code: "EMPTY_NAME" });
+  const nameLength = checkTextLength("ledgerName", name);
+  if (!nameLength.ok) return nameLength;
   const memberNames = input.memberNames.map((n) => n.trim());
   if (memberNames.length === 0) return err({ code: "NO_MEMBERS" });
   if (memberNames.some((n) => n === "")) return err({ code: "EMPTY_NAME" });
+  for (const memberName of memberNames) {
+    const memberLength = checkTextLength("memberName", memberName);
+    if (!memberLength.ok) return memberLength;
+  }
+  const duplicate = findDuplicateName(memberNames);
+  if (duplicate !== undefined) {
+    return err({ code: "DUPLICATE_MEMBER_NAME", name: duplicate });
+  }
 
   const timestamp = deps.now().toISOString();
   const ledger: LedgerRecord = {
@@ -87,6 +109,8 @@ export async function createLedger(
     kind: "shared",
     name,
     baseCurrency: BASE_CURRENCY,
+    cover: input.cover ?? null,
+    tripMonth: null,
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -123,6 +147,8 @@ export async function renameLedger(
 ): CommandResult<LedgerRecord> {
   const trimmed = name.trim();
   if (trimmed === "") return err({ code: "EMPTY_NAME" });
+  const length = checkTextLength("ledgerName", trimmed);
+  if (!length.ok) return length;
   const repos = createRepositories(deps.db);
   const ledger = await repos.ledgers.findById(ledgerId);
   if (!ledger) return err({ code: "LEDGER_NOT_FOUND", ledgerId });
@@ -130,6 +156,50 @@ export async function renameLedger(
   const updated: LedgerRecord = {
     ...ledger,
     name: trimmed,
+    updatedAt: deps.now().toISOString(),
+  };
+  await repos.ledgers.update(updated);
+  return ok(updated);
+}
+
+/** 換封面（設定頁的「換一個封面」），其他欄位不變 */
+export async function changeLedgerCover(
+  deps: LedgerCommandDeps,
+  ledgerId: string,
+  cover: LedgerCover,
+): CommandResult<LedgerRecord> {
+  const repos = createRepositories(deps.db);
+  const ledger = await repos.ledgers.findById(ledgerId);
+  if (!ledger) return err({ code: "LEDGER_NOT_FOUND", ledgerId });
+
+  const updated: LedgerRecord = {
+    ...ledger,
+    cover,
+    updatedAt: deps.now().toISOString(),
+  };
+  await repos.ledgers.update(updated);
+  return ok(updated);
+}
+
+/**
+ * 手動指定旅行月份（YYYY-MM），決定書架上歸在哪個年月；
+ * 傳 null 改回自動（最早一筆消費的月份，沒有消費時用建立的月份）
+ */
+export async function setLedgerTripMonth(
+  deps: LedgerCommandDeps,
+  ledgerId: string,
+  tripMonth: string | null,
+): CommandResult<LedgerRecord> {
+  if (tripMonth !== null && !isTripMonth(tripMonth)) {
+    return err({ code: "INVALID_TRIP_MONTH", value: tripMonth });
+  }
+  const repos = createRepositories(deps.db);
+  const ledger = await repos.ledgers.findById(ledgerId);
+  if (!ledger) return err({ code: "LEDGER_NOT_FOUND", ledgerId });
+
+  const updated: LedgerRecord = {
+    ...ledger,
+    tripMonth,
     updatedAt: deps.now().toISOString(),
   };
   await repos.ledgers.update(updated);
@@ -156,9 +226,16 @@ export async function addMember(
 ): CommandResult<MemberRecord> {
   const trimmed = name.trim();
   if (trimmed === "") return err({ code: "EMPTY_NAME" });
+  const length = checkTextLength("memberName", trimmed);
+  if (!length.ok) return length;
   const repos = createRepositories(deps.db);
   if (!(await repos.ledgers.findById(ledgerId))) {
     return err({ code: "LEDGER_NOT_FOUND", ledgerId });
+  }
+  // Archived members count too: their old expenses still show the name
+  const members = await repos.members.listByLedger(ledgerId);
+  if (members.some((m) => sameMemberName(m.name, trimmed))) {
+    return err({ code: "DUPLICATE_MEMBER_NAME", name: trimmed });
   }
   return ok(
     await repos.members.insert({
@@ -335,6 +412,14 @@ async function validateExpense(
 ): CommandResult<void> {
   if (!toTaipeiDate(expense.occurredAt).ok) {
     return err({ code: "INVALID_TIMESTAMP", value: expense.occurredAt });
+  }
+  for (const [field, text] of [
+    ["expenseTitle", expense.title],
+    ["placeName", expense.placeName],
+    ["note", expense.note],
+  ] as const) {
+    const length = checkTextLength(field, text);
+    if (!length.ok) return length;
   }
   const loaded = await loadLedger(repos, expense.ledgerId);
   if (!loaded.ok) return loaded;

@@ -4,11 +4,13 @@ import {
   addExpense,
   addMember,
   addSettlement,
+  changeLedgerCover,
   createLedger,
   deleteExpense,
   deleteLedger,
   deleteSettlement,
   renameLedger,
+  setLedgerTripMonth,
   settleAll,
   updateExpense,
   type ExpenseInput,
@@ -57,6 +59,65 @@ function ramen(payerId: string, participantIds: string[]): ExpenseInput {
   };
 }
 
+describe("text limits", () => {
+  const tooLong = (n: number) => "字".repeat(n + 1);
+
+  it("rejects a ledger or member name over the limit when creating", async () => {
+    const { deps } = await setup();
+    expect(
+      unwrapErr(
+        await createLedger(deps, { name: tooLong(20), memberNames: ["A"] }),
+      ),
+    ).toEqual({ code: "TEXT_TOO_LONG", field: "ledgerName", max: 20 });
+    expect(
+      unwrapErr(
+        await createLedger(deps, { name: "花東", memberNames: [tooLong(10)] }),
+      ),
+    ).toEqual({ code: "TEXT_TOO_LONG", field: "memberName", max: 10 });
+  });
+
+  it("checks the trimmed name, so surrounding spaces do not count", async () => {
+    const { deps } = await setup();
+    const name = `  ${"字".repeat(20)}  `;
+    const { ledger } = unwrap(
+      await createLedger(deps, { name, memberNames: ["A"] }),
+    );
+    expect(ledger.name).toHaveLength(20);
+  });
+
+  it("rejects renaming a ledger and adding a member over the limit", async () => {
+    const { deps, ledgerId } = await setup();
+    expect(
+      unwrapErr(await renameLedger(deps, ledgerId, tooLong(20))).code,
+    ).toBe("TEXT_TOO_LONG");
+    expect(unwrapErr(await addMember(deps, ledgerId, tooLong(10))).code).toBe(
+      "TEXT_TOO_LONG",
+    );
+  });
+
+  it("rejects an expense whose title, place or note is too long", async () => {
+    const { deps, ledgerId, a } = await setup();
+    const base = ramen(a, [a]);
+    expect(
+      unwrapErr(
+        await addExpense(deps, ledgerId, { ...base, title: tooLong(30) }),
+      ),
+    ).toEqual({ code: "TEXT_TOO_LONG", field: "expenseTitle", max: 30 });
+    expect(
+      unwrapErr(
+        await addExpense(deps, ledgerId, { ...base, placeName: tooLong(40) }),
+      ),
+    ).toEqual({ code: "TEXT_TOO_LONG", field: "placeName", max: 40 });
+
+    const saved = unwrap(await addExpense(deps, ledgerId, base));
+    expect(
+      unwrapErr(
+        await updateExpense(deps, saved.id, { ...base, note: tooLong(200) }),
+      ),
+    ).toEqual({ code: "TEXT_TOO_LONG", field: "note", max: 200 });
+  });
+});
+
 describe("createLedger", () => {
   it("creates the ledger and its members in join order", async () => {
     const { db, ledgerId } = await setup();
@@ -73,6 +134,24 @@ describe("createLedger", () => {
     ]);
   });
 
+  it("stores the cover picked on the create screen", async () => {
+    const { db, deps, ledgerId } = await setup();
+    const cover = {
+      style: "tape",
+      palette: "matcha",
+      pattern: "stripes",
+    } as const;
+    const created = unwrap(
+      await createLedger(deps, { name: "花東", memberNames: ["A"], cover }),
+    );
+    const summary = unwrap(await loadLedgerSummary(db, created.ledger.id));
+    expect(summary.ledger.cover).toEqual(cover);
+    // 沒有指定封面的帳本存成 null，畫面再依 id 補
+    expect(
+      unwrap(await loadLedgerSummary(db, ledgerId)).ledger.cover,
+    ).toBeNull();
+  });
+
   it.each([
     ["an empty ledger name", { name: "  ", memberNames: ["A"] }, "EMPTY_NAME"],
     ["no members", { name: "旅行", memberNames: [] }, "NO_MEMBERS"],
@@ -80,6 +159,11 @@ describe("createLedger", () => {
       "an empty member name",
       { name: "旅行", memberNames: ["A", " "] },
       "EMPTY_NAME",
+    ],
+    [
+      "the same member twice",
+      { name: "旅行", memberNames: ["Bob", "我", "bob "] },
+      "DUPLICATE_MEMBER_NAME",
     ],
   ])("rejects %s", async (_, input, code) => {
     const { deps } = await setup();
@@ -126,6 +210,59 @@ describe("renameLedger", () => {
   });
 });
 
+describe("changeLedgerCover", () => {
+  it("replaces the cover and keeps the name", async () => {
+    const { db, deps, ledgerId } = await setup();
+    const cover = { style: "spine", palette: "ai", pattern: "grid" } as const;
+    unwrap(await changeLedgerCover(deps, ledgerId, cover));
+    const { ledger } = unwrap(await loadLedgerSummary(db, ledgerId));
+    expect(ledger).toMatchObject({ name: "東京五日遊", cover });
+  });
+
+  it("keeps the cover when the ledger is renamed", async () => {
+    const { db, deps, ledgerId } = await setup();
+    const cover = { style: "tape", palette: "kraft", pattern: "dots" } as const;
+    unwrap(await changeLedgerCover(deps, ledgerId, cover));
+    unwrap(await renameLedger(deps, ledgerId, "大阪"));
+    expect(unwrap(await loadLedgerSummary(db, ledgerId)).ledger.cover).toEqual(
+      cover,
+    );
+  });
+
+  it("rejects a missing ledger", async () => {
+    const { deps } = await setup();
+    const cover = { style: "band", palette: "shu", pattern: "dots" } as const;
+    expect(
+      unwrapErr(await changeLedgerCover(deps, "missing", cover)).code,
+    ).toBe("LEDGER_NOT_FOUND");
+  });
+});
+
+describe("setLedgerTripMonth", () => {
+  it("sets a month by hand and clears it back to automatic", async () => {
+    const { db, deps, ledgerId } = await setup();
+    unwrap(await setLedgerTripMonth(deps, ledgerId, "2027-02"));
+    expect(unwrap(await loadLedgerSummary(db, ledgerId)).ledger).toMatchObject({
+      name: "東京五日遊",
+      tripMonth: "2027-02",
+    });
+    unwrap(await setLedgerTripMonth(deps, ledgerId, null));
+    expect(
+      unwrap(await loadLedgerSummary(db, ledgerId)).ledger.tripMonth,
+    ).toBeNull();
+  });
+
+  it("rejects a malformed month and a missing ledger", async () => {
+    const { deps, ledgerId } = await setup();
+    expect(
+      unwrapErr(await setLedgerTripMonth(deps, ledgerId, "2027-13")),
+    ).toEqual({ code: "INVALID_TRIP_MONTH", value: "2027-13" });
+    expect(
+      unwrapErr(await setLedgerTripMonth(deps, "missing", "2027-02")).code,
+    ).toBe("LEDGER_NOT_FOUND");
+  });
+});
+
 describe("deleteLedger", () => {
   it("deletes the ledger with everything in it", async () => {
     const { db, deps, ledgerId, a, b } = await setup();
@@ -161,6 +298,14 @@ describe("addMember", () => {
     expect(unwrapErr(await addMember(deps, "missing", "Dave")).code).toBe(
       "LEDGER_NOT_FOUND",
     );
+  });
+
+  it("rejects a name already in the ledger, whatever the case", async () => {
+    const { deps, ledgerId } = await setup();
+    expect(unwrapErr(await addMember(deps, ledgerId, " alice "))).toEqual({
+      code: "DUPLICATE_MEMBER_NAME",
+      name: "alice",
+    });
   });
 });
 

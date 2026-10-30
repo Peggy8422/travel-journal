@@ -53,6 +53,8 @@ export async function ensurePersonalLedger(
       kind: "personal",
       name: PERSONAL_LEDGER_NAME,
       baseCurrency: "TWD",
+      cover: null,
+      tripMonth: null,
       createdAt: timestamp,
       updatedAt: timestamp,
     };

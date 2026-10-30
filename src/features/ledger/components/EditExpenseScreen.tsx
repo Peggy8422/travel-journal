@@ -8,10 +8,12 @@ import {
   type ExpenseStatus,
 } from "../../../domain/ledger";
 import {
-  Button,
   ErrorText,
   MessageScreen,
+  TextButton,
 } from "../../../shared/ui/components";
+import { useTheme } from "../../../shared/ui/theme";
+import { useToast } from "../../../shared/ui/Toast";
 import { useLedgerCommandDeps } from "../../database/DatabaseProvider";
 import { useLedgerSummary } from "../hooks/useLedgerQueries";
 import { deleteExpense, updateExpense } from "../services/ledgerCommands";
@@ -25,7 +27,9 @@ export function EditExpenseScreen({
   ledgerId: string;
   expenseId: string;
 }) {
+  const theme = useTheme();
   const deps = useLedgerCommandDeps();
+  const toast = useToast();
   const { data, error } = useLedgerSummary(ledgerId);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -62,6 +66,7 @@ export function EditExpenseScreen({
         return;
       }
       router.back();
+      toast(`刪掉「${expense?.title}」了`);
     } catch {
       setDeleteError("刪除失敗，請再試一次");
     }
@@ -70,7 +75,12 @@ export function EditExpenseScreen({
   const deleteSection = (
     <>
       <ErrorText message={deleteError} />
-      <Button title="刪除這筆消費" variant="danger" onPress={confirmDelete} />
+      <TextButton
+        title="刪除這筆消費"
+        color={theme.negative}
+        align="center"
+        onPress={confirmDelete}
+      />
     </>
   );
 
@@ -84,6 +94,7 @@ export function EditExpenseScreen({
     <ExpenseForm
       baseCurrency={ledger.baseCurrency}
       members={selectable}
+      receiptTitle={ledger.name}
       initial={{
         title: expense.title,
         amountText: toAmountInput(expense.amountMinor, expense.currency),
@@ -101,7 +112,9 @@ export function EditExpenseScreen({
       notice={warning}
       onSubmit={async (input) => {
         const result = await updateExpense(deps, expenseId, input);
-        return result.ok ? null : describeError(result.error);
+        if (!result.ok) return describeError(result.error);
+        toast(`改好了「${input.title}」`);
+        return null;
       }}
       footer={deleteSection}
     />

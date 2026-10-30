@@ -9,6 +9,7 @@ import {
 import type { GeoPoint } from "../../../domain/ledger";
 import { regionForPoints, type MapRegion } from "../../../domain/map";
 import { Label } from "../../../shared/ui/components";
+import { fonts } from "../../../shared/ui/fonts";
 import { spacing, useTheme } from "../../../shared/ui/theme";
 
 /** 沒有地點、也拿不到最近位置時，先顯示整個臺灣 */
@@ -212,14 +213,15 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   headerTitle: {
+    fontFamily: fonts.bold,
     fontSize: 17,
-    fontWeight: "600",
   },
   headerButton: {
+    fontFamily: fonts.regular,
     fontSize: 17,
   },
   headerButtonBold: {
-    fontWeight: "600",
+    fontFamily: fonts.bold,
   },
   mapArea: {
     flex: 1,

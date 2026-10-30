@@ -1,8 +1,15 @@
-import { categoryColor, categoryLabel, orderForChart } from "./categories";
+import {
+  categoryColor,
+  categoryLabel,
+  categoryTint,
+  orderForChart,
+} from "./categories";
 
 const palette = {
   categorical: ["c0", "c1", "c2", "c3", "c4", "c5"],
   neutral: "gray",
+  categoricalTint: ["t0", "t1", "t2", "t3", "t4", "t5"],
+  neutralTint: "pale",
 };
 
 describe("categoryLabel", () => {
@@ -41,5 +48,13 @@ describe("categoryColor", () => {
   it("uses the neutral color for uncategorized and legacy categories", () => {
     expect(categoryColor(null, palette)).toBe("gray");
     expect(categoryColor("宵夜", palette)).toBe("gray");
+  });
+});
+
+describe("categoryTint", () => {
+  it("uses the same slots as categoryColor", () => {
+    expect(categoryTint("transport", palette)).toBe("t1");
+    expect(categoryTint(null, palette)).toBe("pale");
+    expect(categoryTint("宵夜", palette)).toBe("pale");
   });
 });

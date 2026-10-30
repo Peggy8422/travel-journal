@@ -1,4 +1,5 @@
 import { MessageScreen } from "../../../shared/ui/components";
+import { useToast } from "../../../shared/ui/Toast";
 import { useLedgerCommandDeps } from "../../database/DatabaseProvider";
 import { usePersonalSelf } from "../hooks/usePersonalQueries";
 import { addPersonalExpense } from "../services/personalCommands";
@@ -7,6 +8,7 @@ import { describeError } from "./messages";
 
 export function AddPersonalExpenseScreen() {
   const deps = useLedgerCommandDeps();
+  const toast = useToast();
   const { self, error } = usePersonalSelf();
 
   if (error) return <MessageScreen text="讀取個人帳本失敗" />;
@@ -16,6 +18,7 @@ export function AddPersonalExpenseScreen() {
     <ExpenseForm
       baseCurrency="TWD"
       members={[self]}
+      receiptTitle="個人記帳"
       hidePeople
       initial={{
         title: "",
@@ -30,7 +33,9 @@ export function AddPersonalExpenseScreen() {
       }}
       onSubmit={async ({ payerId: _payer, split: _split, ...input }) => {
         const result = await addPersonalExpense(deps, input);
-        return result.ok ? null : describeError(result.error);
+        if (!result.ok) return describeError(result.error);
+        toast(`記下「${input.title}」`);
+        return null;
       }}
     />
   );

@@ -13,6 +13,8 @@ describe("MemberRepository", () => {
       kind: "shared",
       name: "首爾",
       baseCurrency: "TWD",
+      cover: null,
+      tripMonth: null,
       createdAt: T0,
       updatedAt: T0,
     });

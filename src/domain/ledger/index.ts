@@ -67,6 +67,27 @@ export {
   isExpenseCategory,
   type ExpenseCategory,
 } from "./categories";
+export {
+  COVER_PALETTES,
+  COVER_PATTERNS,
+  COVER_STYLES,
+  coverFromId,
+  parseCover,
+  randomCover,
+  rerollCover,
+  type CoverPalette,
+  type CoverPattern,
+  type CoverStyle,
+  type LedgerCover,
+} from "./cover";
+export {
+  checkTextLength,
+  TEXT_LIMITS,
+  type LimitedTextField,
+  type TextTooLongError,
+} from "./textLimits";
+export { isTripMonth } from "./tripMonth";
+export { findDuplicateName, sameMemberName } from "./memberNames";
 export type { LedgerBackup } from "./backup";
 export {
   collectPersonalEntries,

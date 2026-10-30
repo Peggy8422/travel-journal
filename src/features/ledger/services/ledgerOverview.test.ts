@@ -6,7 +6,11 @@ import {
   createLedger,
   type LedgerCommandDeps,
 } from "./ledgerCommands";
-import { loadLedgerOverviews } from "./ledgerOverview";
+import { loadLedgerOverviews, tripMonthOf } from "./ledgerOverview";
+import {
+  makeExpenseRecord,
+  makeLedgerRecord,
+} from "../../../data/repositories/testRecords";
 import { archiveMember } from "./memberCommands";
 
 async function setup() {
@@ -105,5 +109,37 @@ describe("loadLedgerOverviews", () => {
       ["壞掉", "invalid"],
       ["正常", "ok"],
     ]);
+  });
+});
+
+describe("tripMonthOf", () => {
+  const ledger = makeLedgerRecord({ createdAt: "2025-10-31T17:00:00.000Z" });
+
+  it("uses the local month of the earliest expense", () => {
+    const expenses = [
+      makeExpenseRecord({
+        id: "late",
+        occurredAt: "2025-12-02T10:00:00+09:00",
+      }),
+      makeExpenseRecord({
+        id: "early",
+        occurredAt: "2025-11-30T23:30:00+09:00",
+      }),
+    ];
+    expect(tripMonthOf(ledger, expenses)).toBe("2025-11");
+  });
+
+  it("falls back to the Taipei month the ledger was created in", () => {
+    // 10/31 17:00 UTC 是臺灣時間 11/1 凌晨
+    expect(tripMonthOf(ledger, [])).toBe("2025-11");
+  });
+
+  it("prefers a month set by hand over the expenses", () => {
+    const manual = { ...ledger, tripMonth: "2026-02" };
+    const prepaid = makeExpenseRecord({
+      occurredAt: "2025-11-15T20:00:00+08:00",
+    });
+    expect(tripMonthOf(manual, [prepaid])).toBe("2026-02");
+    expect(tripMonthOf(manual, [])).toBe("2026-02");
   });
 });
