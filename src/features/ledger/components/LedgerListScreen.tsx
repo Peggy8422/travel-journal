@@ -27,6 +27,7 @@ import type { LedgerOverview } from "../services/ledgerOverview";
 import {
   applyShelfFilter,
   groupShelf,
+  isNewLedger,
   NO_SHELF_FILTER,
   shelfMonths,
   shelfYears,
@@ -191,11 +192,12 @@ function Book({
     overview.kind === "ok" &&
     overview.expenseCount > 0 &&
     overview.pendingTransferCount === 0;
+  const fresh = isNewLedger(overview, new Date());
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${ledger.name}，${month.slice(0, 4)} 年 ${Number(month.slice(5, 7))} 月，${meta}，${status}`}
+      accessibilityLabel={`${fresh ? "新建立的帳本，" : ""}${ledger.name}，${month.slice(0, 4)} 年 ${Number(month.slice(5, 7))} 月，${meta}，${status}`}
       onPress={() =>
         router.push({ pathname: "/ledger/[id]", params: { id: ledger.id } })
       }
@@ -210,6 +212,7 @@ function Book({
         caption={month.replace("-", ".")}
         width={width}
         settled={settled}
+        fresh={fresh}
         tilt={tilt}
       />
       <View style={styles.bookText}>

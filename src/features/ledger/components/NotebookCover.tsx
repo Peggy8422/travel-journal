@@ -12,7 +12,7 @@ import Svg, {
 
 import { COVER_PALETTES, type LedgerCover } from "../../../domain/ledger";
 import { accentOverhang, fonts } from "../../../shared/ui/fonts";
-import { InkStamp, SketchFrame } from "../../../shared/ui/handDrawn";
+import { InkStamp, SketchFrame, WashiTape } from "../../../shared/ui/handDrawn";
 import { useTheme } from "../../../shared/ui/theme";
 import { COVER_COLORS } from "./coverStyles";
 
@@ -37,6 +37,7 @@ export function NotebookCover({
   caption,
   width,
   settled = false,
+  fresh = false,
   tilt = 0,
 }: {
   cover: LedgerCover;
@@ -45,6 +46,8 @@ export function NotebookCover({
   caption: string;
   width: number;
   settled?: boolean;
+  /** 剛建立的帳本，右上角貼一段 NEW 紙膠帶 */
+  fresh?: boolean;
   /** 傾斜角度，讓書架上的書不會排得太整齊 */
   tilt?: number;
 }) {
@@ -116,6 +119,14 @@ export function NotebookCover({
         )}
       </View>
       <SketchFrame radius={10} strokeWidth={1.4} />
+      {fresh && (
+        <View
+          style={[styles.newTape, { right: -width * 0.05, top: height * 0.05 }]}
+        >
+          <WashiTape color="#E9C46A" opacity={0.95} />
+          <Text style={[styles.newText, { color: theme.text }]}>NEW</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -471,5 +482,18 @@ const styles = StyleSheet.create({
   stamp: {
     position: "absolute",
     transform: [{ rotate: "-14deg" }],
+  },
+  newTape: {
+    position: "absolute",
+    paddingTop: 2,
+    paddingHorizontal: 10,
+    paddingBottom: 1,
+    transform: [{ rotate: "8deg" }],
+  },
+  newText: {
+    fontFamily: fonts.accent,
+    fontSize: 16,
+    lineHeight: 19,
+    paddingRight: accentOverhang(16),
   },
 });

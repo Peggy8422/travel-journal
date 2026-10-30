@@ -59,3 +59,16 @@ export function groupShelf(overviews: readonly LedgerOverview[]): ShelfGroup[] {
     .reverse()
     .map((month) => ({ month, overviews: byMonth.get(month) ?? [] }));
 }
+
+/** 建立後幾天內、還沒記消費的帳本算「新的」 */
+export const NEW_LEDGER_DAYS = 3;
+
+/**
+ * 剛建立的帳本：建立後 NEW_LEDGER_DAYS 天內，而且還沒記任何消費。書架上會貼 NEW 紙膠帶，
+ * 方便建好後回到書架一眼找到；開始記帳之後就不算新的。
+ */
+export function isNewLedger(overview: LedgerOverview, now: Date): boolean {
+  if (overview.kind !== "ok" || overview.expenseCount > 0) return false;
+  const age = now.getTime() - Date.parse(overview.ledger.createdAt);
+  return age >= 0 && age < NEW_LEDGER_DAYS * 24 * 60 * 60 * 1000;
+}

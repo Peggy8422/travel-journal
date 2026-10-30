@@ -3,6 +3,7 @@ import type { LedgerOverview } from "./ledgerOverview";
 import {
   applyShelfFilter,
   groupShelf,
+  isNewLedger,
   NO_SHELF_FILTER,
   shelfMonths,
   shelfYears,
@@ -70,5 +71,32 @@ describe("groupShelf", () => {
       ["2025-11", ["kyoto", "kyoto-again"]],
       ["2025-06", ["europe"]],
     ]);
+  });
+});
+
+describe("isNewLedger", () => {
+  const now = new Date("2026-10-30T12:00:00.000Z");
+  const fresh = (createdAt: string, expenseCount = 0): LedgerOverview => ({
+    kind: "ok",
+    ledger: makeLedgerRecord({ createdAt }),
+    activeMemberCount: 2,
+    expenseCount,
+    totalBaseMinor: 0,
+    pendingTransferCount: 0,
+    tripMonth: "2026-10",
+  });
+
+  it("marks a ledger created in the last three days without expenses", () => {
+    expect(isNewLedger(fresh("2026-10-30T11:00:00.000Z"), now)).toBe(true);
+    expect(isNewLedger(fresh("2026-10-27T12:00:01.000Z"), now)).toBe(true);
+  });
+
+  it("stops once it is three days old or has an expense", () => {
+    expect(isNewLedger(fresh("2026-10-27T12:00:00.000Z"), now)).toBe(false);
+    expect(isNewLedger(fresh("2026-10-30T11:00:00.000Z", 1), now)).toBe(false);
+  });
+
+  it("never marks a ledger whose data could not be read", () => {
+    expect(isNewLedger(overview("broken", "2026-10"), now)).toBe(false);
   });
 });
