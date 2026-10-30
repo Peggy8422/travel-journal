@@ -57,6 +57,18 @@ export default function RootLayout() {
               name="map"
               options={{ title: "詳細地圖", headerShown: false }}
             />
+            {/* 消費明細：從下面升起、可以停在半高的卡片，後面的列表或地圖還看得到 */}
+            <Stack.Screen
+              name="expense/[expenseId]"
+              options={{
+                title: "消費明細",
+                headerShown: false,
+                presentation: "formSheet",
+                sheetAllowedDetents: [0.6, 1],
+                sheetGrabberVisible: true,
+                sheetCornerRadius: 20,
+              }}
+            />
             <Stack.Screen
               name="personal/add-expense"
               options={{ title: "新增個人消費", presentation: "modal" }}
