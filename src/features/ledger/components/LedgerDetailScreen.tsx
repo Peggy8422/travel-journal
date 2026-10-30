@@ -137,11 +137,7 @@ export function LedgerDetailScreen({ ledgerId }: { ledgerId: string }) {
 
       <View style={[styles.sheet, { backgroundColor: theme.surface }]}>
         {tab === "expenses" ? (
-          <ExpenseList
-            ledgerId={ledgerId}
-            summary={summary}
-            bottomInset={insets.bottom}
-          />
+          <ExpenseList summary={summary} bottomInset={insets.bottom} />
         ) : (
           <SettlePanel
             ledgerId={ledgerId}

@@ -37,7 +37,7 @@ const BASE = "TWD";
 
 /**
  * 個人記帳：「我」在個人消費與各分帳帳本裡實際負擔的花費，依月份查看。
- * 個人消費點了可以編輯；分帳消費點了回到那本帳本（只能在帳本裡修改）。
+ * 點一筆消費打開消費明細；分帳消費的「編輯」會進那本帳本的表單。
  */
 export function PersonalSpendingScreen() {
   const theme = useTheme();
@@ -214,17 +214,12 @@ function PersonalRow({
             : undefined
       }
       accessibilityLabel={`${expense.title}，${amount}`}
-      accessibilityHint={
-        personal ? "編輯或刪除這筆個人消費" : `到「${ledger.name}」查看`
-      }
+      accessibilityHint="查看這筆消費的明細"
       onPress={() =>
-        personal
-          ? router.push({
-              pathname: "/personal/expense/[expenseId]",
-              params: { expenseId: expense.id },
-            })
-          : // 分帳消費只能在帳本裡修改，帶到那本帳本
-            router.push({ pathname: "/ledger/[id]", params: { id: ledger.id } })
+        router.push({
+          pathname: "/expense/[expenseId]",
+          params: { expenseId: expense.id },
+        })
       }
     />
   );

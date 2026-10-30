@@ -32,11 +32,9 @@ import { DayHeader, ExpenseRowView } from "./ExpenseRows";
  * 再點一次選中的篩選會取消。
  */
 export function ExpenseList({
-  ledgerId,
   summary,
   bottomInset,
 }: {
-  ledgerId: string;
   summary: LedgerSummary;
   /** 底部安全區域，列表最後要留空間給右下角的「新增消費」 */
   bottomInset: number;
@@ -163,8 +161,8 @@ export function ExpenseList({
                 status={summary.expenseStatuses.get(expense.id)}
                 onPress={() =>
                   router.push({
-                    pathname: "/ledger/[id]/expense/[expenseId]",
-                    params: { id: ledgerId, expenseId: expense.id },
+                    pathname: "/expense/[expenseId]",
+                    params: { expenseId: expense.id },
                   })
                 }
               />
@@ -222,7 +220,7 @@ function ExpenseRow({
         ) : undefined
       }
       accessibilityLabel={`${expense.title}，${amount}，${payerName} 付款`}
-      accessibilityHint="編輯或刪除這筆消費"
+      accessibilityHint="查看這筆消費的明細"
       onPress={onPress}
     />
   );

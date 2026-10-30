@@ -175,17 +175,21 @@ function GlobeStage({
     motion.flyTo({ ...view, cy: open ? cySheet : cyPicked });
   }
 
-  function focusExpense(expense: MapExpense) {
-    if (focusId === expense.id) {
-      setFocusId(null);
-      return;
-    }
+  /**
+   * 標出這筆消費並打開明細。明細蓋住畫面時地球的動畫會停（畫面失去焦點），
+   * 所以直接跳到那裡，並放在明細卡片上方看得到的高度。
+   */
+  function openExpense(expense: MapExpense) {
     setFocusId(expense.id);
-    motion.flyTo({
+    motion.jumpTo({
       lon: expense.point.longitude,
       lat: expense.point.latitude,
       k: view.k,
-      cy: sheetOpen ? cySheet : cyPicked,
+      cy: cySheet,
+    });
+    router.push({
+      pathname: "/expense/[expenseId]",
+      params: { expenseId: expense.id },
     });
   }
 
@@ -425,7 +429,7 @@ function GlobeStage({
             setFocusId(null);
           }}
           focusId={focusId}
-          onFocus={focusExpense}
+          onOpen={openExpense}
           onOpenDetail={() =>
             router.push({
               pathname: "/map",

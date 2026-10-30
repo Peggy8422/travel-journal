@@ -81,6 +81,15 @@ export function useGlobeMotion(options: MotionOptions) {
     [motion],
   );
 
+  /** 直接跳到指定視角，不緩動 */
+  const jumpTo = useCallback(
+    (view: GlobeView) => {
+      motion.jumpTo(view);
+      setFrame(motion.frame());
+    },
+    [motion],
+  );
+
   /** 轉回台灣、縮回整顆地球，之後照常擺動 */
   const goHome = useCallback(
     (cy: number) => {
@@ -93,6 +102,7 @@ export function useGlobeMotion(options: MotionOptions) {
     frame,
     panHandlers: motion.panResponder.panHandlers,
     flyTo,
+    jumpTo,
     goHome,
   };
 }
@@ -159,6 +169,12 @@ class GlobeMotion {
     this.view = target;
     this.target = null;
     return true;
+  }
+
+  jumpTo(view: GlobeView) {
+    this.swayArmed = false;
+    this.view = view;
+    this.target = null;
   }
 
   goHome(cy: number): boolean {

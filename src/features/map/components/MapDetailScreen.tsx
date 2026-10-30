@@ -455,17 +455,12 @@ function PinGroupCard({
                 key={pin.id}
                 expense={pin}
                 ledger={ledger}
-                accessibilityHint="編輯或刪除這筆消費"
+                accessibilityHint="查看這筆消費的明細"
                 onPress={() =>
-                  ledger.kind === "personal"
-                    ? router.push({
-                        pathname: "/personal/expense/[expenseId]",
-                        params: { expenseId: pin.id },
-                      })
-                    : router.push({
-                        pathname: "/ledger/[id]/expense/[expenseId]",
-                        params: { id: pin.ledgerId, expenseId: pin.id },
-                      })
+                  router.push({
+                    pathname: "/expense/[expenseId]",
+                    params: { expenseId: pin.id },
+                  })
                 }
               />
             ))}

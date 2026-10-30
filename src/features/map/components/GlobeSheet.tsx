@@ -20,7 +20,7 @@ const BASE = "TWD";
 
 /**
  * 地球下方的消費卡片：標題列可以展開／收合，清單依帳本分段。
- * 點一筆消費，地球會轉到那裡並標出名稱；在地球上點標記時，清單只列那個地方的消費。
+ * 點一筆消費，地球轉到那裡並標出名稱，同時打開消費明細；在地球上點標記時，清單只列那個地方的消費。
  */
 export function GlobeSheet({
   picked,
@@ -31,7 +31,7 @@ export function GlobeSheet({
   placeIds,
   onClearPlace,
   focusId,
-  onFocus,
+  onOpen,
   onOpenDetail,
 }: {
   picked: readonly MapLedger[];
@@ -42,7 +42,7 @@ export function GlobeSheet({
   placeIds: readonly string[] | null;
   onClearPlace: () => void;
   focusId: string | null;
-  onFocus: (expense: MapExpense) => void;
+  onOpen: (expense: MapExpense) => void;
   onOpenDetail: () => void;
 }) {
   const theme = useTheme();
@@ -181,8 +181,8 @@ export function GlobeSheet({
                 expense={expense}
                 ledger={ledger}
                 selected={expense.id === focusId}
-                accessibilityHint="在地球上標出這筆消費"
-                onPress={() => onFocus(expense)}
+                accessibilityHint="在地球上標出這筆消費並打開明細"
+                onPress={() => onOpen(expense)}
               />
             ))}
           </View>
