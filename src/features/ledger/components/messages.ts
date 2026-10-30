@@ -40,6 +40,8 @@ export function describeError(error: DisplayableError): string {
       return `${TEXT_FIELD_LABELS[error.field]}最多 ${error.max} 個字`;
     case "NO_MEMBERS":
       return "至少要有一位成員";
+    case "DUPLICATE_MEMBER_NAME":
+      return `已經有「${error.name}」了，換個名字吧`;
     case "LEDGER_NOT_FOUND":
       return "找不到這本帳本";
     case "EXPENSE_NOT_FOUND":

@@ -1,6 +1,7 @@
 import { err, ok } from "../../../domain/common/result";
 import {
   checkTextLength,
+  sameMemberName,
   type MemberId,
   type MemberRecord,
 } from "../../../domain/ledger";
@@ -28,6 +29,12 @@ export async function renameMember(
   const repos = createRepositories(deps.db);
   const member = await repos.members.findById(memberId);
   if (!member) return err({ code: "MEMBER_NOT_FOUND", memberId });
+  const others = (await repos.members.listByLedger(member.ledgerId)).filter(
+    (m) => m.id !== memberId,
+  );
+  if (others.some((m) => sameMemberName(m.name, trimmed))) {
+    return err({ code: "DUPLICATE_MEMBER_NAME", name: trimmed });
+  }
 
   await repos.members.rename(memberId, trimmed);
   return ok({ ...member, name: trimmed });

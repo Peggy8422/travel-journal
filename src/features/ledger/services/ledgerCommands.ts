@@ -4,7 +4,9 @@ import {
   checkTextLength,
   computeShares,
   expenseMemberIds,
+  findDuplicateName,
   isTripMonth,
+  sameMemberName,
   toExpense,
   toLedger,
   toSettlement,
@@ -45,6 +47,8 @@ export type LedgerCommandError =
   | TextTooLongError
   | { readonly code: "EMPTY_NAME" }
   | { readonly code: "NO_MEMBERS" }
+  /** 同一本帳本已經有這個名字的成員（不分大小寫） */
+  | { readonly code: "DUPLICATE_MEMBER_NAME"; readonly name: string }
   | { readonly code: "INVALID_TIMESTAMP"; readonly value: string }
   | { readonly code: "INVALID_TRIP_MONTH"; readonly value: string }
   | { readonly code: "LEDGER_NOT_FOUND"; readonly ledgerId: string }
@@ -93,6 +97,10 @@ export async function createLedger(
   for (const memberName of memberNames) {
     const memberLength = checkTextLength("memberName", memberName);
     if (!memberLength.ok) return memberLength;
+  }
+  const duplicate = findDuplicateName(memberNames);
+  if (duplicate !== undefined) {
+    return err({ code: "DUPLICATE_MEMBER_NAME", name: duplicate });
   }
 
   const timestamp = deps.now().toISOString();
@@ -223,6 +231,11 @@ export async function addMember(
   const repos = createRepositories(deps.db);
   if (!(await repos.ledgers.findById(ledgerId))) {
     return err({ code: "LEDGER_NOT_FOUND", ledgerId });
+  }
+  // Archived members count too: their old expenses still show the name
+  const members = await repos.members.listByLedger(ledgerId);
+  if (members.some((m) => sameMemberName(m.name, trimmed))) {
+    return err({ code: "DUPLICATE_MEMBER_NAME", name: trimmed });
   }
   return ok(
     await repos.members.insert({

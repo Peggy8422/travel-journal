@@ -24,6 +24,12 @@ describe("describeAllocationGap", () => {
 });
 
 describe("describeError", () => {
+  it("quotes the member name that is already taken", () => {
+    expect(describeError({ code: "DUPLICATE_MEMBER_NAME", name: "Bob" })).toBe(
+      "已經有「Bob」了，換個名字吧",
+    );
+  });
+
   it("names the field and its limit for text that is too long", () => {
     expect(
       describeError({ code: "TEXT_TOO_LONG", field: "memberName", max: 10 }),

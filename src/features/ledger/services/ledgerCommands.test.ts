@@ -160,6 +160,11 @@ describe("createLedger", () => {
       { name: "旅行", memberNames: ["A", " "] },
       "EMPTY_NAME",
     ],
+    [
+      "the same member twice",
+      { name: "旅行", memberNames: ["Bob", "我", "bob "] },
+      "DUPLICATE_MEMBER_NAME",
+    ],
   ])("rejects %s", async (_, input, code) => {
     const { deps } = await setup();
     expect(unwrapErr(await createLedger(deps, input)).code).toBe(code);
@@ -293,6 +298,14 @@ describe("addMember", () => {
     expect(unwrapErr(await addMember(deps, "missing", "Dave")).code).toBe(
       "LEDGER_NOT_FOUND",
     );
+  });
+
+  it("rejects a name already in the ledger, whatever the case", async () => {
+    const { deps, ledgerId } = await setup();
+    expect(unwrapErr(await addMember(deps, ledgerId, " alice "))).toEqual({
+      code: "DUPLICATE_MEMBER_NAME",
+      name: "alice",
+    });
   });
 });
 
