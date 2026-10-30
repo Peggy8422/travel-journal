@@ -497,19 +497,25 @@ function GlobePin({
         )}
       </View>
       {tag !== null && (
+        // An absolute child only gets the space left in the 44pt button unless
+        // it has its own width, so the slot is fixed and the label shrinks to fit
         <View
+          pointerEvents="none"
           style={[
-            styles.pinTag,
-            { backgroundColor: theme.surface },
-            tagOnLeft ? { right: 38 } : { left: 38 },
+            styles.pinTagSlot,
+            tagOnLeft
+              ? { right: 38, alignItems: "flex-end" }
+              : { left: 38, alignItems: "flex-start" },
           ]}
         >
-          <Text
-            numberOfLines={1}
-            style={[styles.pinTagText, { color: theme.text }]}
-          >
-            {tag}
-          </Text>
+          <View style={[styles.pinTag, { backgroundColor: theme.surface }]}>
+            <Text
+              numberOfLines={1}
+              style={[styles.pinTagText, { color: theme.text }]}
+            >
+              {tag}
+            </Text>
+          </View>
         </View>
       )}
     </Pressable>
@@ -595,9 +601,12 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     paddingRight: accentOverhang(16) / 2,
   },
-  pinTag: {
+  pinTagSlot: {
     position: "absolute",
     top: 11,
+    width: 150,
+  },
+  pinTag: {
     maxWidth: 150,
     paddingVertical: 2,
     paddingHorizontal: 8,
