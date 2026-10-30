@@ -18,6 +18,7 @@ import {
 } from "../../../domain/ledger";
 import {
   Button,
+  ButtonIcon,
   CardTitle,
   ErrorText,
   SmallButton,
@@ -314,6 +315,7 @@ export function SettlePanel({
             title="分享結算結果"
             variant="secondary"
             onPress={shareSettlement}
+            icon={(color) => <ButtonIcon color={color} paths={SHARE_ICON} />}
           />
         )}
       </View>
@@ -356,6 +358,13 @@ export function SettlePanel({
     </ScrollView>
   );
 }
+
+/** 分享：盒子加往上的箭頭 */
+const SHARE_ICON = [
+  "M12 3.5v11",
+  "M8.2 7.2L12 3.4l3.8 3.8",
+  "M6 11.5H5c-.8 0-1.4.6-1.4 1.4v6c0 .8.6 1.4 1.4 1.4h14c.8 0 1.4-.6 1.4-1.4v-6c0-.8-.6-1.4-1.4-1.4h-1",
+];
 
 const styles = StyleSheet.create({
   content: {

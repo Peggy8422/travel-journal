@@ -168,6 +168,7 @@ export function Button({
   disabled,
   variant = "primary",
   keepKeyboard = false,
+  icon,
 }: {
   title: string;
   onPress: () => void;
@@ -176,6 +177,8 @@ export function Button({
   variant?: "primary" | "secondary" | "danger";
   /** 按下後會冒出新的輸入欄位、要接著打字時設 true（例如「新增成員」），不收鍵盤 */
   keepKeyboard?: boolean;
+  /** 放在文字左邊的圖示（用 ButtonIcon 畫，顏色跟著按鈕的字） */
+  icon?: (color: string) => ReactNode;
 }) {
   const theme = useTheme();
   const primary = variant === "primary";
@@ -205,8 +208,35 @@ export function Button({
           color={variant === "danger" ? theme.negative : theme.pencil}
         />
       )}
+      {icon?.(color)}
       <Text style={[styles.buttonText, { color }]}>{title}</Text>
     </Pressable>
+  );
+}
+
+/** 按鈕前的手繪線條圖示：24 格的 viewBox，傳入的 path 用按鈕文字的顏色描線 */
+export function ButtonIcon({
+  color,
+  paths,
+}: {
+  color: string;
+  paths: readonly string[];
+}) {
+  return (
+    <Svg
+      width={20}
+      height={20}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {paths.map((d) => (
+        <Path key={d} d={d} />
+      ))}
+    </Svg>
   );
 }
 
@@ -587,8 +617,10 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     minHeight: 48,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 6,
   },
   buttonRaised: {
     boxShadow: "2px 3px 0px rgba(58,51,45,0.22)",

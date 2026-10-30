@@ -12,6 +12,7 @@ import {
 } from "../../../domain/ledger";
 import {
   Button,
+  ButtonIcon,
   Card,
   CardTitle,
   ErrorText,
@@ -434,6 +435,7 @@ export function LedgerSettingsScreen({ ledgerId }: { ledgerId: string }) {
           variant="secondary"
           onPress={exportCsv}
           disabled={busy || expenses.length === 0}
+          icon={(color) => <ButtonIcon color={color} paths={SHEET_ICON} />}
         />
       </Card>
 
@@ -543,6 +545,13 @@ function DiceIcon({ color }: { color: string }) {
     </Svg>
   );
 }
+
+/** 匯出 CSV：折角的試算表 */
+const SHEET_ICON = [
+  "M6.5 3h8.1l4.1 4.1v12.7c0 .7-.5 1.1-1.1 1.1H6.5c-.7 0-1.1-.4-1.1-1.1V4.1c0-.7.4-1.1 1.1-1.1z",
+  "M14.2 3.1v4.2h4.3",
+  "M8.3 12h7.4M8.3 15.3h7.4M12 9.8v8.7",
+];
 
 const styles = StyleSheet.create({
   fill: {
