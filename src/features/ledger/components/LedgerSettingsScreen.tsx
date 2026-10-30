@@ -295,14 +295,26 @@ export function LedgerSettingsScreen({ ledgerId }: { ledgerId: string }) {
           value={nameDraft}
           onChangeText={setLedgerName}
           maxLength={TEXT_LIMITS.ledgerName}
+          // 清空時不能儲存，寫出原因
+          error={
+            nameDraft.trim() === ""
+              ? describeError({ code: "EMPTY_NAME" })
+              : null
+          }
         />
-        {nameChanged && (
-          <View style={styles.end}>
+        {/* 改過才出現；還原回到目前存的名字 */}
+        {nameDraft !== ledger.name && (
+          <View style={styles.actions}>
             <SmallButton
-              title="儲存名稱"
+              title="還原"
+              onPress={() => setLedgerName(null)}
+              disabled={busy}
+            />
+            <SmallButton
+              title="儲存"
               variant="primary"
               onPress={saveLedgerName}
-              disabled={busy}
+              disabled={busy || !nameChanged}
             />
           </View>
         )}
@@ -525,10 +537,17 @@ function MemberEditor({
           />
         </View>
         <SmallButton
-          title="儲存名字"
+          title="還原"
+          onPress={() => setName(member.name)}
+          disabled={busy || name === member.name}
+        />
+        <SmallButton
+          title="儲存"
           variant="primary"
           onPress={() => onRename(name)}
-          disabled={busy || name.trim() === "" || name === member.name}
+          disabled={
+            busy || name.trim() === "" || name === member.name || taken !== null
+          }
         />
       </View>
       <View style={styles.toggles}>
@@ -625,8 +644,10 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
     lineHeight: 22,
   },
-  end: {
-    alignItems: "flex-end",
+  actions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 8,
   },
   start: {
     alignItems: "flex-start",
