@@ -68,6 +68,7 @@ import type { ExpenseInput } from "../services/ledgerCommands";
 import { categoryLabel } from "./categories";
 import { CategoryIcon } from "./CategoryIcon";
 import { currencyLabel } from "./currencies";
+import { basisLabel } from "./fxLabels";
 import { LocationPickerModal } from "./LocationPickerModal";
 import {
   describeAllocationGap,
@@ -1011,10 +1012,6 @@ function BotRateText({
       {detail}
     </Text>
   );
-}
-
-function basisLabel(basis: "spot" | "cash"): string {
-  return basis === "spot" ? "即期" : "現金";
 }
 
 /** 已記錄座標的提示色（若竹深色），在收據紙上約 5:1 */
