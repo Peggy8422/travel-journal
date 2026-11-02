@@ -12,7 +12,7 @@ const ledger = (
   id: string,
   tripMonth: string,
   kind: MapLedger["kind"] = "shared",
-): MapLedger => ({ id, name: id, kind, cover, tripMonth });
+): MapLedger => ({ id, name: id, kind, cover, tripMonth, expenseCount: 1 });
 
 const shinjuku = { latitude: 35.6905, longitude: 139.7024 };
 const kyoto = { latitude: 35.0116, longitude: 135.7681 };

@@ -391,6 +391,10 @@ function GlobeStage({
         onToggleYear={(y) => setOpenYear(y === year ? null : y)}
         onToggleLedger={toggleLedger}
         onClear={clearPicked}
+        loaded={!!data && !failed}
+        showPlaceholder={
+          !!data && !failed && !ledgers.some((l) => l.kind === "shared")
+        }
       />
 
       {picked.length === 0 || !data ? (

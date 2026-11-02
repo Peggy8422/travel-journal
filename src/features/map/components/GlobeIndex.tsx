@@ -7,6 +7,9 @@ import { COVER_COLORS } from "../../ledger/components/coverStyles";
 import type { MapLedger } from "../services/mapData";
 import { groupLedgersByYear } from "../services/globeView";
 
+/** 沒選取的索引籤往右縮進螢幕邊緣的距離；這一段看不到，文字要避開 */
+const TUCK = 12;
+
 /** 個人記帳固定用藍色，和個人分頁的長條一致 */
 const PERSONAL_COLORS = COVER_COLORS.ai;
 
@@ -32,10 +35,16 @@ export function GlobeIndex({
   onToggleYear,
   onToggleLedger,
   onClear,
+  loaded,
+  showPlaceholder,
 }: {
   /** 欄位頂端（含安全區域） */
   top: number;
   ledgers: readonly MapLedger[];
+  /** 資料讀取完成；讀取前不畫空的個人索引籤，免得一打開先閃一下淡色的 */
+  loaded: boolean;
+  /** 讀取完成且還沒有分帳帳本：放幾張淡色的空索引籤，右側才不會整片空白 */
+  showPlaceholder: boolean;
   picked: readonly string[];
   /** 展開的年份；null 代表全部收合 */
   openYear: string | null;
@@ -58,14 +67,16 @@ export function GlobeIndex({
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.list}
       >
-        {personal && (
+        {personal && personal.expenseCount > 0 ? (
           <LedgerTab
             ledger={personal}
             label="個人"
-            sub="記帳"
+            sub="（無分帳）"
             selected={picked.includes(personal.id)}
             onPress={() => onToggleLedger(personal.id)}
           />
+        ) : (
+          loaded && <EmptyPersonalTab />
         )}
         {years.map(({ year, ledgers: inYear }) => {
           const open = year === openYear;
@@ -138,6 +149,7 @@ export function GlobeIndex({
             </View>
           );
         })}
+        {showPlaceholder && <PlaceholderTabs />}
         {picked.length > 0 && (
           <Pressable
             accessibilityRole="button"
@@ -152,6 +164,69 @@ export function GlobeIndex({
           </Pressable>
         )}
       </ScrollView>
+    </View>
+  );
+}
+
+/**
+ * 還沒有帳本時的空索引籤：虛線外框、越往下越淡，第一張直書「尚無帳本」。
+ * 只是裝飾，畫面下方的提示已經說明怎麼建立帳本，所以對螢幕閱讀器隱藏。
+ */
+function PlaceholderTabs() {
+  const theme = useTheme();
+  return (
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={styles.list}
+    >
+      {[0.85, 0.55, 0.3].map((opacity, i) => (
+        <View
+          key={i}
+          style={[
+            styles.placeholderTab,
+            { borderColor: theme.pencil, backgroundColor: theme.chip, opacity },
+          ]}
+        >
+          {i === 0 && (
+            <Text style={[styles.placeholderText, { color: theme.textMuted }]}>
+              {"尚無帳本".split("").join("\n")}
+            </Text>
+          )}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/**
+ * 個人記帳的索引籤常駐；一筆都還沒記（或個人帳本還沒建立）時畫成和空索引籤一樣的淡色虛線，
+ * 不能點。
+ */
+function EmptyPersonalTab() {
+  const theme = useTheme();
+  return (
+    <View
+      accessible
+      accessibilityLabel="個人記帳，還沒有消費"
+      accessibilityState={{ disabled: true }}
+      style={[
+        styles.placeholderTab,
+        styles.emptyPersonal,
+        { borderColor: theme.pencil, backgroundColor: theme.chip },
+      ]}
+    >
+      <Text style={[styles.placeholderText, { color: theme.textMuted }]}>
+        {"個\n人"}
+      </Text>
+      <Text
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.75}
+        style={[styles.tabSub, styles.tuckedSub, { color: theme.textMuted }]}
+      >
+        （無分帳）
+      </Text>
     </View>
   );
 }
@@ -191,7 +266,7 @@ function LedgerTab({
           backgroundColor: colors.tint,
           opacity: pressed ? 0.75 : 1,
           // Unselected tabs tuck back into the edge of the screen
-          transform: [{ translateX: selected ? 0 : 12 }],
+          transform: [{ translateX: selected ? 0 : TUCK }],
         },
       ]}
     >
@@ -220,7 +295,22 @@ function LedgerTab({
           ))}
         </View>
       )}
-      <Text style={[styles.tabSub, { color: theme.textMuted }]}>{sub}</Text>
+      {/*
+        個人記帳的「（無分帳）」比月份長：縮進邊緣時只在看得到的範圍置中，
+        太窄就縮小一點而不是換行
+      */}
+      <Text
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.75}
+        style={[
+          styles.tabSub,
+          !selected && styles.tuckedSub,
+          { color: theme.textMuted },
+        ]}
+      >
+        {sub}
+      </Text>
       {selected && (
         <Svg
           width={16}
@@ -306,6 +396,32 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 12,
     boxShadow: "-2px 3px 0px rgba(58,51,45,0.12)",
   },
+  placeholderTab: {
+    width: 62,
+    minHeight: 92,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingLeft: 3,
+    // iOS only draws dashes when all four sides match; the right side sits off screen
+    borderWidth: 1.2,
+    borderStyle: "dashed",
+    borderTopLeftRadius: 12,
+    borderBottomLeftRadius: 12,
+    transform: [{ translateX: TUCK }],
+  },
+  emptyPersonal: {
+    minHeight: 0,
+    gap: 5,
+    paddingTop: 11,
+    paddingBottom: 9,
+    opacity: 0.85,
+  },
+  placeholderText: {
+    fontFamily: fonts.regular,
+    fontSize: 13,
+    lineHeight: 16,
+    textAlign: "center",
+  },
   strip: {
     position: "absolute",
     left: 0,
@@ -329,6 +445,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 17,
     textAlign: "center",
+  },
+  tuckedSub: {
+    marginRight: TUCK,
   },
   tabSub: {
     fontFamily: fonts.regular,

@@ -119,13 +119,19 @@ describe("loadMapData", () => {
         kind: "shared",
         cover: { style: "tape", palette: "ai", pattern: "dots" },
         tripMonth: "2026-12",
+        expenseCount: 0,
       },
       // Same trip month: the newer ledger comes first
-      expect.objectContaining({ id: "ledger-2", tripMonth: "2026-10" }),
+      expect.objectContaining({
+        id: "ledger-2",
+        tripMonth: "2026-10",
+        expenseCount: 1,
+      }),
       expect.objectContaining({
         id: "ledger-1",
         tripMonth: "2026-10",
         cover: coverFromId("ledger-1"),
+        expenseCount: 1,
       }),
     ]);
   });

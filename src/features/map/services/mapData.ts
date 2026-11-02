@@ -26,6 +26,8 @@ export interface MapLedger {
   readonly cover: LedgerCover;
   /** 旅行月份 YYYY-MM，地球的索引籤依年份分組 */
   readonly tripMonth: string;
+  /** 帳本裡的消費筆數（含沒有地點的）；個人記帳一筆都沒有時索引籤淡化、不能點 */
+  readonly expenseCount: number;
 }
 
 /** 地圖上的一筆消費：pin 之外再帶地球消費卡片要顯示的金額與分類 */
@@ -57,27 +59,34 @@ export async function loadMapData(db: SqlExecutor): Promise<MapData> {
   ]);
   // 旅行月份沒有手動指定時要看最早的一筆消費（包含沒有座標的）
   const entries = await Promise.all(
-    ledgers.map(async (ledger) => ({
-      ledger,
-      tripMonth:
-        ledger.tripMonth ??
-        tripMonthOf(ledger, await repos.expenses.listByLedger(ledger.id)),
-    })),
+    ledgers.map(async (ledger) => {
+      const all = await repos.expenses.listByLedger(ledger.id);
+      return {
+        ledger,
+        tripMonth: ledger.tripMonth ?? tripMonthOf(ledger, all),
+        expenseCount: all.length,
+      };
+    }),
   );
   return buildMapData(entries, expenses);
 }
 
 export function buildMapData(
-  ledgers: readonly { ledger: LedgerRecord; tripMonth: string }[],
+  ledgers: readonly {
+    ledger: LedgerRecord;
+    tripMonth: string;
+    expenseCount: number;
+  }[],
   expenses: readonly LocatedExpenseRecord[],
 ): MapData {
   const ledgerById = new Map(ledgers.map((l) => [l.ledger.id, l.ledger]));
-  const mapLedgers = ledgers.map(({ ledger, tripMonth }) => ({
+  const mapLedgers = ledgers.map(({ ledger, tripMonth, expenseCount }) => ({
     id: ledger.id,
     name: ledger.name,
     kind: ledger.kind,
     cover: ledger.cover ?? coverFromId(ledger.id),
     tripMonth,
+    expenseCount,
   }));
   // sort is stable, so ledgers in the same month keep the list order (newest first)
   const sorted = [...mapLedgers].sort((a, b) =>
