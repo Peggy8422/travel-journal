@@ -5,6 +5,7 @@ import {
   parseShareInputs,
   remainingToAllocate,
   TEXT_LIMITS,
+  toAmountInput,
   type CurrencyCode,
   type ExpenseFx,
   type GeoPoint,
@@ -155,6 +156,34 @@ export function previewRemaining(
     currency,
   );
   return shares.ok ? remainingToAllocate(total.value, shares.value) : undefined;
+}
+
+/**
+ * 「剩下的給某人」：把還沒分配的金額全部算到這位成員身上，回傳他輸入框的新文字。
+ * 分配超過時會從他的金額扣掉。總金額或任一欄格式不對、已經剛好分配完，
+ * 或扣完會變成 0 以下（他分攤的不夠扣）時回傳 null，按鈕就不能按。
+ */
+export function assignRemainingTo(
+  amountText: string,
+  shareTexts: Readonly<Record<MemberId, string>>,
+  memberOrder: readonly MemberId[],
+  currency: CurrencyCode,
+  memberId: MemberId,
+): string | null {
+  const remaining = previewRemaining(
+    amountText,
+    shareTexts,
+    memberOrder,
+    currency,
+  );
+  if (remaining === undefined || remaining === 0) return null;
+  const current = parseShareInputs(
+    [{ memberId, text: shareTexts[memberId] ?? "" }],
+    currency,
+  );
+  if (!current.ok) return null;
+  const next = (current.value[0]?.amountMinor ?? 0) + remaining;
+  return next > 0 ? toAmountInput(next, currency) : null;
 }
 
 /** 表單裡的地點草稿 */

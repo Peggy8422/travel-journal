@@ -1,6 +1,7 @@
 import type { ExpenseFx } from "../../../domain/ledger";
 import {
   applyLocatedPlace,
+  assignRemainingTo,
   buildSplitRule,
   chooseExpenseFx,
   initialPlaceDraft,
@@ -176,6 +177,51 @@ describe("previewRemaining", () => {
   it("shows nothing until every amount is valid", () => {
     expect(previewRemaining("", { a: "100" }, order, "TWD")).toBeUndefined();
     expect(previewRemaining("300", { a: "1.5" }, order, "TWD")).toBeUndefined();
+  });
+});
+
+describe("assignRemainingTo", () => {
+  const order = ["a", "b", "c"];
+
+  it("adds what is left to that member's amount", () => {
+    expect(assignRemainingTo("300", { a: "100" }, order, "TWD", "a")).toBe(
+      "300",
+    );
+    expect(assignRemainingTo("300", { a: "100" }, order, "TWD", "b")).toBe(
+      "200",
+    );
+  });
+
+  it("keeps the currency's decimals", () => {
+    expect(assignRemainingTo("10.5", { a: "3.25" }, order, "USD", "c")).toBe(
+      "7.25",
+    );
+  });
+
+  it("takes an over-allocation off that member", () => {
+    expect(
+      assignRemainingTo("300", { a: "100", b: "250" }, order, "TWD", "b"),
+    ).toBe("200");
+  });
+
+  it("refuses when it would leave the member with nothing", () => {
+    expect(
+      assignRemainingTo("300", { a: "100", b: "250" }, order, "TWD", "c"),
+    ).toBeNull();
+    expect(
+      // Over by exactly what b has: b would end up at 0
+      assignRemainingTo("300", { a: "300", b: "40" }, order, "TWD", "b"),
+    ).toBeNull();
+  });
+
+  it("does nothing when fully allocated or the amounts are not valid yet", () => {
+    expect(
+      assignRemainingTo("300", { a: "100", b: "200" }, order, "TWD", "c"),
+    ).toBeNull();
+    expect(assignRemainingTo("", { a: "100" }, order, "TWD", "b")).toBeNull();
+    expect(
+      assignRemainingTo("300", { a: "1.5" }, order, "TWD", "b"),
+    ).toBeNull();
   });
 });
 

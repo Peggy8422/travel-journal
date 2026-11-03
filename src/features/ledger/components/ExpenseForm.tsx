@@ -54,6 +54,7 @@ import {
 } from "../hooks/useFxRateResolution";
 import {
   applyLocatedPlace,
+  assignRemainingTo,
   buildSplitRule,
   chooseExpenseFx,
   initialPlaceDraft,
@@ -579,6 +580,47 @@ export function ExpenseForm({
                     </View>
                   ))}
                   <RemainingLabel remaining={remaining} currency={currency} />
+                  {remaining !== undefined && remaining !== 0 && (
+                    <View style={styles.remainderRow}>
+                      <Text style={[styles.hint, { color: "#5E554C" }]}>
+                        {remaining > 0 ? "剩下的給：" : "超出的從誰扣："}
+                      </Text>
+                      {members
+                        // 已封存的成員不能加進新的分攤，原本就有金額的才列出來
+                        .filter(
+                          (m) => m.archivedAt === null || shareTexts[m.id],
+                        )
+                        .map((m) => {
+                          const next = assignRemainingTo(
+                            amountText,
+                            shareTexts,
+                            members.map((x) => x.id),
+                            currency,
+                            m.id,
+                          );
+                          return (
+                            <SmallButton
+                              key={m.id}
+                              title={m.name}
+                              accessibilityLabel={
+                                remaining > 0
+                                  ? `把剩下的金額算給 ${m.name}`
+                                  : `超出的金額從 ${m.name} 扣掉`
+                              }
+                              disabled={next === null}
+                              onPress={() => {
+                                if (next === null) return;
+                                setShareTexts((texts) => ({
+                                  ...texts,
+                                  [m.id]: next,
+                                }));
+                                clearError("split");
+                              }}
+                            />
+                          );
+                        })}
+                    </View>
+                  )}
                 </>
               )}
               <ErrorText message={errorFor("split")} />
@@ -1180,6 +1222,12 @@ const styles = StyleSheet.create({
   hint: {
     fontFamily: fonts.regular,
     fontSize: 13,
+  },
+  remainderRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 6,
   },
   categories: {
     flexDirection: "row",
