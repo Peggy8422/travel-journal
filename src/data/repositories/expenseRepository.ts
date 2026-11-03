@@ -79,6 +79,23 @@ export function createExpenseRepository(db: SqlExecutor): ExpenseRepository {
       );
     },
 
+    async restore(id, updatedAt) {
+      await db.runAsync(
+        "UPDATE expenses SET deleted_at = NULL, updated_at = ? WHERE id = ?",
+        [updatedAt, id],
+      );
+    },
+
+    async listDeleted(ledgerId) {
+      const rows = await db.getAllAsync<ExpenseRow>(
+        `SELECT * FROM expenses
+         WHERE ledger_id = ? AND deleted_at IS NOT NULL
+         ORDER BY deleted_at DESC, id`,
+        [ledgerId],
+      );
+      return rows.map(toRecord);
+    },
+
     async findById(id) {
       const row = await db.getFirstAsync<ExpenseRow>(
         "SELECT * FROM expenses WHERE id = ?",

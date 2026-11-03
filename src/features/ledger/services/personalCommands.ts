@@ -13,6 +13,8 @@ import {
 import {
   addExpense,
   deleteExpense,
+  loadDeletedExpenses,
+  restoreExpense,
   updateExpense,
   type CommandResult,
   type ExpenseInput,
@@ -97,6 +99,30 @@ export async function deletePersonalExpense(
   const owner = await findPersonalOwner(deps, expenseId);
   if (!owner) return err({ code: "EXPENSE_NOT_FOUND", expenseId });
   return deleteExpense(deps, expenseId);
+}
+
+/** 把刪除的個人消費放回個人記帳；分帳消費回傳 EXPENSE_NOT_FOUND */
+export async function restorePersonalExpense(
+  deps: LedgerCommandDeps,
+  expenseId: string,
+): CommandResult<void> {
+  const repos = createRepositories(deps.db);
+  const [personal, expense] = await Promise.all([
+    repos.ledgers.findPersonal(),
+    repos.expenses.findById(expenseId),
+  ]);
+  if (!expense || !personal || expense.ledgerId !== personal.id) {
+    return err({ code: "EXPENSE_NOT_FOUND", expenseId });
+  }
+  return restoreExpense(deps, expenseId);
+}
+
+/** 個人記帳裡刪除的消費，最近刪除的在前；個人帳本還沒建立時是空的 */
+export async function loadDeletedPersonalExpenses(
+  db: SqlExecutor,
+): Promise<ExpenseRecord[]> {
+  const personal = await createRepositories(db).ledgers.findPersonal();
+  return personal ? loadDeletedExpenses(db, personal.id) : [];
 }
 
 /** 讀取一筆個人消費（給編輯畫面用）；不是個人帳本的消費回傳 undefined */

@@ -21,7 +21,7 @@ import {
   type SettlementRecord,
   type TextTooLongError,
 } from "../../../domain/ledger";
-import type { SqlDatabase } from "../../../data/db/sqlDatabase";
+import type { SqlDatabase, SqlExecutor } from "../../../data/db/sqlDatabase";
 import {
   createRepositories,
   type Repositories,
@@ -311,6 +311,31 @@ export async function deleteExpense(
   }
   await repos.expenses.softDelete(expenseId, deps.now().toISOString());
   return ok(undefined);
+}
+
+/**
+ * 把刪除的消費放回帳本。消費裡的成員一定還在：刪除的消費也算引用，有引用的成員不能刪除，
+ * 所以不用重新檢查分攤（封存的成員照樣留在這筆消費裡）。已經在帳本裡的消費直接當作成功。
+ */
+export async function restoreExpense(
+  deps: LedgerCommandDeps,
+  expenseId: string,
+): CommandResult<void> {
+  const repos = createRepositories(deps.db);
+  const existing = await repos.expenses.findById(expenseId);
+  if (!existing) return err({ code: "EXPENSE_NOT_FOUND", expenseId });
+  if (existing.deletedAt !== null) {
+    await repos.expenses.restore(expenseId, deps.now().toISOString());
+  }
+  return ok(undefined);
+}
+
+/** 帳本裡刪除的消費，最近刪除的在前，給「最近刪除」清單用 */
+export async function loadDeletedExpenses(
+  db: SqlExecutor,
+  ledgerId: string,
+): Promise<ExpenseRecord[]> {
+  return createRepositories(db).expenses.listDeleted(ledgerId);
 }
 
 /** 封存的成員仍可以參與結算，例如提早離開的人之後再還錢 */

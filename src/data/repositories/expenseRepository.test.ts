@@ -115,6 +115,27 @@ describe("ExpenseRepository", () => {
     );
   });
 
+  it("lists deleted expenses newest deletion first and restores them", async () => {
+    const { repos } = await setupLedger();
+    await repos.expenses.insert(makeExpenseRecord({ id: "kept" }));
+    await repos.expenses.insert(makeExpenseRecord({ id: "first" }));
+    await repos.expenses.insert(makeExpenseRecord({ id: "second" }));
+    await repos.expenses.softDelete("first", "2026-10-13T00:00:00.000Z");
+    await repos.expenses.softDelete("second", "2026-10-14T00:00:00.000Z");
+
+    expect(
+      (await repos.expenses.listDeleted("ledger-1")).map((e) => e.id),
+    ).toEqual(["second", "first"]);
+
+    await repos.expenses.restore("first", "2026-10-15T00:00:00.000Z");
+    const restored = await repos.expenses.findById("first");
+    expect(restored?.deletedAt).toBeNull();
+    expect(restored?.updatedAt).toBe("2026-10-15T00:00:00.000Z");
+    expect(
+      (await repos.expenses.listDeleted("ledger-1")).map((e) => e.id),
+    ).toEqual(["second"]);
+  });
+
   it("throws StoredDataError when the stored split JSON is malformed", async () => {
     const { db, repos } = await setupLedger();
     await repos.expenses.insert(makeExpenseRecord());

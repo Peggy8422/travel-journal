@@ -8,6 +8,7 @@ import {
 } from "../../database/DatabaseProvider";
 import {
   ensurePersonalLedger,
+  loadDeletedPersonalExpenses,
   loadPersonalExpenseForEdit,
   loadPersonalSpending,
 } from "../services/personalCommands";
@@ -16,6 +17,13 @@ import {
 export function usePersonalSpending() {
   const db = useDatabase();
   const load = useCallback(() => loadPersonalSpending(db), [db]);
+  return useFocusedQuery(load);
+}
+
+/** 個人記帳裡刪除的消費（「最近刪除」清單），最近刪除的在前 */
+export function useDeletedPersonalExpenses() {
+  const db = useDatabase();
+  const load = useCallback(() => loadDeletedPersonalExpenses(db), [db]);
   return useFocusedQuery(load);
 }
 

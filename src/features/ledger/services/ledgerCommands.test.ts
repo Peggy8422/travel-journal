@@ -9,7 +9,9 @@ import {
   deleteExpense,
   deleteLedger,
   deleteSettlement,
+  loadDeletedExpenses,
   renameLedger,
+  restoreExpense,
   setLedgerTripMonth,
   settleAll,
   updateExpense,
@@ -389,6 +391,26 @@ describe("expenses", () => {
     expect(
       unwrapErr(await updateExpense(deps, expense.id, ramen(a, [a]))).code,
     ).toBe("EXPENSE_NOT_FOUND");
+  });
+
+  it("restores a deleted expense back into the summary", async () => {
+    const { db, deps, ledgerId, a, b } = await setup();
+    const expense = unwrap(await addExpense(deps, ledgerId, ramen(a, [a, b])));
+    unwrap(await deleteExpense(deps, expense.id));
+    expect((await loadDeletedExpenses(db, ledgerId)).map((e) => e.id)).toEqual([
+      expense.id,
+    ]);
+
+    unwrap(await restoreExpense(deps, expense.id));
+
+    const summary = unwrap(await loadLedgerSummary(db, ledgerId));
+    expect(summary.expenses.map((e) => e.id)).toEqual([expense.id]);
+    expect(await loadDeletedExpenses(db, ledgerId)).toEqual([]);
+    // Restoring twice is harmless; an unknown id is not
+    unwrap(await restoreExpense(deps, expense.id));
+    expect(unwrapErr(await restoreExpense(deps, "missing")).code).toBe(
+      "EXPENSE_NOT_FOUND",
+    );
   });
 });
 

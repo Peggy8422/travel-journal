@@ -10,10 +10,12 @@ import {
 } from "../../../shared/ui/components";
 import { useTheme } from "../../../shared/ui/theme";
 import { useToast } from "../../../shared/ui/Toast";
+import { notifyDataChanged } from "../../../shared/hooks/useFocusedQuery";
 import { useLedgerCommandDeps } from "../../database/DatabaseProvider";
 import { usePersonalExpense } from "../hooks/usePersonalQueries";
 import {
   deletePersonalExpense,
+  restorePersonalExpense,
   updatePersonalExpense,
 } from "../services/personalCommands";
 import { ExpenseForm } from "./ExpenseForm";
@@ -54,9 +56,30 @@ export function EditPersonalExpenseScreen({
         return;
       }
       router.back();
-      toast(`刪掉「${expense.title}」了`);
+      toast(`刪掉「${expense.title}」了`, {
+        label: "復原",
+        onPress: undoDelete,
+      });
     } catch {
       setDeleteError("刪除失敗，請再試一次");
+    }
+  }
+
+  /** 提示紙條上的「復原」：這時已經離開這個畫面，失敗用彈窗告知 */
+  async function undoDelete() {
+    try {
+      const result = await restorePersonalExpense(deps, expenseId);
+      if (!result.ok) {
+        Alert.alert("無法復原", describeError(result.error));
+        return;
+      }
+      notifyDataChanged();
+      toast(`「${expense.title}」放回來了`);
+    } catch {
+      Alert.alert(
+        "無法復原",
+        "復原失敗，可以到個人記帳明細的「最近刪除」再試一次",
+      );
     }
   }
 

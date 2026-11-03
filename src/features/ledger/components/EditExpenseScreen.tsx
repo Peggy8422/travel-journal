@@ -14,9 +14,14 @@ import {
 } from "../../../shared/ui/components";
 import { useTheme } from "../../../shared/ui/theme";
 import { useToast } from "../../../shared/ui/Toast";
+import { notifyDataChanged } from "../../../shared/hooks/useFocusedQuery";
 import { useLedgerCommandDeps } from "../../database/DatabaseProvider";
 import { useLedgerSummary } from "../hooks/useLedgerQueries";
-import { deleteExpense, updateExpense } from "../services/ledgerCommands";
+import {
+  deleteExpense,
+  restoreExpense,
+  updateExpense,
+} from "../services/ledgerCommands";
 import { ExpenseForm } from "./ExpenseForm";
 import { describeError } from "./messages";
 
@@ -66,9 +71,31 @@ export function EditExpenseScreen({
         return;
       }
       router.back();
-      toast(`刪掉「${expense?.title}」了`);
+      const title = expense?.title;
+      toast(`刪掉「${title}」了`, {
+        label: "復原",
+        onPress: () => undoDelete(title),
+      });
     } catch {
       setDeleteError("刪除失敗，請再試一次");
+    }
+  }
+
+  /** 提示紙條上的「復原」：這時已經離開這個畫面，失敗用彈窗告知 */
+  async function undoDelete(title: string | undefined) {
+    try {
+      const result = await restoreExpense(deps, expenseId);
+      if (!result.ok) {
+        Alert.alert("無法復原", describeError(result.error));
+        return;
+      }
+      notifyDataChanged();
+      toast(`「${title}」放回來了`);
+    } catch {
+      Alert.alert(
+        "無法復原",
+        "復原失敗，可以到消費列表最下面的「最近刪除」再試一次",
+      );
     }
   }
 

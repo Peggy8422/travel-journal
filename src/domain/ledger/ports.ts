@@ -61,7 +61,11 @@ export interface ExpenseRepository {
   /** 以 id 覆寫整筆消費（createdAt 不變） */
   update(expense: ExpenseRecord): Promise<void>;
   softDelete(id: string, deletedAt: string): Promise<void>;
+  /** 把刪除的消費放回帳本 */
+  restore(id: string, updatedAt: string): Promise<void>;
   findById(id: string): Promise<ExpenseRecord | undefined>;
+  /** 已刪除的消費，最近刪除的在前 */
+  listDeleted(ledgerId: string): Promise<ExpenseRecord[]>;
   /** 依消費時間由舊到新，預設排除已刪除的消費 */
   listByLedger(
     ledgerId: string,

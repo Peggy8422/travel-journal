@@ -28,6 +28,7 @@ import {
 } from "../services/localTimestamp";
 import { CategoryBreakdown } from "./CategoryBreakdown";
 import { categoryLabel } from "./categories";
+import { DeletedPersonalExpensesFold } from "./DeletedExpenses";
 import { DayHeader, ExpenseRowView } from "./ExpenseRows";
 import { describeError } from "./messages";
 import { PersonalSplit } from "./PersonalSplit";
@@ -171,6 +172,8 @@ export function PersonalSpendingScreen() {
             </View>
           ))}
         </View>
+
+        <DeletedPersonalExpensesFold />
       </ScrollView>
 
       <FloatingAddButton

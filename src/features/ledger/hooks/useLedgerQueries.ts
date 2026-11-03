@@ -3,6 +3,7 @@ import { useCallback } from "react";
 import { useFocusedQuery } from "../../../shared/hooks/useFocusedQuery";
 import { useDatabase } from "../../database/DatabaseProvider";
 import { loadExpenseDetail } from "../services/expenseDetail";
+import { loadDeletedExpenses } from "../services/ledgerCommands";
 import { loadLedgerOverviews } from "../services/ledgerOverview";
 import { loadLedgerStats, loadLedgerSummary } from "../services/ledgerSummary";
 
@@ -36,6 +37,16 @@ export function useExpenseDetail(expenseId: string) {
   const load = useCallback(
     () => loadExpenseDetail(db, expenseId),
     [db, expenseId],
+  );
+  return useFocusedQuery(load);
+}
+
+/** 帳本裡刪除的消費（「最近刪除」清單），最近刪除的在前 */
+export function useDeletedExpenses(ledgerId: string) {
+  const db = useDatabase();
+  const load = useCallback(
+    () => loadDeletedExpenses(db, ledgerId),
+    [db, ledgerId],
   );
   return useFocusedQuery(load);
 }

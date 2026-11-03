@@ -14,7 +14,9 @@ import {
   deletePersonalExpense,
   ensurePersonalLedger,
   findPersonalExpense,
+  loadDeletedPersonalExpenses,
   loadPersonalSpending,
+  restorePersonalExpense,
   updatePersonalExpense,
   type PersonalExpenseInput,
 } from "./personalCommands";
@@ -93,6 +95,20 @@ describe("personal ledger", () => {
     expect(await findPersonalExpense(db, added.id)).toBeUndefined();
   });
 
+  it("lists and restores deleted personal expenses", async () => {
+    const { db, deps } = await setup();
+    expect(await loadDeletedPersonalExpenses(db)).toEqual([]);
+    const added = unwrap(await addPersonalExpense(deps, coffee));
+    unwrap(await deletePersonalExpense(deps, added.id));
+    expect((await loadDeletedPersonalExpenses(db)).map((e) => e.id)).toEqual([
+      added.id,
+    ]);
+
+    unwrap(await restorePersonalExpense(deps, added.id));
+    expect((await findPersonalExpense(db, added.id))?.title).toBe("咖啡");
+    expect(await loadDeletedPersonalExpenses(db)).toEqual([]);
+  });
+
   it("refuses to edit or delete shared expenses from the personal page", async () => {
     const { db, deps } = await setup();
     const { dinner } = await sharedTrip(deps);
@@ -101,6 +117,9 @@ describe("personal ledger", () => {
       unwrapErr(await updatePersonalExpense(deps, dinner.id, coffee)).code,
     ).toBe("EXPENSE_NOT_FOUND");
     expect(unwrapErr(await deletePersonalExpense(deps, dinner.id)).code).toBe(
+      "EXPENSE_NOT_FOUND",
+    );
+    expect(unwrapErr(await restorePersonalExpense(deps, dinner.id)).code).toBe(
       "EXPENSE_NOT_FOUND",
     );
   });

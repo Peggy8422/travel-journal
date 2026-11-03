@@ -25,6 +25,7 @@ import {
 } from "../services/localTimestamp";
 import { SettledTag } from "./badges";
 import { categoryColor, categoryLabel, orderForChart } from "./categories";
+import { DeletedExpensesFold } from "./DeletedExpenses";
 import { DayHeader, ExpenseRowView } from "./ExpenseRows";
 
 /**
@@ -169,6 +170,7 @@ export function ExpenseList({
             ))}
           </View>
         ))}
+        <DeletedExpensesFold ledgerId={summary.ledger.id} />
       </ScrollView>
     </View>
   );
