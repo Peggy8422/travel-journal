@@ -7,7 +7,7 @@ import Svg, { Circle, Path } from "react-native-svg";
 import { coverFromId, formatMinorAmount } from "../../../domain/ledger";
 import { FloatingAddButton } from "../../../shared/ui/components";
 import { fonts } from "../../../shared/ui/fonts";
-import { PaperBackground } from "../../../shared/ui/handDrawn";
+import { PaperBackground, WavyEdge } from "../../../shared/ui/handDrawn";
 import { BackButton, PageMessage } from "../../../shared/ui/PageHeader";
 import { useTheme } from "../../../shared/ui/theme";
 import { useLedgerSummary } from "../hooks/useLedgerQueries";
@@ -203,32 +203,7 @@ function FolderTab({
   );
 }
 
-/** 色帶下緣的波浪：先用和紙色填掉波浪以下，再描一條鉛筆線 */
-function WavyEdge({ top }: { top: number }) {
-  const theme = useTheme();
-  const wave =
-    "M0 7 C 30 1, 60 12, 92 6 S 152 1, 184 7 S 246 12, 278 6 S 340 1, 390 7";
-  return (
-    <Svg
-      width="100%"
-      height={14}
-      viewBox="0 0 390 14"
-      preserveAspectRatio="none"
-      style={[styles.wave, { top }]}
-    >
-      <Path d={`${wave} V14 H0 Z`} fill={theme.background} />
-      <Path
-        d={wave}
-        fill="none"
-        stroke={theme.text}
-        strokeOpacity={0.35}
-        strokeWidth={1.2}
-      />
-    </Svg>
-  );
-}
-
-function GearIcon({ color }: { color: string }) {
+export function GearIcon({ color }: { color: string }) {
   return (
     <Svg
       width={22}
@@ -277,11 +252,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 0,
     top: 0,
-    right: 0,
-  },
-  wave: {
-    position: "absolute",
-    left: 0,
     right: 0,
   },
   topRow: {

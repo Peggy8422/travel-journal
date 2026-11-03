@@ -675,7 +675,37 @@ export function WavyLine({ color }: { color?: string }) {
   );
 }
 
+/** 頁首色帶下緣的波浪（top 是波浪的位置）：先用和紙色填掉波浪以下，再描一條鉛筆線 */
+export function WavyEdge({ top }: { top: number }) {
+  const theme = useTheme();
+  const wave =
+    "M0 7 C 30 1, 60 12, 92 6 S 152 1, 184 7 S 246 12, 278 6 S 340 1, 390 7";
+  return (
+    <Svg
+      width="100%"
+      height={14}
+      viewBox="0 0 390 14"
+      preserveAspectRatio="none"
+      style={[styles.waveEdge, { top }]}
+    >
+      <Path d={`${wave} V14 H0 Z`} fill={theme.background} />
+      <Path
+        d={wave}
+        fill="none"
+        stroke={theme.text}
+        strokeOpacity={0.35}
+        strokeWidth={1.2}
+      />
+    </Svg>
+  );
+}
+
 const styles = StyleSheet.create({
+  waveEdge: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+  },
   wavy: {
     flex: 1,
     minWidth: 20,

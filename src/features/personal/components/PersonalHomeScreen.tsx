@@ -17,6 +17,10 @@ import {
   WashiTape,
 } from "../../../shared/ui/handDrawn";
 import { useTheme } from "../../../shared/ui/theme";
+import { JournalCover } from "../../journal/components/JournalCover";
+import { useJournalShelf } from "../../journal/hooks/useJournalQueries";
+import type { JournalOverview } from "../../journal/services/journalCommands";
+import { journalCaption } from "../../journal/services/journalDates";
 import { PersonalSplit } from "../../ledger/components/PersonalSplit";
 import { usePersonalSpending } from "../../ledger/hooks/usePersonalQueries";
 import { toLocalIsoString } from "../../ledger/services/localTimestamp";
@@ -24,13 +28,14 @@ import { toLocalIsoString } from "../../ledger/services/localTimestamp";
 const STAMP = "#B5452B";
 
 /**
- * 「個人」分頁：01 個人記帳（這個月的花費與入口）、02 旅遊手帳（準備中）。
+ * 「個人」分頁：01 個人記帳（這個月的花費與入口）、02 旅遊手帳（最近的一本與入口）。
  * 導覽列隱藏，頁首自己畫。
  */
 export function PersonalHomeScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { data } = usePersonalSpending();
+  const { data: journals } = useJournalShelf();
   const month = toLocalIsoString(new Date()).slice(0, 7);
   // 讀取中或讀取失敗時只是不顯示金額，按鈕仍然可以用
   const summary =
@@ -103,8 +108,16 @@ export function PersonalHomeScreen() {
         </View>
 
         <View style={styles.section}>
-          <SectionTitle number="02" title="旅遊手帳" hint="準備中" />
-          <JournalCover />
+          <SectionTitle
+            number="02"
+            title="旅遊手帳"
+            hint={
+              journals && journals.length > 0
+                ? `${journals.length} 本手帳 · ${journals.reduce((n, o) => n + o.entryCount, 0)} 篇日記`
+                : "每趟旅行一本"
+            }
+          />
+          <JournalCard latest={journals ? latestJournal(journals) : null} />
         </View>
       </ScrollView>
     </View>
@@ -136,8 +149,26 @@ function SectionTitle({
   );
 }
 
-/** 旅遊手帳的牛皮紙封面：還沒開放，蓋一個「準備中」的章 */
-function JournalCover() {
+/** 最近在寫的手帳：最後一篇日記日期最晚的那本；都還沒有日記時用最新建立的 */
+function latestJournal(
+  journals: readonly JournalOverview[],
+): JournalOverview | null {
+  return journals.reduce<JournalOverview | null>(
+    (best, o) =>
+      best === null || (o.lastDate ?? "") > (best.lastDate ?? "") ? o : best,
+    null,
+  );
+}
+
+/**
+ * 旅遊手帳的牛皮紙卡片：有手帳時放最近那本的封面和最近一篇，
+ * 還沒有手帳時是一段說明加「建立手帳」
+ */
+function JournalCard({ latest }: { latest: JournalOverview | null }) {
+  const entry = latest?.latestEntry ?? null;
+  const recent = entry
+    ? `最近一篇：${Number(entry.date.slice(5, 7))}/${Number(entry.date.slice(8, 10))} ${entry.title || "（沒有標題）"}`
+    : "還沒有日記";
   return (
     <View style={styles.journal}>
       <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
@@ -156,15 +187,58 @@ function JournalCover() {
       <View style={styles.journalSpine} />
       <View style={styles.journalBand} />
       <SketchFrame radius={12} strokeWidth={1.3} />
-      <Text style={styles.journalKicker}>Travel Journal</Text>
-      <Text style={styles.journalText}>
-        之後可以在這裡寫下每趟旅行的日記，記下的地點也會出現在地圖上。
-      </Text>
-      <View style={styles.journalButton}>
-        <SmallButton title="敬請期待" disabled onPress={() => {}} />
-      </View>
-      <View style={styles.journalStamp}>
-        <InkStamp size={66} label="準備中" color={STAMP} labelScale={0.24} />
+      {latest ? (
+        <View style={styles.journalLatest}>
+          <JournalCover
+            cover={latest.journal.cover}
+            title={latest.journal.name}
+            caption={journalCaption(
+              latest.journal.createdAt,
+              latest.firstDate,
+              latest.lastDate,
+            )}
+            width={86}
+            tilt={-3}
+          />
+          <View style={styles.journalInfo}>
+            <Text style={styles.journalKicker}>Travel Journal</Text>
+            <Text style={styles.journalName}>{latest.journal.name}</Text>
+            <Text style={styles.journalRecent}>{recent}</Text>
+          </View>
+        </View>
+      ) : (
+        <>
+          <Text style={styles.journalKicker}>Travel Journal</Text>
+          <Text style={styles.journalText}>
+            每趟旅行一本手帳，按日期寫下去了哪裡、吃了什麼。綁定帳本的話，日記頁還會列出那天的消費。
+          </Text>
+        </>
+      )}
+      <View style={styles.journalButtons}>
+        {latest ? (
+          <>
+            <SmallButton
+              title="打開手帳"
+              variant="primary"
+              onPress={() =>
+                router.push({
+                  pathname: "/journal/[id]",
+                  params: { id: latest.journal.id },
+                })
+              }
+            />
+            <SmallButton
+              title="全部手帳"
+              onPress={() => router.push("/journal")}
+            />
+          </>
+        ) : (
+          <SmallButton
+            title="＋ 建立手帳"
+            variant="primary"
+            onPress={() => router.push("/journal/new")}
+          />
+        )}
       </View>
     </View>
   );
@@ -251,12 +325,11 @@ const styles = StyleSheet.create({
     paddingTop: 4,
   },
   journal: {
-    minHeight: 190,
-    gap: 10,
-    paddingTop: 22,
-    paddingRight: 70,
-    paddingBottom: 20,
-    paddingLeft: 34,
+    gap: 14,
+    paddingTop: 20,
+    paddingRight: 52,
+    paddingBottom: 18,
+    paddingLeft: 32,
     backgroundColor: "#D8C29E",
     borderTopLeftRadius: 4,
     borderTopRightRadius: 14,
@@ -278,11 +351,32 @@ const styles = StyleSheet.create({
   },
   journalBand: {
     position: "absolute",
-    right: 28,
+    right: 22,
     top: 0,
     bottom: 0,
     width: 9,
     backgroundColor: "#7E5F3A",
+  },
+  journalLatest: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+  },
+  journalInfo: {
+    flex: 1,
+    gap: 4,
+  },
+  journalName: {
+    fontFamily: fonts.bold,
+    fontSize: 17,
+    lineHeight: 23,
+    color: "#3A332D",
+  },
+  journalRecent: {
+    fontFamily: fonts.regular,
+    fontSize: 13,
+    lineHeight: 20,
+    color: "#4E4237",
   },
   journalKicker: {
     fontFamily: fonts.accent,
@@ -297,14 +391,9 @@ const styles = StyleSheet.create({
     lineHeight: 25,
     color: "#3A332D",
   },
-  journalButton: {
-    alignItems: "flex-start",
-    marginTop: 4,
-  },
-  journalStamp: {
-    position: "absolute",
-    right: 50,
-    bottom: 16,
-    transform: [{ rotate: "-14deg" }],
+  journalButtons: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
   },
 });

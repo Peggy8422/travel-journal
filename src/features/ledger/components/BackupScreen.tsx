@@ -69,11 +69,11 @@ export function BackupScreen() {
         tape={{ color: "#9DB07A", tilt: -4, side: "left" }}
       >
         <Text style={[styles.body, { color: theme.text }]}>
-          帳本和個人記帳的資料都只存在這支手機上，換手機或刪除 App
+          帳本、個人記帳和旅遊手帳的資料都只存在這支手機上，換手機或刪除 App
           就會消失。建議出發前和回國後各備份一次，存到雲端硬碟或傳給自己。
         </Text>
         <Text style={[styles.small, { color: theme.textMuted }]}>
-          備份包含所有帳本（成員、消費、還款，含已刪除的）和個人記帳。
+          備份包含所有帳本（成員、消費、還款，含已刪除的）、個人記帳，以及旅遊手帳的日記和照片。
         </Text>
         <Button
           title={busy === "export" ? "準備備份檔中…" : "匯出備份檔"}
@@ -89,7 +89,7 @@ export function BackupScreen() {
         tape={{ color: "#6683AA", tilt: 5, side: "right" }}
       >
         <Text style={[styles.body, { color: theme.text }]}>
-          選擇之前匯出的備份檔。手機上已經有的帳本會略過，不會被覆蓋；個人記帳只會補進手機上還沒有的消費。
+          選擇之前匯出的備份檔。手機上已經有的帳本和手帳會略過，不會被覆蓋；個人記帳只會補進手機上還沒有的消費。
         </Text>
         <Button
           title={busy === "restore" ? "讀取備份檔中…" : "選擇備份檔還原"}

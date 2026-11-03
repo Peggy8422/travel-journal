@@ -24,6 +24,12 @@ src/app/  →  src/features/  →  src/domain/
   - 照片封面是第五種樣式 `photo`：`cover.photo` 只記檔名，照片存在 App 文件資料夾（`data/files/coverPhotoStore.ts`，介面是 `domain/ledger/ports.ts` 的 `CoverPhotoStore`，測試用 `memoryCoverPhotoStore`）。配色照樣要選，用在書背和地球、地圖上的顏色。隨機封面不會抽到照片。
   - 照片在自訂封面按「完成」才存進 App；換封面、刪帳本時不直接刪檔，之後用 `tidyCoverPhotos`／`pruneCoverPhotos` 清掉沒有帳本在用的照片。檔名一律檢查 `isCoverPhotoName`（備份讀回的檔名也是），避免指到資料夾外面。
   - 備份檔第 5 版把照片 base64 放在最外層的 `photos`；還原時照片缺檔的照片封面改成同配色的書衣。
+- 旅遊手帳（`domain/journal`、`features/journal`）：一趟旅行一本手帳，可以綁一本分帳帳本（部分唯一索引保證一本帳本最多一本手帳；帳本刪除時 `ON DELETE SET NULL`，手帳照樣保留）。
+  - 名稱存手帳自己的：建立時還沒自己打字就跟著選的帳本填入，之後兩邊各改各的。手帳設定改綁帳本、名稱還是舊帳本名稱時，名稱欄下面出現 `RenameSuggestion`，不跳 `Alert`。
+  - 日記日期是旅行當地的 `YYYY-MM-DD`（`isLocalDate`），使用者自己選，不換算時區。天氣、心情、紙膠帶代碼在 `domain/journal`，和分類一樣只能新增。
+  - 封面是固定的牛皮紙筆記本（`JournalCover`），使用者只挑紙膠帶顏色和要不要貼照片，不沿用帳本的 `NotebookCover`。
+  - 手帳封面和日記的照片與帳本照片封面放在同一個資料夾（`CoverPhotoStore`）。`pruneCoverPhotos` 會一起看帳本封面、手帳封面、日記照片（含已刪除的日記，才能復原），之後新增存照片的地方，`usedPhotoNames` 和 `backupPhotoNames`（`features/ledger/services/coverPhotos.ts`）都要補。
+  - 備份第 6 版多了最外層的 `journals`；還原時先還原帳本再還原手帳，綁的帳本不在手機上或已經綁給別本手帳時，改成不綁定。
 - 共用 UI 元件與主題色在 `src/shared/ui/`（只用 React Native 內建元件，不用 `@expo/ui`）。
 - 日系手繪風格（設計稿：https://claude.ai/artifact/Bq5DkRzceSM8V5rzqG2HPD）：
   - 這一版固定和紙淺色（`app.json` 的 `userInterfaceStyle` 也是 `light`），`useTheme()` 不跟系統切換。
