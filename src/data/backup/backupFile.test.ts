@@ -1,3 +1,4 @@
+import type { JournalBackup } from "../../domain/journal";
 import type { LedgerBackup } from "../../domain/ledger";
 import { unwrap, unwrapErr } from "../../domain/ledger/testFixtures";
 import {
@@ -54,9 +55,42 @@ const entry: LedgerBackup = {
   settlements: [makeSettlementRecord({ fromId: "b", toId: "a" })],
 };
 
+const journalEntry: JournalBackup = {
+  journal: {
+    id: "j1",
+    name: "京都賞楓之旅",
+    ledgerId: "ledger-1",
+    cover: { tape: "matcha", photo: "journal-cover.jpg" },
+    createdAt: T0,
+    updatedAt: T0,
+  },
+  entries: [
+    {
+      id: "n1",
+      journalId: "j1",
+      date: "2025-11-22",
+      title: "千本鳥居",
+      body: "爬到一半\n就放棄",
+      weather: "sunny",
+      mood: null,
+      photos: ["p1.jpg"],
+      places: [
+        {
+          name: "伏見稻荷大社",
+          location: { latitude: 34.9671, longitude: 135.7727 },
+        },
+      ],
+      createdAt: T0,
+      updatedAt: T0,
+      deletedAt: "2026-10-02T00:00:00.000Z",
+    },
+  ],
+};
+
 const contents = {
   exportedAt: "2026-10-21T00:00:00.000Z",
   ledgers: [entry],
+  journals: [journalEntry],
   photos: {},
 };
 
@@ -73,7 +107,7 @@ describe("backup file", () => {
   });
 
   it("round-trips an empty backup", () => {
-    const empty = { exportedAt: T0, ledgers: [], photos: {} };
+    const empty = { exportedAt: T0, ledgers: [], journals: [], photos: {} };
     expect(unwrap(parseBackup(serializeBackup(empty)))).toEqual(empty);
   });
 
@@ -237,5 +271,59 @@ describe("backup file trip months", () => {
         ),
       ).ledgers[0]?.ledger.tripMonth,
     ).toBeNull();
+  });
+});
+
+describe("backup file journals", () => {
+  it("reads backups before version 6 as having no journals", () => {
+    const raw = JSON.parse(serializeBackup(contents));
+    raw.version = 5;
+    delete raw.journals;
+    expect(unwrap(parseBackup(JSON.stringify(raw))).journals).toEqual([]);
+  });
+
+  it("falls back on unknown cover and stamp codes and unsafe photo names", () => {
+    const parsed = unwrap(
+      parseBackup(
+        corrupted((r) => {
+          r.journals[0].journal.cover = { tape: "neon", photo: "../x.jpg" };
+          r.journals[0].entries[0].weather = "thunder";
+          r.journals[0].entries[0].photos = ["../x.jpg", "ok.jpg"];
+        }),
+      ),
+    );
+    expect(parsed.journals[0]?.journal.cover).toEqual({
+      tape: "sakura",
+      photo: null,
+    });
+    expect(parsed.journals[0]?.entries[0]).toMatchObject({
+      weather: null,
+      photos: ["ok.jpg"],
+    });
+  });
+
+  it.each([
+    [
+      "a malformed date",
+      (r: Record<string, any>) =>
+        (r.journals[0].entries[0].date = "2025/11/22"),
+    ],
+    [
+      "a place without coordinates",
+      (r: Record<string, any>) =>
+        (r.journals[0].entries[0].places[0].location = null),
+    ],
+    [
+      "a missing journal name",
+      (r: Record<string, any>) => delete r.journals[0].journal.name,
+    ],
+    [
+      "journals that is not a list",
+      (r: Record<string, any>) => (r.journals = {}),
+    ],
+  ])("rejects %s", (_, mutate) => {
+    expect(unwrapErr(parseBackup(corrupted(mutate))).code).toBe(
+      "INVALID_BACKUP",
+    );
   });
 });

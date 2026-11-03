@@ -18,6 +18,9 @@ import {
 } from "./ledgerCommands";
 import { loadLedgerSummary } from "./ledgerSummary";
 import { createMemoryCoverPhotoStore } from "./memoryCoverPhotoStore";
+import { pruneCoverPhotos } from "./coverPhotos";
+import { createJournal } from "../../journal/services/journalCommands";
+import { collectJournalBackups } from "../../journal/services/journalBackup";
 import { archiveMember } from "./memberCommands";
 
 const NOW = new Date("2026-10-12T03:00:00.000Z");
@@ -87,6 +90,7 @@ describe("backup and restore", () => {
         serializeBackup({
           exportedAt: NOW.toISOString(),
           ledgers: backup,
+          journals: [],
           photos: {},
         }),
       ),
@@ -270,5 +274,107 @@ describe("cover photos in backups", () => {
         pattern: "waves",
       },
     );
+  });
+});
+
+describe("journals in backups", () => {
+  async function withJournal() {
+    const source = await seededDatabase();
+    const deps = depsFor(source.db);
+    const journal = unwrap(
+      await createJournal(deps, {
+        name: "東京手帳",
+        ledgerId: source.ledgerId,
+        cover: { tape: "matcha", photo: "journal.jpg" },
+      }),
+    );
+    await createRepositories(source.db).journalEntries.insert({
+      id: "entry-1",
+      journalId: journal.id,
+      date: "2026-10-12",
+      title: "淺草",
+      body: "人好多",
+      weather: "sunny",
+      mood: "happy",
+      photos: ["day1.jpg", "missing.jpg"],
+      places: [
+        {
+          name: "淺草寺",
+          location: { latitude: 35.7148, longitude: 139.7967 },
+        },
+      ],
+      createdAt: NOW.toISOString(),
+      updatedAt: NOW.toISOString(),
+      deletedAt: null,
+    });
+    const photos = createMemoryCoverPhotoStore({
+      "journal.jpg": "COVER",
+      "day1.jpg": "DAY1",
+    });
+    return { ...source, journal, photos };
+  }
+
+  it("restores journals with their entries, photos and ledger binding", async () => {
+    const source = await withJournal();
+    const file = await buildBackupFile(source.db, source.photos, NOW);
+
+    const target = await createTestDatabase();
+    const phone = createMemoryCoverPhotoStore();
+    const report = unwrap(
+      await restoreFromBackupText(target, phone, file.content),
+    );
+    expect(report.journals.restored.map((j) => j.name)).toEqual(["東京手帳"]);
+
+    const repos = createRepositories(target);
+    expect(await repos.journals.findById(source.journal.id)).toEqual(
+      source.journal,
+    );
+    // The photo that was already gone at export time is dropped from the entry
+    expect((await repos.journalEntries.findById("entry-1"))?.photos).toEqual([
+      "day1.jpg",
+    ]);
+    expect(Object.fromEntries(phone.files)).toEqual({
+      "journal.jpg": "COVER",
+      "day1.jpg": "DAY1",
+    });
+
+    // Restoring the same file again skips the journal
+    const again = unwrap(
+      await restoreFromBackupText(target, phone, file.content),
+    );
+    expect(again.journals.skipped.map((j) => j.id)).toEqual([
+      source.journal.id,
+    ]);
+  });
+
+  it("unbinds a journal whose ledger is not on the phone", async () => {
+    const source = await withJournal();
+    const ledgers = await collectBackup(source.db);
+    const journals = await collectJournalBackups(source.db);
+    const target = await createTestDatabase();
+    const text = serializeBackup({
+      exportedAt: NOW.toISOString(),
+      ledgers: [],
+      journals,
+      photos: {},
+    });
+    expect(ledgers).toHaveLength(1);
+    unwrap(
+      await restoreFromBackupText(target, createMemoryCoverPhotoStore(), text),
+    );
+    expect(
+      (await createRepositories(target).journals.findById(source.journal.id))
+        ?.ledgerId,
+    ).toBeNull();
+  });
+
+  it("keeps journal photos when tidying up", async () => {
+    const source = await withJournal();
+    source.photos.files.set("stray.jpg", "X");
+    await pruneCoverPhotos(source.db, source.photos);
+    expect([...source.photos.files.keys()].sort()).toEqual([
+      "day1.jpg",
+      "journal.jpg",
+    ]);
   });
 });

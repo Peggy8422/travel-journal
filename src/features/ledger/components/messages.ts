@@ -5,6 +5,8 @@ import {
   type LimitedTextField,
 } from "../../../domain/ledger";
 import type { BackupFileError } from "../../../data/backup/backupFile";
+import type { JournalCommandError } from "../../journal/services/journalCommands";
+import type { JournalRestoreReport } from "../../journal/services/journalBackup";
 import type { RestoreReport } from "../services/backupCommands";
 import type { LedgerCommandError } from "../services/ledgerCommands";
 import type { LedgerSummaryError } from "../services/ledgerSummary";
@@ -16,6 +18,7 @@ import type {
 
 type DisplayableError =
   | LedgerCommandError
+  | JournalCommandError
   | LedgerSummaryError
   | ResolveFxRateError
   | BackupFileError
@@ -27,6 +30,9 @@ const TEXT_FIELD_LABELS: Readonly<Record<LimitedTextField, string>> = {
   expenseTitle: "消費名稱",
   placeName: "地名",
   note: "備註",
+  journalName: "手帳名稱",
+  entryTitle: "日記標題",
+  entryBody: "日記內容",
 };
 
 /** 錯誤代碼轉成給使用者看的訊息 */
@@ -44,6 +50,10 @@ export function describeError(error: DisplayableError): string {
       return `已經有「${error.name}」了，換個名字吧`;
     case "LEDGER_NOT_FOUND":
       return "找不到這本帳本";
+    case "JOURNAL_NOT_FOUND":
+      return "找不到這本手帳，可能已被刪除";
+    case "LEDGER_HAS_JOURNAL":
+      return `這本帳本已經綁了手帳「${error.journalName}」`;
     case "EXPENSE_NOT_FOUND":
       return "找不到這筆消費，可能已被刪除";
     case "SETTLEMENT_NOT_FOUND":
@@ -158,7 +168,9 @@ export function describeAllocationGap(
  * 還原結果的說明：分帳帳本分成還原、略過、失敗三段，個人記帳另外說明
  * （個人帳本在畫面上不是一本帳本，不列成「個人」）。
  */
-export function describeRestoreReport(report: RestoreReport): string {
+export function describeRestoreReport(
+  report: RestoreReport & { readonly journals?: JournalRestoreReport },
+): string {
   const shared = (ledgers: readonly LedgerRecord[]) =>
     ledgers.filter((l) => l.kind === "shared");
   const names = (ledgers: readonly LedgerRecord[]) =>
@@ -190,6 +202,25 @@ export function describeRestoreReport(report: RestoreReport): string {
   }
   if (failed.some((l) => l.kind === "personal")) {
     lines.push("個人記帳的資料有誤，沒有還原");
+  }
+  const journals = report.journals;
+  const journalNames = (items: readonly { readonly name: string }[]) =>
+    items.map((j) => `「${j.name}」`).join("、");
+  if (journals && journals.restored.length > 0) {
+    lines.push(
+      `已還原 ${journals.restored.length} 本手帳：${journalNames(journals.restored)}`,
+    );
+  }
+  if (journals && journals.skipped.length > 0) {
+    lines.push(
+      `手機上已經有 ${journals.skipped.length} 本手帳，沒有變動：${journalNames(journals.skipped)}`,
+    );
+  }
+  if (journals && journals.failed.length > 0) {
+    const failedJournals = journals.failed.map((f) => f.journal);
+    lines.push(
+      `${failedJournals.length} 本手帳資料有誤，沒有還原：${journalNames(failedJournals)}`,
+    );
   }
   // 備份是空的，或只有個人記帳而且消費手機上都已經有了
   return lines.length > 0 ? lines.join("\n") : "備份裡沒有需要還原的資料";

@@ -12,6 +12,9 @@ export const TEXT_LIMITS = {
   expenseTitle: 30,
   placeName: 40,
   note: 200,
+  journalName: 20,
+  entryTitle: 30,
+  entryBody: 2000,
 } as const;
 
 export type LimitedTextField = keyof typeof TEXT_LIMITS;

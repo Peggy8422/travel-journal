@@ -1,5 +1,15 @@
 import { err, ok, type Result } from "../../domain/common/result";
 import {
+  isJournalMood,
+  isJournalWeather,
+  isLocalDate,
+  parseJournalCover,
+  type JournalBackup,
+  type JournalEntryRecord,
+  type JournalPlace,
+  type JournalRecord,
+} from "../../domain/journal";
+import {
   isCoverPhotoName,
   isTripMonth,
   parseCover,
@@ -28,16 +38,19 @@ export const BACKUP_FORMAT = "travel-journal-backup";
  * 4：帳本加上 tripMonth。
  * 5：照片封面：cover 多一個 photo（檔名），照片本身放在最外層的 photos（檔名 → base64 JPEG）。
  *    讀取 1～4 版時沒有照片。
+ * 6：旅遊手帳：最外層多一個 journals（手帳與日記），手帳封面與日記的照片也放在 photos。
+ *    讀取 1～5 版時沒有手帳。
  */
-export const BACKUP_VERSION = 5;
+export const BACKUP_VERSION = 6;
 /** 可以讀取的版本 */
-const READABLE_VERSIONS: readonly unknown[] = [1, 2, 3, 4, 5];
+const READABLE_VERSIONS: readonly unknown[] = [1, 2, 3, 4, 5, 6];
 
 export interface BackupContents {
   /** 匯出時間，ISO 8601 UTC */
   readonly exportedAt: string;
   readonly ledgers: readonly LedgerBackup[];
-  /** 照片封面的檔案：檔名 → base64 的 JPEG */
+  readonly journals: readonly JournalBackup[];
+  /** 照片的檔案（帳本與手帳的封面、日記的照片）：檔名 → base64 的 JPEG */
   readonly photos: Readonly<Record<string, string>>;
 }
 
@@ -52,6 +65,7 @@ export function serializeBackup(contents: BackupContents): string {
       version: BACKUP_VERSION,
       exportedAt: contents.exportedAt,
       ledgers: contents.ledgers,
+      journals: contents.journals,
       photos: contents.photos,
     },
     null,
@@ -86,9 +100,21 @@ export function parseBackup(
     }
     ledgers.push(parsed.value);
   }
+  // 1～5 版沒有手帳
+  const journals = parseList(
+    value.journals ?? [],
+    "journals",
+    parseJournalBackup,
+  );
+  if (!journals.ok) return invalid(journals.error);
   const photos = parsePhotos(value.photos);
   if (!photos.ok) return invalid(photos.error);
-  return ok({ exportedAt: value.exportedAt, ledgers, photos: photos.value });
+  return ok({
+    exportedAt: value.exportedAt,
+    ledgers,
+    journals: journals.value,
+    photos: photos.value,
+  });
 }
 
 /** 1～4 版沒有 photos。檔名格式不對的照片不收：照片只影響外觀，不值得因此拒絕整份備份 */
@@ -283,6 +309,79 @@ function parseLocation(value: unknown): Parsed<GeoPoint | null> {
     return err("latitude and longitude must be numbers");
   }
   return ok({ latitude: value.latitude, longitude: value.longitude });
+}
+
+function parseJournalBackup(value: unknown): Parsed<JournalBackup> {
+  if (!isObject(value)) return err("not an object");
+  const journal = parseJournal(value.journal);
+  if (!journal.ok) return err(`journal: ${journal.error}`);
+  const entries = parseList(value.entries, "entries", parseJournalEntry);
+  if (!entries.ok) return entries;
+  return ok({ journal: journal.value, entries: entries.value });
+}
+
+function parseJournal(value: unknown): Parsed<JournalRecord> {
+  if (!isObject(value)) return err("not an object");
+  const missing = firstMissing(value, {
+    id: isString,
+    name: isString,
+    ledgerId: isNullableString,
+    createdAt: isString,
+    updatedAt: isString,
+  });
+  if (missing) return err(missing);
+  // 封面只影響外觀：認不得的紙膠帶、格式不對的照片檔名都退回預設，不拒絕整份備份
+  const cover = isObject(value.cover) ? value.cover : {};
+  return ok({
+    id: value.id as string,
+    name: value.name as string,
+    ledgerId: value.ledgerId as string | null,
+    cover: parseJournalCover(cover.tape, cover.photo),
+    createdAt: value.createdAt as string,
+    updatedAt: value.updatedAt as string,
+  });
+}
+
+function parseJournalEntry(value: unknown): Parsed<JournalEntryRecord> {
+  if (!isObject(value)) return err("not an object");
+  const missing = firstMissing(value, {
+    id: isString,
+    journalId: isString,
+    date: isLocalDate,
+    title: isString,
+    body: isString,
+    createdAt: isString,
+    updatedAt: isString,
+    deletedAt: isNullableString,
+  });
+  if (missing) return err(missing);
+  if (!Array.isArray(value.photos)) return err("photos must be an array");
+  const places = parseList(value.places, "places", parsePlace);
+  if (!places.ok) return places;
+  return ok({
+    id: value.id as string,
+    journalId: value.journalId as string,
+    date: value.date as string,
+    title: value.title as string,
+    body: value.body as string,
+    // 認不得的印章（較新版本的 App 才有的）當作沒選，理由同封面
+    weather: isJournalWeather(value.weather) ? value.weather : null,
+    mood: isJournalMood(value.mood) ? value.mood : null,
+    // 檔名格式不對的照片不收，免得指到資料夾外面
+    photos: value.photos.filter(isCoverPhotoName),
+    places: places.value,
+    createdAt: value.createdAt as string,
+    updatedAt: value.updatedAt as string,
+    deletedAt: value.deletedAt as string | null,
+  });
+}
+
+function parsePlace(value: unknown): Parsed<JournalPlace> {
+  if (!isObject(value) || !isString(value.name)) return err("invalid name");
+  const location = parseLocation(value.location);
+  if (!location.ok) return location;
+  if (location.value === null) return err("missing location");
+  return ok({ name: value.name, location: location.value });
 }
 
 function parseSettlement(value: unknown): Parsed<SettlementRecord> {
