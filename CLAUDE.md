@@ -21,6 +21,9 @@ src/app/  →  src/features/  →  src/domain/
 - 文字欄位的字數上限在 `domain/ledger/textLimits.ts`（`TEXT_LIMITS`），輸入框的 `maxLength` 和建立／修改指令的檢查共用同一份；還原備份不檢查，舊資料超過上限也照常還原，`TextField` 會放寬 `maxLength` 避免 Android 截掉顯示的舊文字，並在欄位下面提示超過上限。新增文字欄位時要一起補上限。
 - 書架的年月分組用 `tripMonthOf`（`features/ledger/services/ledgerOverview.ts`）：帳本設定手動指定的 `tripMonth` 優先，否則取最早一筆消費的當地月份，沒有消費時用建立帳本的月份。旅行月份不另外存自動算出的值，所以記帳、刪消費後會自動重新歸類。
 - 帳本封面：存三個代碼（`domain/ledger/cover.ts`，和分類一樣只能新增、不能改名或刪除），顏色與名稱在 `features/ledger/components/coverStyles.ts`。`cover` 是 null 或代碼讀不回來的帳本，畫面一律用 `coverFromId(id)` 補一個固定的封面。
+  - 照片封面是第五種樣式 `photo`：`cover.photo` 只記檔名，照片存在 App 文件資料夾（`data/files/coverPhotoStore.ts`，介面是 `domain/ledger/ports.ts` 的 `CoverPhotoStore`，測試用 `memoryCoverPhotoStore`）。配色照樣要選，用在書背和地球、地圖上的顏色。隨機封面不會抽到照片。
+  - 照片在自訂封面按「完成」才存進 App；換封面、刪帳本時不直接刪檔，之後用 `tidyCoverPhotos`／`pruneCoverPhotos` 清掉沒有帳本在用的照片。檔名一律檢查 `isCoverPhotoName`（備份讀回的檔名也是），避免指到資料夾外面。
+  - 備份檔第 5 版把照片 base64 放在最外層的 `photos`；還原時照片缺檔的照片封面改成同配色的書衣。
 - 共用 UI 元件與主題色在 `src/shared/ui/`（只用 React Native 內建元件，不用 `@expo/ui`）。
 - 日系手繪風格（設計稿：https://claude.ai/artifact/Bq5DkRzceSM8V5rzqG2HPD）：
   - 這一版固定和紙淺色（`app.json` 的 `userInterfaceStyle` 也是 `light`），`useTheme()` 不跟系統切換。

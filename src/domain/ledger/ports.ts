@@ -90,3 +90,19 @@ export interface SettlementRepository {
     options?: { readonly includeDeleted?: boolean },
   ): Promise<SettlementRecord[]>;
 }
+
+/**
+ * 照片封面的檔案（在 App 自己的資料夾裡），data 層用 expo-file-system 實作。
+ * 檔名由呼叫端產生（`isCoverPhotoName` 的格式），讀不到的檔案回傳 null，不 throw。
+ */
+export interface CoverPhotoStore {
+  /** 把一張圖片檔（例如壓縮後的暫存檔）存成封面照片 */
+  saveFrom(name: string, sourceUri: string): Promise<void>;
+  readBase64(name: string): Promise<string | null>;
+  writeBase64(name: string, base64: string): Promise<void>;
+  /** 資料夾裡所有的封面照片檔名 */
+  list(): Promise<string[]>;
+  delete(name: string): Promise<void>;
+  /** 給圖片元件顯示用的位址 */
+  uri(name: string): string;
+}

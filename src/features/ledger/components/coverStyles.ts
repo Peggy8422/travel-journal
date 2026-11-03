@@ -80,14 +80,17 @@ export const COVER_COLORS: Readonly<
   },
 };
 
-const STYLE_NAMES: Readonly<Record<CoverStyle, string>> = {
+/** 封面樣式的名稱（自訂封面的選單也用） */
+export const COVER_STYLE_NAMES: Readonly<Record<CoverStyle, string>> = {
   band: "書衣＋鬆緊帶",
   pattern: "和柄",
   spine: "布書背",
   tape: "紙膠帶",
+  photo: "照片",
 };
 
-const PATTERN_NAMES: Readonly<Record<CoverPattern, string>> = {
+/** 和柄花紋的名稱 */
+export const COVER_PATTERN_NAMES: Readonly<Record<CoverPattern, string>> = {
   dots: "水玉",
   stripes: "斜紋",
   checker: "市松",
@@ -102,9 +105,11 @@ export function coverTilt(ledgerId: string): number {
 
 /** 例如「和柄（水玉）· 藍色」 */
 export function describeCover(cover: LedgerCover): string {
+  const colorName = COVER_COLORS[cover.palette].name;
+  if (cover.style === "photo") return `照片 · ${colorName}色書背`;
   const style =
     cover.style === "pattern"
-      ? `${STYLE_NAMES.pattern}（${PATTERN_NAMES[cover.pattern]}）`
-      : STYLE_NAMES[cover.style];
-  return `${style} · ${COVER_COLORS[cover.palette].name}色`;
+      ? `${COVER_STYLE_NAMES.pattern}（${COVER_PATTERN_NAMES[cover.pattern]}）`
+      : COVER_STYLE_NAMES[cover.style];
+  return `${style} · ${colorName}色`;
 }

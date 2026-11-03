@@ -1,5 +1,6 @@
 import type { BackupFileError } from "../../../data/backup/backupFile";
 import type { SqlDatabase } from "../../../data/db/sqlDatabase";
+import { appCoverPhotos } from "./appCoverPhotos";
 import { pickTextFile, shareFile } from "../../../data/files/fileTransfer";
 import { err, ok, type Result } from "../../../domain/common/result";
 import { toTaipeiDate } from "../../../domain/fx";
@@ -19,7 +20,7 @@ import type { LedgerSummary } from "./ledgerSummary";
 
 /** 匯出所有帳本的備份檔並開啟分享選單 */
 export async function shareBackup(db: SqlDatabase, now: Date): Promise<void> {
-  const file = await buildBackupFile(db, now);
+  const file = await buildBackupFile(db, appCoverPhotos, now);
   await shareFile({
     name: file.fileName,
     content: file.content,
@@ -34,7 +35,7 @@ export async function pickAndRestoreBackup(
 ): Promise<Result<RestoreReport, BackupFileError> | null> {
   const text = await pickTextFile();
   if (text === null) return null;
-  return restoreFromBackupText(db, text);
+  return restoreFromBackupText(db, appCoverPhotos, text);
 }
 
 /** 匯出單一帳本的消費明細 CSV 並開啟分享選單 */

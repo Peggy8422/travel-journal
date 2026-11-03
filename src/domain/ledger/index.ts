@@ -33,6 +33,7 @@ export {
   validateNoArchivedMembers,
 } from "./records";
 export type {
+  CoverPhotoStore,
   ExpenseRepository,
   LedgerRepository,
   MemberRepository,
@@ -72,6 +73,7 @@ export {
   COVER_PATTERNS,
   COVER_STYLES,
   coverFromId,
+  isCoverPhotoName,
   parseCover,
   randomCover,
   rerollCover,

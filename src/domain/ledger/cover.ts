@@ -2,7 +2,15 @@
  * 帳本封面：存三個代碼（樣式、配色、和柄），實際顏色與畫法在畫面層對照。
  * 代碼只能新增，不要改名或刪除，否則舊帳本的封面會讀不回來（讀不回來時會退回 coverFromId）。
  */
-export const COVER_STYLES = ["band", "pattern", "spine", "tape"] as const;
+export const COVER_STYLES = [
+  "band",
+  "pattern",
+  "spine",
+  "tape",
+  "photo",
+] as const;
+/** 隨機抽封面時的樣式；照片要使用者自己挑，不會抽到 */
+const RANDOM_STYLES = ["band", "pattern", "spine", "tape"] as const;
 export const COVER_PALETTES = [
   "shu",
   "ai",
@@ -27,9 +35,22 @@ export type CoverPattern = (typeof COVER_PATTERNS)[number];
 
 export interface LedgerCover {
   readonly style: CoverStyle;
+  /** 照片封面也用：書背的顏色，以及地球、地圖上這本帳本的顏色 */
   readonly palette: CoverPalette;
   /** 只有 pattern 樣式會畫出來，其他樣式也照樣存，換樣式時才有一致的和柄 */
   readonly pattern: CoverPattern;
+  /**
+   * 照片封面的檔名（存在 App 的封面照片資料夾），只有 photo 樣式才有。
+   * 換成其他樣式時就不留，舊照片之後會被清掉。
+   */
+  readonly photo?: string;
+}
+
+/** 照片檔名只能是英數、底線、連字號加 .jpg，從備份讀回時才不會指到資料夾外面 */
+const PHOTO_NAME = /^[A-Za-z0-9_-]{1,80}\.jpg$/;
+
+export function isCoverPhotoName(value: unknown): value is string {
+  return typeof value === "string" && PHOTO_NAME.test(value);
 }
 
 function pick<T>(items: readonly T[], random: () => number): T {
@@ -39,7 +60,7 @@ function pick<T>(items: readonly T[], random: () => number): T {
 /** 隨機封面；random 回傳 [0, 1)，測試時可以傳固定的序列 */
 export function randomCover(random: () => number = Math.random): LedgerCover {
   return {
-    style: pick(COVER_STYLES, random),
+    style: pick(RANDOM_STYLES, random),
     palette: pick(COVER_PALETTES, random),
     pattern: pick(COVER_PATTERNS, random),
   };
@@ -72,11 +93,15 @@ export function coverFromId(id: string): LedgerCover {
   return randomCover(seededRandom(hashString(id)));
 }
 
-/** 從資料庫或備份讀回三個代碼；任何一個不認得就回傳 null，交給 coverFromId */
+/**
+ * 從資料庫或備份讀回三個代碼與照片檔名；代碼任何一個不認得就回傳 null，交給 coverFromId。
+ * photo 樣式沒有可用的檔名時改成同配色的書衣樣式，其他樣式不保留照片檔名。
+ */
 export function parseCover(
   style: unknown,
   palette: unknown,
   pattern: unknown,
+  photo?: unknown,
 ): LedgerCover | null {
   if (
     !(COVER_STYLES as readonly unknown[]).includes(style) ||
@@ -85,11 +110,16 @@ export function parseCover(
   ) {
     return null;
   }
-  return {
-    style: style as CoverStyle,
+  const codes = {
     palette: palette as CoverPalette,
     pattern: pattern as CoverPattern,
   };
+  if (style === "photo") {
+    return isCoverPhotoName(photo)
+      ? { style: "photo", ...codes, photo }
+      : { style: "band", ...codes };
+  }
+  return { style: style as CoverStyle, ...codes };
 }
 
 /** FNV-1a */

@@ -1,5 +1,6 @@
 import { err, ok, type Result } from "../../domain/common/result";
 import {
+  isCoverPhotoName,
   isTripMonth,
   parseCover,
   type ExpenseFx,
@@ -24,15 +25,20 @@ export const BACKUP_FORMAT = "travel-journal-backup";
  * 目前寫出的版本。
  * 2：帳本加上 kind（分帳／個人）、成員加上 isSelf。讀取 1 版時這兩個欄位用預設值。
  * 3：帳本加上 cover（封面的三個代碼，或 null）。讀取 1、2 版時當作沒有封面。
+ * 4：帳本加上 tripMonth。
+ * 5：照片封面：cover 多一個 photo（檔名），照片本身放在最外層的 photos（檔名 → base64 JPEG）。
+ *    讀取 1～4 版時沒有照片。
  */
-export const BACKUP_VERSION = 4;
+export const BACKUP_VERSION = 5;
 /** 可以讀取的版本 */
-const READABLE_VERSIONS: readonly unknown[] = [1, 2, 3, 4];
+const READABLE_VERSIONS: readonly unknown[] = [1, 2, 3, 4, 5];
 
 export interface BackupContents {
   /** 匯出時間，ISO 8601 UTC */
   readonly exportedAt: string;
   readonly ledgers: readonly LedgerBackup[];
+  /** 照片封面的檔案：檔名 → base64 的 JPEG */
+  readonly photos: Readonly<Record<string, string>>;
 }
 
 export type BackupFileError =
@@ -46,6 +52,7 @@ export function serializeBackup(contents: BackupContents): string {
       version: BACKUP_VERSION,
       exportedAt: contents.exportedAt,
       ledgers: contents.ledgers,
+      photos: contents.photos,
     },
     null,
     2,
@@ -79,7 +86,21 @@ export function parseBackup(
     }
     ledgers.push(parsed.value);
   }
-  return ok({ exportedAt: value.exportedAt, ledgers });
+  const photos = parsePhotos(value.photos);
+  if (!photos.ok) return invalid(photos.error);
+  return ok({ exportedAt: value.exportedAt, ledgers, photos: photos.value });
+}
+
+/** 1～4 版沒有 photos。檔名格式不對的照片不收：照片只影響外觀，不值得因此拒絕整份備份 */
+function parsePhotos(value: unknown): Parsed<Record<string, string>> {
+  if (value === undefined) return ok({});
+  if (!isObject(value)) return err("photos must be an object");
+  const photos: Record<string, string> = {};
+  for (const [name, data] of Object.entries(value)) {
+    if (typeof data !== "string") return err(`photos.${name} must be a string`);
+    if (isCoverPhotoName(name)) photos[name] = data;
+  }
+  return ok(photos);
 }
 
 type Parsed<T> = Result<T, string>;
@@ -149,7 +170,9 @@ function parseLedger(value: unknown): Parsed<LedgerRecord> {
     kind,
     name: value.name as string,
     baseCurrency: value.baseCurrency as string,
-    cover: cover && parseCover(cover.style, cover.palette, cover.pattern),
+    cover:
+      cover &&
+      parseCover(cover.style, cover.palette, cover.pattern, cover.photo),
     tripMonth,
     createdAt: value.createdAt as string,
     updatedAt: value.updatedAt as string,

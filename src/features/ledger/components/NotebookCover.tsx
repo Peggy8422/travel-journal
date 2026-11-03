@@ -1,3 +1,4 @@
+import { Image } from "expo-image";
 import { StyleSheet, Text, View } from "react-native";
 import Svg, {
   Circle,
@@ -14,6 +15,7 @@ import { COVER_PALETTES, type LedgerCover } from "../../../domain/ledger";
 import { accentOverhang, fonts } from "../../../shared/ui/fonts";
 import { InkStamp, SketchFrame, WashiTape } from "../../../shared/ui/handDrawn";
 import { useTheme } from "../../../shared/ui/theme";
+import { coverPhotoUri } from "../services/appCoverPhotos";
 import { COVER_COLORS } from "./coverStyles";
 
 const PAPER = "#FBF7EE";
@@ -25,6 +27,8 @@ const LABEL_BOX = {
   pattern: { left: 0.18, right: 0.1, top: 0.22 },
   spine: { left: 0.33, right: 0.09, top: 0.16 },
   tape: { left: 0.15, right: 0.12, top: 0.26 },
+  // 照片的主角通常在中間，標籤貼在上方
+  photo: { left: 0.18, right: 0.1, top: 0.1 },
 } as const;
 
 /**
@@ -39,6 +43,7 @@ export function NotebookCover({
   settled = false,
   fresh = false,
   tilt = 0,
+  photoUri,
 }: {
   cover: LedgerCover;
   title: string;
@@ -50,11 +55,17 @@ export function NotebookCover({
   fresh?: boolean;
   /** 傾斜角度，讓書架上的書不會排得太整齊 */
   tilt?: number;
+  /** 自訂封面時剛挑的照片（還沒存檔）；省略時用 cover.photo 存好的照片 */
+  photoUri?: string;
 }) {
   const theme = useTheme();
   const height = Math.round((width * 4) / 3);
   const colors = COVER_COLORS[cover.palette];
   const box = LABEL_BOX[cover.style];
+  const photoSource =
+    cover.style !== "photo"
+      ? undefined
+      : (photoUri ?? (cover.photo ? coverPhotoUri(cover.photo) : undefined));
   const fontSize = Math.max(12, Math.min(16, width / 11));
 
   return (
@@ -76,6 +87,14 @@ export function NotebookCover({
         ]}
       />
       <View style={[styles.body, { backgroundColor: colors.base }]}>
+        {photoSource ? (
+          <Image
+            source={{ uri: photoSource }}
+            contentFit="cover"
+            style={StyleSheet.absoluteFill}
+            accessible={false}
+          />
+        ) : null}
         <CoverArt cover={cover} width={width} height={height} />
         <View
           style={[
@@ -152,6 +171,16 @@ function CoverArt({
       strokeWidth={1.5}
     />
   );
+
+  if (cover.style === "photo") {
+    // 照片畫在底下；這裡只加書背，讓照片封面也看得出是一本筆記本
+    return (
+      <Svg width={w} height={h} style={StyleSheet.absoluteFill}>
+        <Rect width={w * 0.08} height={h} fill={c.deep} />
+        {edge(w * 0.08)}
+      </Svg>
+    );
+  }
 
   if (cover.style === "band") {
     return (

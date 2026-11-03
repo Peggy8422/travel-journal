@@ -11,11 +11,13 @@ import {
 import {
   addExpense,
   addSettlement,
+  changeLedgerCover,
   createLedger,
   deleteExpense,
   type LedgerCommandDeps,
 } from "./ledgerCommands";
 import { loadLedgerSummary } from "./ledgerSummary";
+import { createMemoryCoverPhotoStore } from "./memoryCoverPhotoStore";
 import { archiveMember } from "./memberCommands";
 
 const NOW = new Date("2026-10-12T03:00:00.000Z");
@@ -82,7 +84,11 @@ describe("backup and restore", () => {
     // 經過實際的檔案格式，確認序列化不會遺失資料
     const parsed = unwrap(
       parseBackup(
-        serializeBackup({ exportedAt: NOW.toISOString(), ledgers: backup }),
+        serializeBackup({
+          exportedAt: NOW.toISOString(),
+          ledgers: backup,
+          photos: {},
+        }),
       ),
     );
     const report = await restoreBackup(target, parsed.ledgers);
@@ -175,19 +181,94 @@ describe("backup file round trip", () => {
   it("names the file by the Taiwan date and restores from its text", async () => {
     const { db } = await seededDatabase();
     // 臺灣時間已經是 10/22
-    const file = await buildBackupFile(db, new Date("2026-10-21T17:00:00Z"));
+    const file = await buildBackupFile(
+      db,
+      createMemoryCoverPhotoStore(),
+      new Date("2026-10-21T17:00:00Z"),
+    );
     expect(file.fileName).toBe("旅遊記帳備份-2026-10-22.json");
 
     const target = await createTestDatabase();
-    const report = unwrap(await restoreFromBackupText(target, file.content));
+    const report = unwrap(
+      await restoreFromBackupText(
+        target,
+        createMemoryCoverPhotoStore(),
+        file.content,
+      ),
+    );
     expect(report.restored.map((l) => l.name)).toEqual(["東京"]);
   });
 
   it("writes nothing when the file is not a backup", async () => {
     const target = await createTestDatabase();
-    expect(unwrapErr(await restoreFromBackupText(target, "{}")).code).toBe(
-      "INVALID_BACKUP",
-    );
+    expect(
+      unwrapErr(
+        await restoreFromBackupText(
+          target,
+          createMemoryCoverPhotoStore(),
+          "{}",
+        ),
+      ).code,
+    ).toBe("INVALID_BACKUP");
     expect(await collectBackup(target)).toEqual([]);
+  });
+});
+
+describe("cover photos in backups", () => {
+  it("carries a photo cover to a new phone and drops photos nobody uses", async () => {
+    const { db, ledgerId } = await seededDatabase();
+    const deps = depsFor(db);
+    unwrap(
+      await changeLedgerCover(deps, ledgerId, {
+        style: "photo",
+        palette: "ai",
+        pattern: "dots",
+        photo: "cover-1.jpg",
+      }),
+    );
+    const source = createMemoryCoverPhotoStore({ "cover-1.jpg": "JPEGDATA" });
+    const file = await buildBackupFile(db, source, NOW);
+
+    const target = await createTestDatabase();
+    const phone = createMemoryCoverPhotoStore({ "left-over.jpg": "OLD" });
+    unwrap(await restoreFromBackupText(target, phone, file.content));
+
+    const restored = (await createRepositories(target).ledgers.list())[0];
+    expect(restored?.cover).toMatchObject({
+      style: "photo",
+      photo: "cover-1.jpg",
+    });
+    expect([...phone.files]).toEqual([["cover-1.jpg", "JPEGDATA"]]);
+  });
+
+  it("falls back to a band cover when the backup has no photo data", async () => {
+    const { db, ledgerId } = await seededDatabase();
+    const deps = depsFor(db);
+    unwrap(
+      await changeLedgerCover(deps, ledgerId, {
+        style: "photo",
+        palette: "matcha",
+        pattern: "waves",
+        photo: "gone.jpg",
+      }),
+    );
+    // The photo file disappeared before the export
+    const file = await buildBackupFile(db, createMemoryCoverPhotoStore(), NOW);
+
+    const target = await createTestDatabase();
+    unwrap(
+      await restoreFromBackupText(
+        target,
+        createMemoryCoverPhotoStore(),
+        file.content,
+      ),
+    );
+    expect((await createRepositories(target).ledgers.list())[0]?.cover).toEqual(
+      {
+        style: "band",
+        palette: "matcha",
+        pattern: "waves",
+      },
+    );
   });
 });

@@ -54,7 +54,11 @@ const entry: LedgerBackup = {
   settlements: [makeSettlementRecord({ fromId: "b", toId: "a" })],
 };
 
-const contents = { exportedAt: "2026-10-21T00:00:00.000Z", ledgers: [entry] };
+const contents = {
+  exportedAt: "2026-10-21T00:00:00.000Z",
+  ledgers: [entry],
+  photos: {},
+};
 
 /** 先序列化，再用 mutate 改壞其中一部分 */
 function corrupted(mutate: (raw: Record<string, any>) => void): string {
@@ -69,7 +73,7 @@ describe("backup file", () => {
   });
 
   it("round-trips an empty backup", () => {
-    const empty = { exportedAt: T0, ledgers: [] };
+    const empty = { exportedAt: T0, ledgers: [], photos: {} };
     expect(unwrap(parseBackup(serializeBackup(empty)))).toEqual(empty);
   });
 
@@ -167,6 +171,49 @@ describe("backup file covers", () => {
     delete raw.ledgers[0].ledger.cover;
     const parsed = unwrap(parseBackup(JSON.stringify(raw)));
     expect(parsed.ledgers[0]?.ledger.cover).toBeNull();
+  });
+});
+
+describe("backup file cover photos", () => {
+  const photoEntry = {
+    ...entry,
+    ledger: {
+      ...entry.ledger,
+      cover: {
+        style: "photo",
+        palette: "ai",
+        pattern: "dots",
+        photo: "cover-1.jpg",
+      },
+    },
+  } as const;
+
+  it("round-trips the photo name and its data", () => {
+    const withPhoto = {
+      ...contents,
+      ledgers: [photoEntry],
+      photos: { "cover-1.jpg": "/9j/AAAA" },
+    };
+    expect(unwrap(parseBackup(serializeBackup(withPhoto)))).toEqual(withPhoto);
+  });
+
+  it("reads older backups as having no photos", () => {
+    const raw = JSON.parse(serializeBackup(contents));
+    raw.version = 4;
+    delete raw.photos;
+    expect(unwrap(parseBackup(JSON.stringify(raw))).photos).toEqual({});
+  });
+
+  it("drops photos with an unsafe name but rejects non-text data", () => {
+    const raw = JSON.parse(serializeBackup(contents));
+    raw.photos = { "../evil.jpg": "AAAA", "ok.jpg": "BBBB" };
+    expect(unwrap(parseBackup(JSON.stringify(raw))).photos).toEqual({
+      "ok.jpg": "BBBB",
+    });
+    raw.photos = { "ok.jpg": 3 };
+    expect(unwrapErr(parseBackup(JSON.stringify(raw))).code).toBe(
+      "INVALID_BACKUP",
+    );
   });
 });
 

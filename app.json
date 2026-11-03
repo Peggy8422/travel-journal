@@ -44,7 +44,13 @@
       ],
       "expo-font",
       "expo-image",
-      "expo-status-bar"
+      "expo-status-bar",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "選一張照片當帳本封面。"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

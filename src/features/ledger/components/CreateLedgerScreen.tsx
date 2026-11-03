@@ -26,6 +26,8 @@ import { useLedgerCommandDeps } from "../../database/DatabaseProvider";
 import { createLedger } from "../services/ledgerCommands";
 import { toLocalIsoString } from "../services/localTimestamp";
 import { describeCover } from "./coverStyles";
+import { CoverPickerModal } from "./CoverPickerModal";
+import { tidyCoverPhotos } from "../services/appCoverPhotos";
 import { describeError } from "./messages";
 import { NotebookCover } from "./NotebookCover";
 
@@ -38,8 +40,11 @@ export function CreateLedgerScreen() {
   const [focusField, setFocusField] = useState<number | null>(null);
   /** 哪一個成員欄位是「我」（memberNames 的索引），null 代表不指定 */
   const [selfField, setSelfField] = useState<number | null>(null);
-  // 一打開就隨機抽一個封面；之後會開放自訂
+  // 一打開就隨機抽一個封面，可以再換或自己挑
   const [cover, setCover] = useState(() => randomCover());
+  /** 自己挑過封面後，說明文字不再寫「隨機抽到」 */
+  const [coverChosen, setCoverChosen] = useState(false);
+  const [pickingCover, setPickingCover] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** 欄位自己的錯誤，寫在欄位下面；建立時有錯會把那一欄捲進畫面 */
   const [nameError, setNameError] = useState<string | null>(null);
@@ -100,6 +105,8 @@ export function CreateLedgerScreen() {
         setError(describeError(result.error));
         return;
       }
+      // 自訂封面時挑過又換掉的照片在這裡清掉
+      tidyCoverPhotos(deps.db);
       router.replace({
         pathname: "/ledger/[id]",
         params: { id: result.value.ledger.id },
@@ -112,31 +119,54 @@ export function CreateLedgerScreen() {
     }
   }
 
+  const coverTitle = name.trim() || "新的帳本";
+  const coverCaption = toLocalIsoString(new Date())
+    .slice(0, 7)
+    .replace("-", ".");
+
   return (
     <Screen scrollRef={scroller.scrollRef} contentRef={scroller.contentRef}>
       <View style={styles.coverPreview}>
         <NotebookCover
           cover={cover}
-          title={name.trim() || "新的帳本"}
-          caption={toLocalIsoString(new Date()).slice(0, 7).replace("-", ".")}
+          title={coverTitle}
+          caption={coverCaption}
           width={150}
           tilt={-1}
         />
-        <Label muted>{`隨機抽到：${describeCover(cover)}`}</Label>
+        <Label muted>
+          {coverChosen
+            ? `封面：${describeCover(cover)}`
+            : `隨機抽到：${describeCover(cover)}`}
+        </Label>
         <View style={styles.coverActions}>
           <Button
             title="換一個封面"
             variant="secondary"
-            onPress={() => setCover((current) => rerollCover(current))}
+            onPress={() => {
+              setCover((current) => rerollCover(current));
+              setCoverChosen(false);
+            }}
           />
           <Button
-            title="自訂 · 即將推出"
+            title="自訂封面"
             variant="secondary"
-            disabled
-            onPress={() => {}}
+            onPress={() => setPickingCover(true)}
           />
         </View>
       </View>
+      <CoverPickerModal
+        visible={pickingCover}
+        initialCover={cover}
+        title={coverTitle}
+        caption={coverCaption}
+        onCancel={() => setPickingCover(false)}
+        onConfirm={(chosen) => {
+          setCover(chosen);
+          setCoverChosen(true);
+          setPickingCover(false);
+        }}
+      />
       <View ref={scroller.field("name")}>
         <TextField
           label="帳本名稱"

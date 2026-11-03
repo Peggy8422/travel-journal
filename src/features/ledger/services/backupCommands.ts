@@ -7,7 +7,16 @@ import type { SqlDatabase, SqlExecutor } from "../../../data/db/sqlDatabase";
 import { createRepositories } from "../../../data/repositories";
 import { ok, type Result } from "../../../domain/common/result";
 import { toTaipeiDate } from "../../../domain/fx";
-import type { LedgerBackup, LedgerRecord } from "../../../domain/ledger";
+import type {
+  CoverPhotoStore,
+  LedgerBackup,
+  LedgerRecord,
+} from "../../../domain/ledger";
+import {
+  collectCoverPhotos,
+  prepareCoverPhotos,
+  pruneCoverPhotos,
+} from "./coverPhotos";
 
 /** 讀出所有帳本的完整資料（含已刪除的消費與還款），依建立時間由新到舊 */
 export async function collectBackup(db: SqlExecutor): Promise<LedgerBackup[]> {
@@ -146,25 +155,42 @@ async function insertLedgerBackup(
   }
 }
 
-/** 產生完整備份檔的檔名與內容 */
+/** 產生完整備份檔的檔名與內容（含照片封面的照片） */
 export async function buildBackupFile(
   db: SqlExecutor,
+  photoStore: CoverPhotoStore,
   now: Date,
 ): Promise<{ fileName: string; content: string }> {
   const ledgers = await collectBackup(db);
+  const photos = await collectCoverPhotos(photoStore, ledgers);
   const date = toTaipeiDate(now.toISOString());
   return {
     fileName: `旅遊記帳備份-${date.ok ? date.value : "backup"}.json`,
-    content: serializeBackup({ exportedAt: now.toISOString(), ledgers }),
+    content: serializeBackup({
+      exportedAt: now.toISOString(),
+      ledgers,
+      photos,
+    }),
   };
 }
 
-/** 解析備份檔內容後還原；檔案格式不對時回傳錯誤，不寫入任何資料 */
+/**
+ * 解析備份檔內容後還原；檔案格式不對時回傳錯誤，不寫入任何資料。
+ * 照片先寫回手機，還原完再清掉沒有帳本在用的照片（例如被略過的帳本帶來的）。
+ */
 export async function restoreFromBackupText(
   db: SqlDatabase,
+  photoStore: CoverPhotoStore,
   text: string,
 ): Promise<Result<RestoreReport, BackupFileError>> {
   const parsed = parseBackup(text);
   if (!parsed.ok) return parsed;
-  return ok(await restoreBackup(db, parsed.value.ledgers));
+  const ledgers = await prepareCoverPhotos(
+    photoStore,
+    parsed.value.ledgers,
+    parsed.value.photos,
+  );
+  const report = await restoreBackup(db, ledgers);
+  await pruneCoverPhotos(db, photoStore);
+  return ok(report);
 }

@@ -49,6 +49,8 @@ import { shareExpensesCsv } from "../services/fileExports";
 import { ArchivedTag, SelfBadge } from "./badges";
 import { categoryLabel } from "./categories";
 import { COVER_COLORS, coverTilt, describeCover } from "./coverStyles";
+import { CoverPickerModal } from "./CoverPickerModal";
+import { tidyCoverPhotos } from "../services/appCoverPhotos";
 import { describeError } from "./messages";
 import { NotebookCover } from "./NotebookCover";
 
@@ -62,6 +64,7 @@ export function LedgerSettingsScreen({ ledgerId }: { ledgerId: string }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pickingCover, setPickingCover] = useState(false);
 
   if (error) {
     return (
@@ -224,6 +227,7 @@ export function LedgerSettingsScreen({ ledgerId }: { ledgerId: string }) {
               reload: false,
             });
             if (!deleted) return;
+            tidyCoverPhotos(deps.db);
             router.dismissTo("/ledgers");
             toast(`刪掉「${ledger.name}」了`);
           },
@@ -268,25 +272,41 @@ export function LedgerSettingsScreen({ ledgerId }: { ledgerId: string }) {
         <View style={styles.coverSide}>
           <CardTitle title="封面" />
           <Text style={[styles.body, { color: theme.textMuted }]}>
-            {describeCover(cover)}。之後會開放自己挑樣式和顏色。
+            {describeCover(cover)}
           </Text>
           <View style={styles.coverButtons}>
             <SmallButton
               title="換一個封面"
               icon={<DiceIcon color={theme.text} />}
               disabled={busy}
-              onPress={() =>
-                run(() => changeLedgerCover(deps, ledgerId, rerollCover(cover)))
-              }
+              onPress={async () => {
+                const changed = await run(() =>
+                  changeLedgerCover(deps, ledgerId, rerollCover(cover)),
+                );
+                if (changed) tidyCoverPhotos(deps.db);
+              }}
             />
             <SmallButton
-              title="自訂封面 · 即將推出"
-              disabled
-              onPress={() => {}}
+              title="自訂封面"
+              disabled={busy}
+              onPress={() => setPickingCover(true)}
             />
           </View>
         </View>
       </Card>
+      <CoverPickerModal
+        visible={pickingCover}
+        initialCover={cover}
+        title={ledger.name}
+        caption={tripMonthOf(ledger, expenses).replace("-", ".")}
+        onCancel={() => setPickingCover(false)}
+        onConfirm={(chosen) => {
+          setPickingCover(false);
+          void run(() => changeLedgerCover(deps, ledgerId, chosen)).then(
+            (changed) => changed && tidyCoverPhotos(deps.db),
+          );
+        }}
+      />
 
       <Card style={styles.card}>
         <CardTitle title="帳本名稱" />

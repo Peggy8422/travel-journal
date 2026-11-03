@@ -15,6 +15,7 @@ interface LedgerRow {
   cover_style: string | null;
   cover_palette: string | null;
   cover_pattern: string | null;
+  cover_photo: string | null;
   trip_month: string | null;
   created_at: string;
   updated_at: string;
@@ -25,9 +26,9 @@ export function createLedgerRepository(db: SqlExecutor): LedgerRepository {
     async insert(ledger) {
       await db.runAsync(
         `INSERT INTO ledgers (id, kind, name, base_currency,
-           cover_style, cover_palette, cover_pattern, trip_month,
+           cover_style, cover_palette, cover_pattern, cover_photo, trip_month,
            created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           ledger.id,
           ledger.kind,
@@ -36,6 +37,7 @@ export function createLedgerRepository(db: SqlExecutor): LedgerRepository {
           ledger.cover?.style ?? null,
           ledger.cover?.palette ?? null,
           ledger.cover?.pattern ?? null,
+          ledger.cover?.photo ?? null,
           ledger.tripMonth,
           ledger.createdAt,
           ledger.updatedAt,
@@ -46,13 +48,14 @@ export function createLedgerRepository(db: SqlExecutor): LedgerRepository {
     async update(ledger) {
       await db.runAsync(
         `UPDATE ledgers SET name = ?, cover_style = ?, cover_palette = ?,
-           cover_pattern = ?, trip_month = ?, updated_at = ?
+           cover_pattern = ?, cover_photo = ?, trip_month = ?, updated_at = ?
          WHERE id = ?`,
         [
           ledger.name,
           ledger.cover?.style ?? null,
           ledger.cover?.palette ?? null,
           ledger.cover?.pattern ?? null,
+          ledger.cover?.photo ?? null,
           ledger.tripMonth,
           ledger.updatedAt,
           ledger.id,
@@ -96,7 +99,12 @@ function toRecord(row: LedgerRow): LedgerRecord {
     kind: row.kind,
     name: row.name,
     baseCurrency: row.base_currency,
-    cover: parseCover(row.cover_style, row.cover_palette, row.cover_pattern),
+    cover: parseCover(
+      row.cover_style,
+      row.cover_palette,
+      row.cover_pattern,
+      row.cover_photo,
+    ),
     tripMonth: isTripMonth(row.trip_month) ? row.trip_month : null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

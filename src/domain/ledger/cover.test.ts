@@ -27,6 +27,8 @@ describe("randomCover", () => {
     for (let i = 0; i < 200; i++) {
       const cover = randomCover();
       expect(COVER_STYLES).toContain(cover.style);
+      // A photo cover needs a photo the user picked
+      expect(cover.style).not.toBe("photo");
       expect(COVER_PALETTES).toContain(cover.palette);
       expect(COVER_PATTERNS).toContain(cover.pattern);
     }
@@ -80,5 +82,35 @@ describe("parseCover", () => {
     expect(parseCover(null, null, null)).toBeNull();
     expect(parseCover("tape", "neon", "waves")).toBeNull();
     expect(parseCover("tape", "matcha", 3)).toBeNull();
+  });
+  it("keeps the photo only for a photo cover with a safe file name", () => {
+    expect(parseCover("photo", "ai", "dots", "abc-1.jpg")).toEqual({
+      style: "photo",
+      palette: "ai",
+      pattern: "dots",
+      photo: "abc-1.jpg",
+    });
+    expect(parseCover("tape", "ai", "dots", "abc-1.jpg")).toEqual({
+      style: "tape",
+      palette: "ai",
+      pattern: "dots",
+    });
+  });
+
+  it("falls back to a band cover when the photo name is missing or unsafe", () => {
+    for (const photo of [
+      null,
+      undefined,
+      "",
+      "../secret.jpg",
+      "a/b.jpg",
+      "x.png",
+    ]) {
+      expect(parseCover("photo", "ai", "dots", photo)).toEqual({
+        style: "band",
+        palette: "ai",
+        pattern: "dots",
+      });
+    }
   });
 });
