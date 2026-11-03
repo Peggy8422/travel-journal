@@ -49,13 +49,7 @@ export function PersonalSpendingScreen() {
   );
 
   if (error) {
-    return (
-      <PageMessage
-        backLabel="個人"
-        onBack={router.back}
-        text="讀取個人花費失敗"
-      />
-    );
+    return <PageMessage onBack={router.back} text="讀取個人花費失敗" />;
   }
   if (!data) {
     return (
@@ -64,11 +58,7 @@ export function PersonalSpendingScreen() {
   }
   if (!data.ok) {
     return (
-      <PageMessage
-        backLabel="個人"
-        onBack={router.back}
-        text={describeError(data.error)}
-      />
+      <PageMessage onBack={router.back} text={describeError(data.error)} />
     );
   }
 
@@ -86,7 +76,7 @@ export function PersonalSpendingScreen() {
       <PaperBackground />
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <View style={styles.headerRow}>
-          <BackButton label="個人" onPress={router.back} />
+          <BackButton onPress={router.back} />
           <View style={styles.titleBlock}>
             <Text style={[styles.kicker, { color: theme.textMuted }]}>
               Personal Ledger

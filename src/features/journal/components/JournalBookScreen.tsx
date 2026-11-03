@@ -32,13 +32,7 @@ export function JournalBookScreen({ journalId }: { journalId: string }) {
   const { data, error } = useJournal(journalId);
 
   if (error) {
-    return (
-      <PageMessage
-        backLabel="旅遊手帳"
-        onBack={router.back}
-        text="讀取手帳失敗"
-      />
-    );
+    return <PageMessage onBack={router.back} text="讀取手帳失敗" />;
   }
   if (!data) {
     return (
@@ -47,11 +41,7 @@ export function JournalBookScreen({ journalId }: { journalId: string }) {
   }
   if (!data.ok) {
     return (
-      <PageMessage
-        backLabel="旅遊手帳"
-        onBack={router.back}
-        text={describeError(data.error)}
-      />
+      <PageMessage onBack={router.back} text={describeError(data.error)} />
     );
   }
 
@@ -75,7 +65,7 @@ export function JournalBookScreen({ journalId }: { journalId: string }) {
         <WavyEdge top={insets.top + BAND_HEIGHT - 12} />
 
         <View style={[styles.topRow, { paddingTop: insets.top + 6 }]}>
-          <BackButton label="旅遊手帳" onPress={router.back} />
+          <BackButton onPress={router.back} />
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="手帳設定"

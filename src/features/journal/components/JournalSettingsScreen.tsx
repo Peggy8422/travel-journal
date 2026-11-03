@@ -38,18 +38,12 @@ import {
 export function JournalSettingsScreen({ journalId }: { journalId: string }) {
   const { data, error } = useJournal(journalId);
   if (error) {
-    return (
-      <PageMessage backLabel="手帳" onBack={router.back} text="讀取手帳失敗" />
-    );
+    return <PageMessage onBack={router.back} text="讀取手帳失敗" />;
   }
   if (!data) return <Screen>{null}</Screen>;
   if (!data.ok) {
     return (
-      <PageMessage
-        backLabel="手帳"
-        onBack={router.back}
-        text={describeError(data.error)}
-      />
+      <PageMessage onBack={router.back} text={describeError(data.error)} />
     );
   }
   // 讀到之後才建立表單，欄位的初始值就是存好的設定
@@ -168,12 +162,7 @@ function SettingsForm({ detail }: { detail: JournalDetail }) {
   return (
     <Screen
       header={
-        <PageHeader
-          backLabel={journal.name}
-          onBack={router.back}
-          kicker="Settings"
-          title="手帳設定"
-        />
+        <PageHeader onBack={router.back} kicker="Settings" title="手帳設定" />
       }
       scrollRef={scroller.scrollRef}
       contentRef={scroller.contentRef}

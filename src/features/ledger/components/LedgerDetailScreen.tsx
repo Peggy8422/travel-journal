@@ -34,9 +34,7 @@ export function LedgerDetailScreen({ ledgerId }: { ledgerId: string }) {
   const [tab, setTab] = useState<Tab>("expenses");
 
   if (error) {
-    return (
-      <PageMessage backLabel="帳本" onBack={router.back} text="讀取帳本失敗" />
-    );
+    return <PageMessage onBack={router.back} text="讀取帳本失敗" />;
   }
   if (!data) {
     return (
@@ -45,11 +43,7 @@ export function LedgerDetailScreen({ ledgerId }: { ledgerId: string }) {
   }
   if (!data.ok) {
     return (
-      <PageMessage
-        backLabel="帳本"
-        onBack={router.back}
-        text={describeError(data.error)}
-      />
+      <PageMessage onBack={router.back} text={describeError(data.error)} />
     );
   }
 
@@ -78,7 +72,7 @@ export function LedgerDetailScreen({ ledgerId }: { ledgerId: string }) {
         <WavyEdge top={insets.top + BAND_HEIGHT - 12} />
 
         <View style={[styles.topRow, { paddingTop: insets.top + 6 }]}>
-          <BackButton label="帳本" onPress={router.back} />
+          <BackButton onPress={router.back} />
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="帳本設定"

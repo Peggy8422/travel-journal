@@ -36,18 +36,11 @@ export function JournalShelfScreen() {
   const bookWidth = Math.floor((width - SIDE * 2 - GAP) / 2);
 
   if (error) {
-    return (
-      <PageMessage backLabel="個人" onBack={router.back} text="讀取手帳失敗" />
-    );
+    return <PageMessage onBack={router.back} text="讀取手帳失敗" />;
   }
 
   const header = (
-    <PageHeader
-      backLabel="個人"
-      onBack={router.back}
-      kicker="Travel Journal"
-      title="旅遊手帳"
-    />
+    <PageHeader onBack={router.back} kicker="Travel Journal" title="旅遊手帳" />
   );
   const entryTotal = data?.reduce((sum, o) => sum + o.entryCount, 0) ?? 0;
 

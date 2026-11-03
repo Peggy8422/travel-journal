@@ -60,13 +60,7 @@ export function MapDetailScreen({
   const userLocation = useUserLocation();
 
   if (error) {
-    return (
-      <PageMessage
-        backLabel="地球"
-        onBack={router.back}
-        text="讀取地圖資料失敗"
-      />
-    );
+    return <PageMessage onBack={router.back} text="讀取地圖資料失敗" />;
   }
   if (!data) {
     return (
@@ -82,7 +76,6 @@ export function MapDetailScreen({
   if (pins.length === 0) {
     return (
       <PageMessage
-        backLabel="地球"
         onBack={router.back}
         text="這幾本帳本還沒有標記地點的消費。新增消費時按「使用目前位置」，足跡就會出現在地圖上。"
       />
@@ -152,7 +145,7 @@ export function MapDetailScreen({
           },
         ]}
       >
-        <BackButton label="地球" onPress={router.back} />
+        <BackButton onPress={router.back} />
         <View style={styles.titleBlock}>
           <Text style={[styles.kicker, { color: theme.textMuted }]}>Map</Text>
           <Text

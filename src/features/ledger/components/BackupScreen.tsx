@@ -51,12 +51,7 @@ export function BackupScreen() {
   return (
     <Screen
       header={
-        <PageHeader
-          backLabel="帳本"
-          onBack={router.back}
-          kicker="Backup"
-          title="備份與還原"
-        />
+        <PageHeader onBack={router.back} kicker="Backup" title="備份與還原" />
       }
       contentStyle={styles.content}
     >
