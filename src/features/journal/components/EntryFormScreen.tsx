@@ -34,6 +34,7 @@ import { useTheme } from "../../../shared/ui/theme";
 import { useToast } from "../../../shared/ui/Toast";
 import { useLedgerCommandDeps } from "../../database/DatabaseProvider";
 import { describeError } from "../../ledger/components/messages";
+import { tidyCoverPhotos } from "../../ledger/services/appCoverPhotos";
 import { useEntryForm } from "../hooks/useJournalQueries";
 import {
   deleteEntry,
@@ -49,10 +50,11 @@ import {
   monthDayLabel,
   weekdayOf,
 } from "../services/journalDates";
+import { EntryPhotoField, useEntryPhotos } from "./EntryPhotos";
 import { JournalStamp } from "./JournalStamp";
 import { MOOD_STAMPS, STAMP_TILTS, WEATHER_STAMPS } from "./stamps";
 
-type FormField = "title" | "body";
+type FormField = "title" | "photos" | "body";
 
 /** 寫日記（entryId 為 null）與編輯日記共用的 modal，保留原生導覽列放取消、儲存 */
 export function EntryFormScreen({
@@ -83,6 +85,7 @@ function Form({ form }: { form: EntryForm }) {
     entry?.weather ?? null,
   );
   const [mood, setMood] = useState<JournalMood | null>(entry?.mood ?? null);
+  const photos = useEntryPhotos(entry?.photos ?? []);
   const [fieldError, setFieldError] = useState<{
     field: FormField;
     message: string;
@@ -103,9 +106,16 @@ function Form({ form }: { form: EntryForm }) {
   async function submit() {
     Keyboard.dismiss();
     setFieldError(null);
-    const input: EntryInput = { date, title, body, weather, mood };
     setSaving(true);
     try {
+      const input: EntryInput = {
+        date,
+        title,
+        body,
+        weather,
+        mood,
+        photos: await photos.commit(deps.newId),
+      };
       const result = entry
         ? await updateEntry(deps, entry.id, input)
         : await writeEntry(deps, journal.id, input);
@@ -113,6 +123,9 @@ function Form({ form }: { form: EntryForm }) {
         const error = result.error;
         if (error.code === "TEXT_TOO_LONG" && error.field === "entryTitle") {
           return fail("title", describeError(error));
+        }
+        if (error.code === "TOO_MANY_PHOTOS") {
+          return fail("photos", describeError(error));
         }
         if (
           error.code === "EMPTY_ENTRY" ||
@@ -124,6 +137,8 @@ function Form({ form }: { form: EntryForm }) {
         Alert.alert("無法儲存", describeError(error));
         return;
       }
+      // Photos taken off this page are no longer used by anything
+      tidyCoverPhotos(deps.db);
       if (entry) {
         router.back();
         toast("已儲存日記");
@@ -214,7 +229,7 @@ function Form({ form }: { form: EntryForm }) {
             <HeaderAction
               title="儲存"
               strong
-              disabled={saving}
+              disabled={saving || photos.busy}
               onPress={submit}
             />
           ),
@@ -267,6 +282,10 @@ function Form({ form }: { form: EntryForm }) {
         <Text style={[styles.hint, { color: theme.textMuted }]}>
           再點一次可以取消，天氣和心情都可以不選。
         </Text>
+      </View>
+
+      <View ref={scroller.field("photos")}>
+        <EntryPhotoField photos={photos} error={errorFor("photos")} />
       </View>
 
       <View ref={scroller.field("body")} style={styles.group}>

@@ -26,6 +26,7 @@ import {
   monthDayLabel,
   weekdayOf,
 } from "../services/journalDates";
+import { PhotoThumbs } from "./EntryPhotos";
 import { JournalStamp } from "./JournalStamp";
 import { PencilIcon } from "./PencilIcon";
 import { KRAFT, ledgerDotColor } from "./tapes";
@@ -177,7 +178,7 @@ export function JournalBookScreen({ journalId }: { journalId: string }) {
   );
 }
 
-/** 一篇日記：左邊大大的日期，右邊標題、印章與開頭幾行 */
+/** 一篇日記：左邊大大的日期，右邊標題、印章、開頭幾行與照片縮圖 */
 function EntryRow({
   entry,
   firstDate,
@@ -240,6 +241,7 @@ function EntryRow({
             {entry.body.replace(/\n/g, " ")}
           </Text>
         )}
+        {entry.photos.length > 0 && <PhotoThumbs photos={entry.photos} />}
       </View>
     </Pressable>
   );

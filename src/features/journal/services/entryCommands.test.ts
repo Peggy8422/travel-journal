@@ -21,6 +21,7 @@ const PAGE: EntryInput = {
   body: "\n一路爬到山頂。\n",
   weather: "sunny",
   mood: null,
+  photos: [],
 };
 
 async function setup() {
@@ -39,9 +40,14 @@ async function setup() {
 }
 
 describe("entry commands", () => {
-  it("writes an entry with trimmed text and no photos or places yet", async () => {
+  it("writes an entry with trimmed text, its photos and no places yet", async () => {
     const { db, deps, journal } = await setup();
-    const entry = unwrap(await writeEntry(deps, journal.id, PAGE));
+    const entry = unwrap(
+      await writeEntry(deps, journal.id, {
+        ...PAGE,
+        photos: ["b.jpg", "a.jpg"],
+      }),
+    );
     expect(entry).toMatchObject({
       journalId: journal.id,
       date: "2025-11-22",
@@ -49,7 +55,7 @@ describe("entry commands", () => {
       body: "一路爬到山頂。",
       weather: "sunny",
       mood: null,
-      photos: [],
+      photos: ["b.jpg", "a.jpg"],
       places: [],
       deletedAt: null,
     });
@@ -64,8 +70,15 @@ describe("entry commands", () => {
     expect(unwrapErr(await writeEntry(deps, journal.id, blank))).toEqual({
       code: "EMPTY_ENTRY",
     });
-    // A stamp alone is enough
+    // A stamp or a photo alone is enough
     unwrap(await writeEntry(deps, journal.id, { ...blank, mood: "tired" }));
+    unwrap(await writeEntry(deps, journal.id, { ...blank, photos: ["a.jpg"] }));
+    const tenPhotos = Array.from({ length: 10 }, (_, i) => `p${i}.jpg`);
+    expect(
+      unwrapErr(
+        await writeEntry(deps, journal.id, { ...PAGE, photos: tenPhotos }),
+      ),
+    ).toEqual({ code: "TOO_MANY_PHOTOS", max: 9 });
     expect(
       unwrapErr(
         await writeEntry(deps, journal.id, { ...PAGE, date: "2025-02-30" }),
@@ -89,7 +102,7 @@ describe("entry commands", () => {
     );
   });
 
-  it("updates the text and stamps but keeps photos and places", async () => {
+  it("updates the text, stamps and photos but keeps places", async () => {
     const { db, deps, journal } = await setup();
     const entry = unwrap(await writeEntry(deps, journal.id, PAGE));
     const repos = createRepositories(db);
@@ -110,6 +123,7 @@ describe("entry commands", () => {
         title: "嵐山",
         weather: null,
         mood: "moved",
+        photos: ["c.jpg", "a.jpg"],
       }),
     );
     expect(updated).toMatchObject({
@@ -117,7 +131,7 @@ describe("entry commands", () => {
       title: "嵐山",
       weather: null,
       mood: "moved",
-      photos: ["a.jpg"],
+      photos: ["c.jpg", "a.jpg"],
       places: [place],
       createdAt: entry.createdAt,
     });

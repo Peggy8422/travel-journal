@@ -33,8 +33,9 @@ export type JournalCommandError =
     }
   | { readonly code: "ENTRY_NOT_FOUND"; readonly entryId: string }
   | { readonly code: "INVALID_ENTRY_DATE"; readonly date: string }
-  /** 標題、內容、天氣、心情都沒有 */
-  | { readonly code: "EMPTY_ENTRY" };
+  /** 標題、內容、天氣、心情、照片都沒有 */
+  | { readonly code: "EMPTY_ENTRY" }
+  | { readonly code: "TOO_MANY_PHOTOS"; readonly max: number };
 
 export type JournalCommandResult<T> = Promise<Result<T, JournalCommandError>>;
 

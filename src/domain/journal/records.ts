@@ -27,6 +27,9 @@ export interface JournalPlace {
   readonly location: GeoPoint;
 }
 
+/** 一篇日記最多幾張照片；照片會跟著備份檔走，沒有上限的話備份檔會越來越大 */
+export const ENTRY_PHOTO_LIMIT = 9;
+
 export interface JournalEntryRecord {
   readonly id: string;
   readonly journalId: string;

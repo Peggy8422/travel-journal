@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -9,17 +10,22 @@ import { useTheme } from "../../../shared/ui/theme";
 import { describeError } from "../../ledger/components/messages";
 import { useEntry } from "../hooks/useJournalQueries";
 import { entryHeading, monthDayLabel } from "../services/journalDates";
+import { PhotoCollage, PhotoViewer } from "./EntryPhotos";
 import { JournalStamp } from "./JournalStamp";
 import { PencilIcon } from "./PencilIcon";
+import { TAPE_COLORS } from "./tapes";
 
 /**
- * 一篇日記（只能看）：橫線信紙上寫日期、印章、標題與內容，右上角「編輯」才進表單。
+ * 一篇日記（只能看）：橫線信紙上寫日期、印章、標題、照片與內容，右上角「編輯」才進表單。
+ * 點照片全螢幕看，可以左右滑。
  * 導覽列隱藏，返回鍵自己畫。
  */
 export function JournalEntryScreen({ entryId }: { entryId: string }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { data, error } = useEntry(entryId);
+  /** 全螢幕看的那張照片；沒在看時為 null */
+  const [viewing, setViewing] = useState<number | null>(null);
 
   if (error) {
     return <PageMessage onBack={router.back} text="讀取日記失敗" />;
@@ -90,6 +96,13 @@ export function JournalEntryScreen({ entryId }: { entryId: string }) {
           >
             {entryHeading(entry)}
           </Text>
+          {entry.photos.length > 0 && (
+            <PhotoCollage
+              photos={entry.photos}
+              tape={TAPE_COLORS[journal.cover.tape].color}
+              onOpen={setViewing}
+            />
+          )}
           {entry.body !== "" && (
             <Text selectable style={[styles.body, { color: theme.text }]}>
               {entry.body}
@@ -97,6 +110,13 @@ export function JournalEntryScreen({ entryId }: { entryId: string }) {
           )}
         </RuledPaper>
       </ScrollView>
+      {viewing !== null && (
+        <PhotoViewer
+          photos={entry.photos}
+          start={Math.min(viewing, entry.photos.length - 1)}
+          onClose={() => setViewing(null)}
+        />
+      )}
     </View>
   );
 }

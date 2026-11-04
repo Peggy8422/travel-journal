@@ -5,6 +5,7 @@ export type {
   JournalPlace,
   JournalRecord,
 } from "./records";
+export { ENTRY_PHOTO_LIMIT } from "./records";
 export type { JournalEntryRepository, JournalRepository } from "./ports";
 export {
   isJournalTape,
