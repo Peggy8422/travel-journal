@@ -11,6 +11,7 @@ import type { RestoreReport } from "../services/backupCommands";
 import type { LedgerCommandError } from "../services/ledgerCommands";
 import type { LedgerSummaryError } from "../services/ledgerSummary";
 import type { LocateError } from "../services/locateCurrentPlace";
+import type { PlaceSearchError } from "../services/searchPlaces";
 import type {
   ManualReason,
   ResolveFxRateError,
@@ -22,7 +23,8 @@ export type DisplayableError =
   | LedgerSummaryError
   | ResolveFxRateError
   | BackupFileError
-  | LocateError;
+  | LocateError
+  | PlaceSearchError;
 
 const TEXT_FIELD_LABELS: Readonly<Record<LimitedTextField, string>> = {
   ledgerName: "帳本名稱",
@@ -127,6 +129,8 @@ export function describeError(error: DisplayableError): string {
       return "沒有定位權限，請到系統設定開啟，或直接輸入地名";
     case "LOCATION_UNAVAILABLE":
       return "目前無法定位，請確認定位服務已開啟，或直接輸入地名";
+    case "PLACE_SEARCH_FAILED":
+      return "搜尋失敗，請確認網路連線後再試一次，或直接點地圖放置標記";
     default:
       return `資料有誤（${error.code}）`;
   }

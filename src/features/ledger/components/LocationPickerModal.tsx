@@ -1,6 +1,16 @@
-import { useEffect, useState } from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import {
+  Keyboard,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import MapView, { Marker } from "react-native-maps";
+import Svg, { Path } from "react-native-svg";
 import {
   SafeAreaProvider,
   useSafeAreaInsets,
@@ -8,9 +18,12 @@ import {
 
 import type { GeoPoint } from "../../../domain/ledger";
 import { regionForPoints, type MapRegion } from "../../../domain/map";
-import { Label } from "../../../shared/ui/components";
+import type { FoundPlace } from "../../../domain/location";
+import { ErrorText, Label } from "../../../shared/ui/components";
 import { fonts } from "../../../shared/ui/fonts";
 import { spacing, useTheme } from "../../../shared/ui/theme";
+import { usePlaceSearch } from "../hooks/usePlaceSearch";
+import { describeError } from "./messages";
 
 /** 沒有地點、也拿不到最近位置時，先顯示整個臺灣 */
 const DEFAULT_REGION: MapRegion = {
@@ -28,8 +41,9 @@ function regionAround(point: GeoPoint): MapRegion {
 }
 
 /**
- * 在地圖上選消費地點：點地圖放標記，或拖曳標記微調。
+ * 在地圖上選地點：搜尋地名（只有 iOS，用 Apple 地圖），或點地圖放標記，再拖曳標記微調。
  * 用 React Native 的 Modal 而不是路由，選好的座標直接交回表單，不用跨畫面傳值。
+ * 從搜尋結果選的地點會一起交回名稱，表單就不用再用座標反查地名。
  */
 export function LocationPickerModal({
   visible,
@@ -44,7 +58,8 @@ export function LocationPickerModal({
   /** 沒有座標時一開始要看的位置，例如最近一次已知位置 */
   loadStartPoint: () => Promise<GeoPoint | null>;
   onCancel: () => void;
-  onConfirm: (point: GeoPoint) => void;
+  /** placeName 是搜尋結果的名稱；點地圖放的標記為 null */
+  onConfirm: (point: GeoPoint, placeName: string | null) => void;
 }) {
   return (
     <Modal
@@ -77,11 +92,19 @@ function PickerContent({
   initialPoint: GeoPoint | null;
   loadStartPoint: () => Promise<GeoPoint | null>;
   onCancel: () => void;
-  onConfirm: (point: GeoPoint) => void;
+  onConfirm: (point: GeoPoint, placeName: string | null) => void;
 }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const [point, setPoint] = useState(initialPoint);
+  /** 從搜尋結果選的名稱；改點地圖別的地方就不算了，拖曳微調仍算 */
+  const [pickedName, setPickedName] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [listOpen, setListOpen] = useState(false);
+  const placeSearch = usePlaceSearch();
+  const mapRef = useRef<MapView>(null);
+  /** 地圖目前看的範圍，搜尋時優先找附近 */
+  const visibleRegion = useRef<MapRegion | null>(null);
   // MapView only reads initialRegion once, so wait for the start point before showing it
   const [startRegion, setStartRegion] = useState<MapRegion | null>(
     initialPoint ? regionAround(initialPoint) : null,
@@ -97,6 +120,37 @@ function PickerContent({
       active = false;
     };
   }, [initialPoint, loadStartPoint]);
+
+  function submitSearch() {
+    if (query.trim() === "") return;
+    setListOpen(true);
+    void placeSearch.run(query, visibleRegion.current ?? startRegion);
+  }
+
+  function changeQuery(text: string) {
+    setQuery(text);
+    if (text.trim() === "") {
+      placeSearch.clear();
+      setListOpen(false);
+    }
+  }
+
+  function choose(place: FoundPlace) {
+    Keyboard.dismiss();
+    setListOpen(false);
+    setPoint(place.location);
+    setPickedName(place.name);
+    mapRef.current?.animateToRegion(regionAround(place.location), 350);
+  }
+
+  const state = placeSearch.state;
+  const hint = pickedName
+    ? `已選「${pickedName}」，拖曳標記可以微調`
+    : point
+      ? "拖曳標記可以微調，或點地圖其他地方重新放置"
+      : placeSearch.available
+        ? "搜尋地點，或點一下地圖放置標記"
+        : "點一下地圖放置標記";
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -118,21 +172,60 @@ function PickerContent({
           title="完成"
           bold
           disabled={point === null}
-          onPress={() => point && onConfirm(point)}
+          onPress={() => point && onConfirm(point, pickedName)}
         />
       </View>
+
+      {placeSearch.available && (
+        <View
+          style={[
+            styles.searchBar,
+            { backgroundColor: theme.surface, borderColor: theme.border },
+          ]}
+        >
+          <View style={[styles.searchField, { backgroundColor: theme.chip }]}>
+            <SearchIcon color={theme.textMuted} />
+            <TextInput
+              accessibilityLabel="搜尋地點"
+              value={query}
+              onChangeText={changeQuery}
+              onSubmitEditing={submitSearch}
+              onFocus={() => {
+                if (state.status !== "idle") setListOpen(true);
+              }}
+              placeholder="搜尋地點，例如：清水寺、一蘭"
+              placeholderTextColor={theme.textMuted}
+              returnKeyType="search"
+              clearButtonMode="while-editing"
+              autoCorrect={false}
+              style={[styles.searchInput, { color: theme.text }]}
+            />
+          </View>
+        </View>
+      )}
 
       <View style={styles.mapArea}>
         {startRegion && (
           <MapView
+            ref={mapRef}
             style={StyleSheet.absoluteFill}
             initialRegion={startRegion}
             userInterfaceStyle={theme.isDark ? "dark" : "light"}
             toolbarEnabled={false}
+            onRegionChangeComplete={(region) => {
+              visibleRegion.current = region;
+            }}
             onPress={(event) => {
               // Android also reports marker taps here; dragging handles those
               if (event.nativeEvent.action === "marker-press") return;
+              // The first tap only closes the search results
+              if (listOpen) {
+                Keyboard.dismiss();
+                setListOpen(false);
+                return;
+              }
               setPoint(event.nativeEvent.coordinate);
+              setPickedName(null);
             }}
           >
             {point && (
@@ -155,14 +248,92 @@ function PickerContent({
             },
           ]}
         >
-          <Label muted>
-            {point
-              ? "拖曳標記可以微調，或點地圖其他地方重新放置"
-              : "點一下地圖放置標記"}
-          </Label>
+          <Label muted>{hint}</Label>
         </View>
+        {listOpen && state.status !== "idle" && (
+          <View
+            style={[
+              styles.results,
+              { backgroundColor: theme.surface, borderColor: theme.border },
+            ]}
+          >
+            {state.status === "searching" ? (
+              <View style={styles.resultNote}>
+                <Label muted>搜尋中…</Label>
+              </View>
+            ) : !state.result.ok ? (
+              <View style={styles.resultNote}>
+                <ErrorText message={describeError(state.result.error)} />
+              </View>
+            ) : state.result.value.length === 0 ? (
+              <View style={styles.resultNote}>
+                <Label muted>
+                  找不到「{state.query}」，換個關鍵字，或直接點地圖放置標記
+                </Label>
+              </View>
+            ) : (
+              <ScrollView keyboardShouldPersistTaps="handled">
+                {state.result.value.map((place, i) => (
+                  <Pressable
+                    key={`${place.name}@${place.location.latitude},${place.location.longitude}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      place.address
+                        ? `${place.name}，${place.address}`
+                        : place.name
+                    }
+                    accessibilityHint="在地圖上放置這個地點的標記"
+                    onPress={() => choose(place)}
+                    style={({ pressed }) => [
+                      styles.result,
+                      i > 0 && {
+                        borderTopWidth: StyleSheet.hairlineWidth,
+                        borderColor: theme.border,
+                      },
+                      { opacity: pressed ? 0.6 : 1 },
+                    ]}
+                  >
+                    <Text
+                      numberOfLines={1}
+                      style={[styles.resultName, { color: theme.text }]}
+                    >
+                      {place.name}
+                    </Text>
+                    {place.address && (
+                      <Text
+                        numberOfLines={1}
+                        style={[
+                          styles.resultAddress,
+                          { color: theme.textMuted },
+                        ]}
+                      >
+                        {place.address}
+                      </Text>
+                    )}
+                  </Pressable>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+        )}
       </View>
     </View>
+  );
+}
+
+function SearchIcon({ color }: { color: string }) {
+  return (
+    <Svg
+      width={16}
+      height={16}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke={color}
+      strokeWidth={1.6}
+      strokeLinecap="round"
+    >
+      <Path d="M7 2.6c2.5-.1 4.4 1.8 4.4 4.3 0 2.4-1.9 4.4-4.4 4.4-2.4 0-4.4-1.9-4.4-4.3C2.6 4.6 4.5 2.7 7 2.6zM10.3 10.4l3.2 3.1" />
+    </Svg>
   );
 }
 
@@ -223,8 +394,58 @@ const styles = StyleSheet.create({
   headerButtonBold: {
     fontFamily: fonts.bold,
   },
+  searchBar: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  searchField: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    minHeight: 40,
+    paddingLeft: 12,
+    borderRadius: 12,
+  },
+  searchInput: {
+    flex: 1,
+    minWidth: 0,
+    paddingVertical: 8,
+    paddingRight: 8,
+    fontFamily: fonts.regular,
+    fontSize: 16,
+  },
   mapArea: {
     flex: 1,
+  },
+  results: {
+    position: "absolute",
+    top: spacing.sm,
+    left: spacing.md,
+    right: spacing.md,
+    maxHeight: "60%",
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    boxShadow: "0px 6px 18px rgba(58,51,45,0.16)",
+    overflow: "hidden",
+  },
+  resultNote: {
+    padding: spacing.md,
+  },
+  result: {
+    minHeight: 52,
+    justifyContent: "center",
+    gap: 2,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  resultName: {
+    fontFamily: fonts.bold,
+    fontSize: 15,
+  },
+  resultAddress: {
+    fontFamily: fonts.regular,
+    fontSize: 12.5,
   },
   hint: {
     position: "absolute",

@@ -39,6 +39,7 @@ src/app/  →  src/features/  →  src/domain/
   - 手繪線條是 react-native-svg 畫的抖動路徑（`shared/ui/sketch.ts` 純函式、`handDrawn.tsx` 元件），不用 SVG 濾鏡：react-native-svg 雖然有 `FeTurbulence`、`FeDisplacementMap` 元件，但都沒有實作（只會警告、不畫任何東西），設計稿裡的鉛筆抖動要用路徑本身做出來。鉛筆的顆粒與印章缺墨則是用 `Mask` 挖掉小點（`HandCircle`、`InkStamp`），小點合成一條 path，不要一點一個 `Circle`。
 - 地圖分頁是手繪地球（`features/map/components/GlobeScreen.tsx`，投影在 `domain/map/globe.ts`，海岸線在 `worldOutline.ts`），只放大到城市大小；城市裡的日期篩選、當天路線、目前位置在「詳細地圖」（`/map?ledgers=…`，react-native-maps），從地球的消費卡片進去。
   - 地球每一格都重新投影整個世界：海岸線先用 `toSphere` 轉成球面向量，投影只剩乘法，路徑字串直接串接；改這段時注意 Hermes 沒有 JIT，比 Node 慢很多。
+  - 選擇地點（`LocationPickerModal`，記帳和日記共用）的搜尋用 Apple 地圖的 `MKLocalSearch`，包在本機原生模組 `modules/place-search`（介面是 `domain/location` 的 `PlaceSearch`）。只有 iOS，Android 和測試裡 `createPlaceSearch()` 回傳 null、不顯示搜尋框。不用 expo-location 的 `geocodeAsync`：它只查得到地址，搜「清水寺」會跑到土城的「清水里」（2026-11-04 實測）。改了 Swift 要重新 `pod install`（終端機要 UTF-8，否則 CocoaPods 會報 Unicode Normalization 錯誤）並重 build，Fast Refresh 不會更新。
   - 地圖上的線（詳細地圖的當天路線）用 SVG 疊在 `MapView` 上，地圖移動時用 `pointForCoordinate` 重新換算位置（`DayMap`）：react-native-maps 的 `Polyline`、`Polygon` 在 iOS 實機上都畫不出來（2026-10-29 確認）。
   - 動畫與拖曳狀態放在 `useGlobeMotion` 的 class 裡，畫面只拿快照：React Compiler 的 lint 不允許 render 時讀 ref（連把 ref 傳給 `PanResponder.create` 也算）。系統開啟「減少動態效果」時不擺動、視角直接跳到目標。
 - 帳本內頁、統計、帳本設定、個人記帳、備份、詳細地圖，以及三個分頁都隱藏導覽列（`src/app/_layout.tsx`、`src/app/(tabs)/_layout.tsx`），頁首自己畫（`shared/ui/PageHeader.tsx`）；這類畫面讀取失敗時要用 `PageMessage`，不然沒有返回鍵可以離開。新增／編輯消費是 modal，保留原生導覽列（左右放取消、儲存）。

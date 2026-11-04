@@ -228,8 +228,15 @@ export function ExpenseForm({
     if (result?.ok) setPlace((draft) => applyLocatedPlace(draft, result.value));
   }
 
-  async function fillPickedPlace(point: GeoPoint) {
+  async function fillPickedPlace(point: GeoPoint, placeName: string | null) {
     setPickingPlace(false);
+    // A search result already has its name; no need to look one up
+    if (placeName !== null) {
+      setPlace((draft) =>
+        applyLocatedPlace(draft, { location: point, placeName }),
+      );
+      return;
+    }
     // Keep the point even if the name lookup is slow or fails
     setPlace((draft) => ({ ...draft, location: point }));
     const result = await currentPlace.describe(point);

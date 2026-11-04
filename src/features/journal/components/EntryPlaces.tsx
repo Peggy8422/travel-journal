@@ -31,7 +31,8 @@ function suggested(name: string | null): string {
 }
 
 /**
- * 日記表單的地點：用目前位置或在地圖上選，地名先用反查到的，查不到再讓使用者自己打。
+ * 日記表單的地點：用目前位置或在地圖上選（可以搜尋），地名先用搜尋結果或反查到的，
+ * 查不到再讓使用者自己打。
  * 儲存時用 toPlaces 交給指令檢查（地名不能空白）。
  */
 export function useEntryPlaces(saved: readonly JournalPlace[]) {
@@ -59,8 +60,14 @@ export function useEntryPlaces(saved: readonly JournalPlace[]) {
     if (added.name === "") setFocusKey(added.key);
   }
 
-  async function addPicked(point: GeoPoint) {
+  async function addPicked(point: GeoPoint, placeName: string | null) {
     setPicking(false);
+    // A search result already has its name; no need to look one up
+    const searched = suggested(placeName);
+    if (searched !== "") {
+      append(searched, point);
+      return;
+    }
     // Keep the point even if the name lookup is slow or fails
     const added = append("", point);
     const result = await currentPlace.describe(point);
