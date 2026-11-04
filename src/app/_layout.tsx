@@ -90,7 +90,8 @@ export default function RootLayout() {
               name="ledger/[id]/stats"
               options={{ title: "統計", headerShown: false }}
             />
-            {/* 旅遊手帳：書架、手帳內頁、設定自己畫頁首；建立手帳和建立帳本一樣用導覽列 */}
+            {/* 旅遊手帳：書架、手帳內頁、日記頁、設定自己畫頁首；建立手帳和建立帳本一樣用導覽列，
+                寫日記／編輯日記和消費表單一樣是 modal */}
             <Stack.Screen
               name="journal/index"
               options={{ title: "旅遊手帳", headerShown: false }}
@@ -103,6 +104,18 @@ export default function RootLayout() {
             <Stack.Screen
               name="journal/[id]/settings"
               options={{ title: "手帳設定", headerShown: false }}
+            />
+            <Stack.Screen
+              name="journal/[id]/entry/[entryId]/index"
+              options={{ title: "日記", headerShown: false }}
+            />
+            <Stack.Screen
+              name="journal/[id]/write"
+              options={{ title: "寫日記", presentation: "modal" }}
+            />
+            <Stack.Screen
+              name="journal/[id]/entry/[entryId]/edit"
+              options={{ title: "編輯日記", presentation: "modal" }}
             />
             <Stack.Screen
               name="ledger/[id]/add-expense"

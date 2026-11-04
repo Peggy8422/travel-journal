@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle, Defs, Path, Pattern, Rect } from "react-native-svg";
 
 import type { JournalEntryRecord } from "../../../domain/journal";
+import { FloatingAddButton } from "../../../shared/ui/components";
 import { accentOverhang, fonts } from "../../../shared/ui/fonts";
 import {
   DashedLine,
@@ -12,19 +13,29 @@ import {
 } from "../../../shared/ui/handDrawn";
 import { BackButton, PageMessage } from "../../../shared/ui/PageHeader";
 import { useTheme } from "../../../shared/ui/theme";
+import { DeletedFold } from "../../ledger/components/DeletedExpenses";
 import { GearIcon } from "../../ledger/components/LedgerDetailScreen";
 import { describeError } from "../../ledger/components/messages";
-import { useJournal } from "../hooks/useJournalQueries";
-import { formatDateRange } from "../services/journalDates";
+import { useLedgerCommandDeps } from "../../database/DatabaseProvider";
+import { useDeletedEntries, useJournal } from "../hooks/useJournalQueries";
+import { restoreEntry } from "../services/entryCommands";
+import {
+  dayNumber,
+  entryHeading,
+  formatDateRange,
+  monthDayLabel,
+  weekdayOf,
+} from "../services/journalDates";
+import { JournalStamp } from "./JournalStamp";
+import { PencilIcon } from "./PencilIcon";
 import { KRAFT, ledgerDotColor } from "./tapes";
 
 /** 牛皮紙色帶在安全區域以下的高度；名稱卡片的上緣壓在色帶的波浪邊上 */
 const BAND_HEIGHT = 96;
-const WEEKDAYS = "日一二三四五六";
 
 /**
- * 一本手帳：頂端是牛皮紙色帶與名稱卡片（綁定帳本時可以點過去），下面依日期列出日記。
- * 導覽列隱藏，返回鍵自己畫。
+ * 一本手帳：頂端是牛皮紙色帶與名稱卡片（綁定帳本時可以點過去），下面依日期列出日記，
+ * 點一篇打開日記頁，右下角「寫日記」。導覽列隱藏，返回鍵自己畫。
  */
 export function JournalBookScreen({ journalId }: { journalId: string }) {
   const theme = useTheme();
@@ -129,13 +140,16 @@ export function JournalBookScreen({ journalId }: { journalId: string }) {
         <ScrollView
           contentContainerStyle={[
             styles.list,
-            { paddingBottom: insets.bottom + 40 },
+            { paddingBottom: insets.bottom + 110 },
           ]}
         >
           {entries.length === 0 ? (
-            <Text style={[styles.empty, { color: theme.textMuted }]}>
-              還沒有日記。
-            </Text>
+            <View style={styles.empty}>
+              <PencilIcon color={theme.textMuted} size={64} strokeWidth={1.2} />
+              <Text style={[styles.emptyText, { color: theme.textMuted }]}>
+                還沒有日記。按右下角「寫日記」記下今天去了哪裡、看到什麼。
+              </Text>
+            </View>
           ) : (
             entries.map((entry, index) => (
               <View key={entry.id}>
@@ -144,13 +158,26 @@ export function JournalBookScreen({ journalId }: { journalId: string }) {
               </View>
             ))
           )}
+          <DeletedEntriesFold journalId={journalId} />
         </ScrollView>
       </View>
+
+      <FloatingAddButton
+        title="寫日記"
+        icon={<PencilIcon color={theme.onPrimary} strokeWidth={2} />}
+        bottom={insets.bottom + 18}
+        onPress={() =>
+          router.push({
+            pathname: "/journal/[id]/write",
+            params: { id: journalId },
+          })
+        }
+      />
     </View>
   );
 }
 
-/** 一篇日記：左邊大大的日期，右邊標題與開頭幾行 */
+/** 一篇日記：左邊大大的日期，右邊標題、印章與開頭幾行 */
 function EntryRow({
   entry,
   firstDate,
@@ -159,33 +186,52 @@ function EntryRow({
   firstDate: string;
 }) {
   const theme = useTheme();
-  const [year, month, day] = entry.date.split("-").map(Number) as [
-    number,
-    number,
-    number,
-  ];
-  const weekday =
-    WEEKDAYS[new Date(Date.UTC(year, month - 1, day)).getUTCDay()];
-  const dayNumber =
-    Math.round(
-      (Date.UTC(year, month - 1, day) - Date.parse(`${firstDate}T00:00:00Z`)) /
-        86_400_000,
-    ) + 1;
+  const month = Number(entry.date.slice(5, 7));
+  const day = Number(entry.date.slice(8, 10));
+  const heading = entryHeading(entry);
   return (
-    <View style={styles.entry}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${monthDayLabel(entry.date)}，${heading}`}
+      onPress={() =>
+        router.push({
+          pathname: "/journal/[id]/entry/[entryId]",
+          params: { id: entry.journalId, entryId: entry.id },
+        })
+      }
+      style={({ pressed }) => [styles.entry, { opacity: pressed ? 0.6 : 1 }]}
+    >
       <View style={styles.date}>
         <Text style={[styles.day, { color: theme.primary }]}>{day}</Text>
         <Text style={[styles.monthWeek, { color: theme.textMuted }]}>
-          {month}月 · {weekday}
+          {month}月 · {weekdayOf(entry.date)}
         </Text>
         <Text style={[styles.dayN, { color: theme.textMuted }]}>
-          Day {dayNumber}
+          Day {dayNumber(firstDate, entry.date)}
         </Text>
       </View>
       <View style={styles.entryText}>
-        <Text style={[styles.entryTitle, { color: theme.text }]}>
-          {entry.title || `${month}月${day}日`}
-        </Text>
+        <View style={styles.titleRow}>
+          <Text style={[styles.entryTitle, { color: theme.text }]}>
+            {heading}
+          </Text>
+          {entry.weather && (
+            <JournalStamp
+              code={entry.weather}
+              size={30}
+              showLabel={false}
+              tilt={-6}
+            />
+          )}
+          {entry.mood && (
+            <JournalStamp
+              code={entry.mood}
+              size={30}
+              showLabel={false}
+              tilt={5}
+            />
+          )}
+        </View>
         {entry.body !== "" && (
           <Text
             numberOfLines={2}
@@ -195,7 +241,26 @@ function EntryRow({
           </Text>
         )}
       </View>
-    </View>
+    </Pressable>
+  );
+}
+
+/** 日記列表最下面的「最近刪除」；沒有刪除的日記時不顯示 */
+function DeletedEntriesFold({ journalId }: { journalId: string }) {
+  const deps = useLedgerCommandDeps();
+  const { data } = useDeletedEntries(journalId);
+  return (
+    <DeletedFold
+      items={data?.map((entry) => ({
+        id: entry.id,
+        title: entryHeading(entry),
+        detail: monthDayLabel(entry.date),
+        deletedAt: entry.deletedAt,
+      }))}
+      unit="篇"
+      hint="還原後會放回手帳"
+      restore={(id) => restoreEntry(deps, id)}
+    />
   );
 }
 
@@ -326,8 +391,12 @@ const styles = StyleSheet.create({
     paddingTop: 4,
   },
   empty: {
-    paddingHorizontal: 10,
-    paddingVertical: 40,
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 48,
+  },
+  emptyText: {
     textAlign: "center",
     fontFamily: fonts.regular,
     fontSize: 14.5,
@@ -364,7 +433,13 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 6,
   },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
   entryTitle: {
+    flex: 1,
     fontFamily: fonts.bold,
     fontSize: 16,
     lineHeight: 22,

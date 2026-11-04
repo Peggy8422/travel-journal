@@ -27,6 +27,7 @@ src/app/  →  src/features/  →  src/domain/
 - 旅遊手帳（`domain/journal`、`features/journal`）：一趟旅行一本手帳，可以綁一本分帳帳本（部分唯一索引保證一本帳本最多一本手帳；帳本刪除時 `ON DELETE SET NULL`，手帳照樣保留）。
   - 名稱存手帳自己的：建立時還沒自己打字就跟著選的帳本填入，之後兩邊各改各的。手帳設定改綁帳本、名稱還是舊帳本名稱時，名稱欄下面出現 `RenameSuggestion`，不跳 `Alert`。
   - 日記日期是旅行當地的 `YYYY-MM-DD`（`isLocalDate`），使用者自己選，不換算時區。天氣、心情、紙膠帶代碼在 `domain/journal`，和分類一樣只能新增。
+  - 點一篇日記開的是整頁的日記頁（`/journal/[id]/entry/[entryId]`，和設計稿一樣不是消費明細那種 formSheet），「編輯」與「寫日記」是 modal。刪除日記和消費一樣是軟刪除、有「復原」和「最近刪除」（`DeletedFold` 共用）；從編輯表單刪除後用 `dismissTo` 回到手帳，日記頁也一起關掉。
   - 封面是固定的牛皮紙筆記本（`JournalCover`），使用者只挑紙膠帶顏色和要不要貼照片，不沿用帳本的 `NotebookCover`。
   - 手帳封面和日記的照片與帳本照片封面放在同一個資料夾（`CoverPhotoStore`）。`pruneCoverPhotos` 會一起看帳本封面、手帳封面、日記照片（含已刪除的日記，才能復原），之後新增存照片的地方，`usedPhotoNames` 和 `backupPhotoNames`（`features/ledger/services/coverPhotos.ts`）都要補。
   - 備份第 6 版多了最外層的 `journals`；還原時先還原帳本再還原手帳，綁的帳本不在手機上或已經綁給別本手帳時，改成不綁定。

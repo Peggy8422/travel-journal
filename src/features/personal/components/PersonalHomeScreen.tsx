@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle, Defs, Pattern, Rect } from "react-native-svg";
 
@@ -18,9 +18,13 @@ import {
 } from "../../../shared/ui/handDrawn";
 import { useTheme } from "../../../shared/ui/theme";
 import { JournalCover } from "../../journal/components/JournalCover";
+import { PencilIcon } from "../../journal/components/PencilIcon";
 import { useJournalShelf } from "../../journal/hooks/useJournalQueries";
 import type { JournalOverview } from "../../journal/services/journalCommands";
-import { journalCaption } from "../../journal/services/journalDates";
+import {
+  entryHeading,
+  journalCaption,
+} from "../../journal/services/journalDates";
 import { PersonalSplit } from "../../ledger/components/PersonalSplit";
 import { usePersonalSpending } from "../../ledger/hooks/usePersonalQueries";
 import { toLocalIsoString } from "../../ledger/services/localTimestamp";
@@ -161,13 +165,14 @@ function latestJournal(
 }
 
 /**
- * 旅遊手帳的牛皮紙卡片：有手帳時放最近那本的封面和最近一篇，
+ * 旅遊手帳的牛皮紙卡片：有手帳時放最近那本的封面和最近一篇（點封面打開那本），
  * 還沒有手帳時是一段說明加「建立手帳」
  */
 function JournalCard({ latest }: { latest: JournalOverview | null }) {
+  const theme = useTheme();
   const entry = latest?.latestEntry ?? null;
   const recent = entry
-    ? `最近一篇：${Number(entry.date.slice(5, 7))}/${Number(entry.date.slice(8, 10))} ${entry.title || "（沒有標題）"}`
+    ? `最近一篇：${Number(entry.date.slice(5, 7))}/${Number(entry.date.slice(8, 10))} ${entryHeading(entry)}`
     : "還沒有日記";
   return (
     <View style={styles.journal}>
@@ -188,7 +193,20 @@ function JournalCard({ latest }: { latest: JournalOverview | null }) {
       <View style={styles.journalBand} />
       <SketchFrame radius={12} strokeWidth={1.3} />
       {latest ? (
-        <View style={styles.journalLatest}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`打開手帳「${latest.journal.name}」`}
+          onPress={() =>
+            router.push({
+              pathname: "/journal/[id]",
+              params: { id: latest.journal.id },
+            })
+          }
+          style={({ pressed }) => [
+            styles.journalLatest,
+            { opacity: pressed ? 0.7 : 1 },
+          ]}
+        >
           <JournalCover
             cover={latest.journal.cover}
             title={latest.journal.name}
@@ -205,7 +223,7 @@ function JournalCard({ latest }: { latest: JournalOverview | null }) {
             <Text style={styles.journalName}>{latest.journal.name}</Text>
             <Text style={styles.journalRecent}>{recent}</Text>
           </View>
-        </View>
+        </Pressable>
       ) : (
         <>
           <Text style={styles.journalKicker}>Travel Journal</Text>
@@ -218,11 +236,14 @@ function JournalCard({ latest }: { latest: JournalOverview | null }) {
         {latest ? (
           <>
             <SmallButton
-              title="打開手帳"
+              title="寫日記"
               variant="primary"
+              icon={
+                <PencilIcon color={theme.onPrimary} size={16} strokeWidth={2} />
+              }
               onPress={() =>
                 router.push({
-                  pathname: "/journal/[id]",
+                  pathname: "/journal/[id]/write",
                   params: { id: latest.journal.id },
                 })
               }
