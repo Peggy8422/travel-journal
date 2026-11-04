@@ -499,6 +499,34 @@ export function InkStamp({
   );
 }
 
+/**
+ * 放在 Svg 裡，讓裡面畫的東西像蓋上去的印泥：有沒沾滿墨的淡區和白點（同 InkStamp 的字）。
+ * width、height 是外層 Svg 的大小。
+ */
+export function WornInk({
+  width,
+  height,
+  children,
+}: {
+  width: number;
+  height: number;
+  children: ReactNode;
+}) {
+  const seed = useSeed();
+  const wear = useMemo(
+    () => stampWear({ width, height, seed: seed + 3, density: 3 }),
+    [width, height, seed],
+  );
+  return (
+    <>
+      <Defs>
+        <SpeckMask id="wornInk" width={width} height={height} layers={wear} />
+      </Defs>
+      <G mask="url(#wornInk)">{children}</G>
+    </>
+  );
+}
+
 /** 收據紙上下鋸齒的齒數與深度 */
 const RECEIPT_TEETH = 24;
 const RECEIPT_TOOTH = 7;

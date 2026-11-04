@@ -31,6 +31,7 @@ import {
   Button,
   Chip,
   ErrorText,
+  HeaderAction,
   Label,
   Screen,
   SmallButton,
@@ -721,44 +722,6 @@ function FieldLabel({ children }: { children: ReactNode }) {
   );
 }
 
-/** 導覽列左右的文字按鈕（取消、儲存） */
-function HeaderAction({
-  title,
-  onPress,
-  strong = false,
-  disabled = false,
-}: {
-  title: string;
-  onPress: () => void;
-  strong?: boolean;
-  disabled?: boolean;
-}) {
-  const theme = useTheme();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      disabled={disabled}
-      hitSlop={10}
-      onPress={onPress}
-      style={({ pressed }) => ({
-        opacity: disabled ? 0.45 : pressed ? 0.6 : 1,
-        paddingHorizontal: 4,
-      })}
-    >
-      <Text
-        style={[
-          styles.headerAction,
-          strong
-            ? { color: theme.primary, fontFamily: fonts.bold }
-            : { color: "#5E554C" },
-        ]}
-      >
-        {title}
-      </Text>
-    </Pressable>
-  );
-}
-
 /** 分攤方式的兩段切換：選中的那段是白紙加細框 */
 function Segment({
   title,
@@ -1353,9 +1316,5 @@ const styles = StyleSheet.create({
   total: {
     fontFamily: fonts.bold,
     fontSize: 20,
-  },
-  headerAction: {
-    fontFamily: fonts.regular,
-    fontSize: 15,
   },
 });
