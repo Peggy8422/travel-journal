@@ -51,10 +51,11 @@ import {
   weekdayOf,
 } from "../services/journalDates";
 import { EntryPhotoField, useEntryPhotos } from "./EntryPhotos";
+import { EntryPlaceField, useEntryPlaces } from "./EntryPlaces";
 import { JournalStamp } from "./JournalStamp";
 import { MOOD_STAMPS, STAMP_TILTS, WEATHER_STAMPS } from "./stamps";
 
-type FormField = "title" | "photos" | "body";
+type FormField = "title" | "photos" | "body" | "places";
 
 /** 寫日記（entryId 為 null）與編輯日記共用的 modal，保留原生導覽列放取消、儲存 */
 export function EntryFormScreen({
@@ -86,6 +87,7 @@ function Form({ form }: { form: EntryForm }) {
   );
   const [mood, setMood] = useState<JournalMood | null>(entry?.mood ?? null);
   const photos = useEntryPhotos(entry?.photos ?? []);
+  const places = useEntryPlaces(entry?.places ?? []);
   const [fieldError, setFieldError] = useState<{
     field: FormField;
     message: string;
@@ -115,6 +117,7 @@ function Form({ form }: { form: EntryForm }) {
         weather,
         mood,
         photos: await photos.commit(deps.newId),
+        places: places.toPlaces(),
       };
       const result = entry
         ? await updateEntry(deps, entry.id, input)
@@ -132,6 +135,12 @@ function Form({ form }: { form: EntryForm }) {
           (error.code === "TEXT_TOO_LONG" && error.field === "entryBody")
         ) {
           return fail("body", describeError(error));
+        }
+        if (
+          error.code === "EMPTY_PLACE_NAME" ||
+          (error.code === "TEXT_TOO_LONG" && error.field === "placeName")
+        ) {
+          return fail("places", describeError(error));
         }
         // 不屬於某一欄的錯誤用彈窗：「儲存」在頁首
         Alert.alert("無法儲存", describeError(error));
@@ -229,7 +238,7 @@ function Form({ form }: { form: EntryForm }) {
             <HeaderAction
               title="儲存"
               strong
-              disabled={saving || photos.busy}
+              disabled={saving || photos.busy || places.busy}
               onPress={submit}
             />
           ),
@@ -298,6 +307,10 @@ function Form({ form }: { form: EntryForm }) {
           }}
           error={errorFor("body")}
         />
+      </View>
+
+      <View ref={scroller.field("places")}>
+        <EntryPlaceField places={places} error={errorFor("places")} />
       </View>
 
       {entry && (

@@ -8,16 +8,18 @@ import { PaperBackground, RuledPaper } from "../../../shared/ui/handDrawn";
 import { BackButton, PageMessage } from "../../../shared/ui/PageHeader";
 import { useTheme } from "../../../shared/ui/theme";
 import { describeError } from "../../ledger/components/messages";
+import { UNBOUND_JOURNALS_ID } from "../../map/services/mapData";
 import { useEntry } from "../hooks/useJournalQueries";
 import { entryHeading, monthDayLabel } from "../services/journalDates";
 import { PhotoCollage, PhotoViewer } from "./EntryPhotos";
+import { GlobeIcon, PlacePinIcon } from "./EntryPlaces";
 import { JournalStamp } from "./JournalStamp";
 import { PencilIcon } from "./PencilIcon";
 import { TAPE_COLORS } from "./tapes";
 
 /**
- * 一篇日記（只能看）：橫線信紙上寫日期、印章、標題、照片與內容，右上角「編輯」才進表單。
- * 點照片全螢幕看，可以左右滑。
+ * 一篇日記（只能看）：橫線信紙上寫日期、印章、標題、照片、內容與去過的地方，
+ * 右上角「編輯」才進表單。點照片全螢幕看，可以左右滑；「在地圖上看」打開這天的詳細地圖。
  * 導覽列隱藏，返回鍵自己畫。
  */
 export function JournalEntryScreen({ entryId }: { entryId: string }) {
@@ -107,6 +109,55 @@ export function JournalEntryScreen({ entryId }: { entryId: string }) {
             <Text selectable style={[styles.body, { color: theme.text }]}>
               {entry.body}
             </Text>
+          )}
+          {entry.places.length > 0 && (
+            <View style={styles.places}>
+              <View style={styles.placesHead}>
+                <Text
+                  accessibilityRole="header"
+                  style={[styles.placesTitle, { color: theme.text }]}
+                >
+                  去過的地方
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityHint="打開詳細地圖，看這天的地點"
+                  onPress={() =>
+                    router.push({
+                      pathname: "/map",
+                      params: {
+                        // Journal places show up with the bound ledger
+                        ledgers: journal.ledgerId ?? UNBOUND_JOURNALS_ID,
+                        date: entry.date,
+                      },
+                    })
+                  }
+                  style={({ pressed }) => [
+                    styles.mapButton,
+                    {
+                      backgroundColor: theme.surface,
+                      opacity: pressed ? 0.7 : 1,
+                    },
+                  ]}
+                >
+                  <GlobeIcon size={16} color={theme.text} />
+                  <Text style={[styles.mapText, { color: theme.text }]}>
+                    在地圖上看
+                  </Text>
+                </Pressable>
+              </View>
+              {entry.places.map((place, i) => (
+                <View key={i} style={styles.place}>
+                  <PlacePinIcon size={18} filled />
+                  <Text
+                    selectable
+                    style={[styles.placeName, { color: theme.text }]}
+                  >
+                    {place.name}
+                  </Text>
+                </View>
+              ))}
+            </View>
           )}
         </RuledPaper>
       </ScrollView>
@@ -199,5 +250,47 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     fontSize: 15.5,
     lineHeight: 28,
+  },
+  places: {
+    gap: 6,
+  },
+  placesHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  placesTitle: {
+    fontFamily: fonts.bold,
+    fontSize: 15.5,
+  },
+  mapButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    minHeight: 36,
+    paddingLeft: 9,
+    paddingRight: 12,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 15,
+    borderBottomRightRadius: 17,
+    borderBottomLeftRadius: 16,
+    boxShadow: "0px 0px 0px 1.2px rgba(58,51,45,0.5)",
+  },
+  mapText: {
+    fontFamily: fonts.regular,
+    fontSize: 13,
+  },
+  place: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    minHeight: 28,
+  },
+  placeName: {
+    flex: 1,
+    minWidth: 0,
+    fontFamily: fonts.regular,
+    fontSize: 15,
   },
 });

@@ -59,7 +59,9 @@ export function describeError(error: DisplayableError): string {
     case "INVALID_ENTRY_DATE":
       return "日期的格式不對";
     case "EMPTY_ENTRY":
-      return "寫點什麼再儲存，或蓋個印章、貼張照片也可以";
+      return "寫點什麼再儲存，或蓋個印章、貼張照片、記個地點也可以";
+    case "EMPTY_PLACE_NAME":
+      return "地點要有名字，請輸入地名或把這個地點拿掉";
     case "TOO_MANY_PHOTOS":
       return `一篇日記最多 ${error.max} 張照片`;
     case "EXPENSE_NOT_FOUND":

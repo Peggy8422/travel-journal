@@ -27,6 +27,7 @@ import {
   weekdayOf,
 } from "../services/journalDates";
 import { PhotoThumbs } from "./EntryPhotos";
+import { PlacePinIcon } from "./EntryPlaces";
 import { JournalStamp } from "./JournalStamp";
 import { PencilIcon } from "./PencilIcon";
 import { KRAFT, ledgerDotColor } from "./tapes";
@@ -242,6 +243,24 @@ function EntryRow({
           </Text>
         )}
         {entry.photos.length > 0 && <PhotoThumbs photos={entry.photos} />}
+        {entry.places.length > 0 && (
+          <View style={styles.placeChips}>
+            {entry.places.map((place, i) => (
+              <View
+                key={i}
+                style={[styles.placeChip, { backgroundColor: "#EFE7D8" }]}
+              >
+                <PlacePinIcon size={13} color="#A3452E" />
+                <Text
+                  numberOfLines={1}
+                  style={[styles.placeChipText, { color: theme.text }]}
+                >
+                  {place.name}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
       </View>
     </Pressable>
   );
@@ -445,6 +464,30 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bold,
     fontSize: 16,
     lineHeight: 22,
+  },
+  placeChips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  placeChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    maxWidth: "100%",
+    paddingVertical: 2,
+    paddingLeft: 6,
+    paddingRight: 9,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 10,
+    borderBottomRightRadius: 11,
+    borderBottomLeftRadius: 13,
+  },
+  placeChipText: {
+    flexShrink: 1,
+    fontFamily: fonts.regular,
+    fontSize: 12.5,
+    lineHeight: 20,
   },
   excerpt: {
     fontFamily: fonts.regular,

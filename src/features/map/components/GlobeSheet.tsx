@@ -10,17 +10,31 @@ import {
   WashiTape,
 } from "../../../shared/ui/handDrawn";
 import { useTheme } from "../../../shared/ui/theme";
-import type { GlobeSheetContent } from "../services/globeView";
-import type { MapExpense, MapLedger } from "../services/mapData";
+import {
+  countLabel,
+  type GlobeSheetContent,
+  type MapEntry,
+} from "../services/globeView";
+import {
+  mapLedgerName,
+  type MapExpense,
+  type MapItem,
+  type MapLedger,
+} from "../services/mapData";
 import { ledgerColors } from "./GlobeIndex";
-import { LedgerSectionHeader, MapExpenseRow } from "./MapExpenseRow";
+import {
+  LedgerSectionHeader,
+  MapEntryRow,
+  MapExpenseRow,
+} from "./MapExpenseRow";
 
 /** 地圖上的金額一律換算成新台幣（帳本的基準幣） */
 const BASE = "TWD";
 
 /**
- * 地球下方的消費卡片：標題列可以展開／收合，清單依帳本分段。
- * 點一筆消費，地球轉到那裡並標出名稱，同時打開消費明細；在地球上點標記時，清單只列那個地方的消費。
+ * 地球下方的消費卡片：標題列可以展開／收合，清單依帳本分段，有地點的日記和消費依日期排在一起。
+ * 點一筆消費（一篇日記），地球轉到那裡並標出名稱，同時打開消費明細（日記頁）；
+ * 在地球上點標記時，清單只列那個地方的消費與日記。
  */
 export function GlobeSheet({
   picked,
@@ -32,6 +46,7 @@ export function GlobeSheet({
   onClearPlace,
   focusId,
   onOpen,
+  onOpenEntry,
   onOpenDetail,
 }: {
   picked: readonly MapLedger[];
@@ -43,22 +58,35 @@ export function GlobeSheet({
   onClearPlace: () => void;
   focusId: string | null;
   onOpen: (expense: MapExpense) => void;
+  onOpenEntry: (entry: MapEntry) => void;
   onOpenDetail: () => void;
 }) {
   const theme = useTheme();
   const multi = picked.length > 1;
   const money = (minor: number) => `${BASE} ${formatMinorAmount(minor, BASE)}`;
   const title =
-    picked.length === 1
-      ? picked[0].kind === "personal"
-        ? "個人記帳"
-        : picked[0].name
-      : `${picked.length} 本帳本`;
+    picked.length === 1 ? mapLedgerName(picked[0]) : `${picked.length} 本帳本`;
   const count = content.expenses.length;
-  const shown = content.sections.flatMap((s) => s.expenses);
+  const hasItems = count > 0 || content.entryCount > 0;
+  // What the list shows when narrowed to a place on the globe
+  const shown: MapItem[] = content.sections.flatMap((s) =>
+    s.rows.flatMap<MapItem>((row) =>
+      row.kind === "expense"
+        ? [row.expense]
+        : row.entry.pins.filter((p) => placeIds?.includes(p.id) ?? true),
+    ),
+  );
   const placeNames = [
     ...new Set(shown.map((e) => e.placeName ?? e.title)),
   ].join("、");
+  const summary = [
+    content.entryCount > 0 ? `${content.entryCount} 篇日記` : null,
+    count > 0 ? `${count} 筆消費` : null,
+    `${content.placeCount} 個地點`,
+  ]
+    .filter((part) => part !== null)
+    .join(" · ");
+  const onlyJournals = picked.every((l) => l.kind === "journals");
 
   return (
     <View style={[styles.sheet, { height, backgroundColor: theme.surface }]}>
@@ -90,19 +118,23 @@ export function GlobeSheet({
             </Text>
           </View>
           <Text style={[styles.sub, { color: theme.textMuted }]}>
-            {count > 0
-              ? `${count} 筆消費 · ${content.placeCount} 個地點`
-              : "還沒有標記地點的消費"}
+            {hasItems
+              ? summary
+              : onlyJournals
+                ? "日記還沒有記地點"
+                : "還沒有標記地點的消費"}
           </Text>
         </View>
-        <View style={styles.headTotal}>
-          <Text style={[styles.total, { color: theme.text }]}>
-            {money(content.totalBaseMinor)}
-          </Text>
-          <Text style={[styles.totalLabel, { color: theme.textMuted }]}>
-            合計
-          </Text>
-        </View>
+        {!onlyJournals && (
+          <View style={styles.headTotal}>
+            <Text style={[styles.total, { color: theme.text }]}>
+              {money(content.totalBaseMinor)}
+            </Text>
+            <Text style={[styles.totalLabel, { color: theme.textMuted }]}>
+              合計
+            </Text>
+          </View>
+        )}
         <Svg
           width={18}
           height={18}
@@ -118,12 +150,12 @@ export function GlobeSheet({
         </Svg>
       </Pressable>
 
-      {count > 0 && (
+      {hasItems && (
         <View style={styles.tools}>
           {placeIds ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`取消只看${placeNames}，顯示全部消費`}
+              accessibilityLabel={`取消只看${placeNames}，顯示全部`}
               onPress={onClearPlace}
               style={({ pressed }) => [
                 styles.placeChip,
@@ -134,7 +166,7 @@ export function GlobeSheet({
                 numberOfLines={1}
                 style={[styles.placeText, { color: theme.text }]}
               >
-                只看 {placeNames} · {shown.length} 筆
+                只看 {placeNames} · {countLabel(shown)}
               </Text>
               <Svg
                 width={14}
@@ -162,29 +194,42 @@ export function GlobeSheet({
         style={styles.list}
         contentContainerStyle={styles.listContent}
       >
-        {count === 0 && (
+        {!hasItems && (
           <Text style={[styles.empty, { color: theme.textMuted }]}>
-            {picked.length === 1 && picked[0].kind === "personal"
-              ? "個人記帳"
-              : multi
-                ? "選的帳本"
-                : "這本帳本"}
-            還沒有標記地點的消費。新增消費時按「使用目前位置」，足跡就會出現在地球上。
+            {onlyJournals
+              ? "這些手帳的日記還沒有記地點。寫日記時按「目前位置」或「在地圖上選」，地點就會出現在地球上。"
+              : `${
+                  picked.length === 1 && picked[0].kind === "personal"
+                    ? "個人記帳"
+                    : multi
+                      ? "選的帳本"
+                      : "這本帳本"
+                }還沒有標記地點的消費。新增消費時按「使用目前位置」，足跡就會出現在地球上。`}
           </Text>
         )}
-        {content.sections.map(({ ledger, expenses }) => (
+        {content.sections.map(({ ledger, rows }) => (
           <View key={ledger.id}>
             {multi && <LedgerSectionHeader ledger={ledger} />}
-            {expenses.map((expense) => (
-              <MapExpenseRow
-                key={expense.id}
-                expense={expense}
-                ledger={ledger}
-                selected={expense.id === focusId}
-                accessibilityHint="在地球上標出這筆消費並打開明細"
-                onPress={() => onOpen(expense)}
-              />
-            ))}
+            {rows.map((row) =>
+              row.kind === "expense" ? (
+                <MapExpenseRow
+                  key={row.expense.id}
+                  expense={row.expense}
+                  ledger={ledger}
+                  selected={row.expense.id === focusId}
+                  accessibilityHint="在地球上標出這筆消費並打開明細"
+                  onPress={() => onOpen(row.expense)}
+                />
+              ) : (
+                <MapEntryRow
+                  key={row.entry.entryId}
+                  entry={row.entry}
+                  selected={row.entry.pins.some((p) => p.id === focusId)}
+                  accessibilityHint="在地球上標出這篇日記的地點並打開日記"
+                  onPress={() => onOpenEntry(row.entry)}
+                />
+              ),
+            )}
           </View>
         ))}
       </ScrollView>

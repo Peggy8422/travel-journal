@@ -4,6 +4,7 @@ import {
   isLocalDate,
   type JournalEntryRecord,
   type JournalMood,
+  type JournalPlace,
   type JournalRecord,
   type JournalWeather,
 } from "../../../domain/journal";
@@ -21,7 +22,7 @@ import { dayNumber, suggestEntryDate } from "./journalDates";
  * 日記的寫入與讀取。刪除是軟刪除，可以從提示紙條的「復原」或「最近刪除」放回來。
  */
 
-/** 寫日記與編輯日記時使用者可以改的欄位；地點之後再加 */
+/** 寫日記與編輯日記時使用者可以改的欄位 */
 export interface EntryInput {
   readonly date: string;
   readonly title: string;
@@ -30,6 +31,8 @@ export interface EntryInput {
   readonly mood: JournalMood | null;
   /** 已經存進 App 的照片檔名（saveCoverPhoto），依顯示順序 */
   readonly photos: readonly string[];
+  /** 依顯示順序；地名去掉前後空白後不能空白 */
+  readonly places: readonly JournalPlace[];
 }
 
 export async function writeEntry(
@@ -48,7 +51,6 @@ export async function writeEntry(
     ...checked.value,
     id: deps.newId(),
     journalId,
-    places: [],
     createdAt: timestamp,
     updatedAt: timestamp,
     deletedAt: null,
@@ -59,7 +61,7 @@ export async function writeEntry(
   return ok(entry);
 }
 
-/** 地點保留原本的；拿掉的照片之後由 tidyCoverPhotos 清掉 */
+/** 拿掉的照片之後由 tidyCoverPhotos 清掉 */
 export async function updateEntry(
   deps: JournalCommandDeps,
   entryId: string,
@@ -111,7 +113,7 @@ export async function restoreEntry(
   return ok(undefined);
 }
 
-/** 檢查日期、字數與照片張數，回傳去掉前後空白的標題與內容 */
+/** 檢查日期、字數、照片張數與地名，回傳去掉前後空白的標題、內容與地名 */
 function checkEntry(
   input: EntryInput,
 ): Result<EntryInput, JournalCommandError> {
@@ -127,16 +129,25 @@ function checkEntry(
   if (input.photos.length > ENTRY_PHOTO_LIMIT) {
     return err({ code: "TOO_MANY_PHOTOS", max: ENTRY_PHOTO_LIMIT });
   }
+  const places: JournalPlace[] = [];
+  for (const place of input.places) {
+    const name = place.name.trim();
+    if (name === "") return err({ code: "EMPTY_PLACE_NAME" });
+    const nameLength = checkTextLength("placeName", name);
+    if (!nameLength.ok) return nameLength;
+    places.push({ name, location: place.location });
+  }
   if (
     title === "" &&
     body === "" &&
     input.weather === null &&
     input.mood === null &&
-    input.photos.length === 0
+    input.photos.length === 0 &&
+    places.length === 0
   ) {
     return err({ code: "EMPTY_ENTRY" });
   }
-  return ok({ ...input, title, body });
+  return ok({ ...input, title, body, places });
 }
 
 /** 日記頁要顯示的資料 */

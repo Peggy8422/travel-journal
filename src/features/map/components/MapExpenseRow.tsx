@@ -4,10 +4,19 @@ import { formatMinorAmount } from "../../../domain/ledger";
 import { localDateOf } from "../../../domain/map";
 import { fonts } from "../../../shared/ui/fonts";
 import { useTheme } from "../../../shared/ui/theme";
+import { PencilIcon } from "../../journal/components/PencilIcon";
 import { CategoryIcon } from "../../ledger/components/CategoryIcon";
 import { formatLocalDate } from "../../ledger/services/localTimestamp";
-import type { MapExpense, MapLedger } from "../services/mapData";
+import type { MapEntry } from "../services/globeView";
+import {
+  mapLedgerName,
+  type MapExpense,
+  type MapLedger,
+} from "../services/mapData";
 import { ledgerColors } from "./GlobeIndex";
+
+/** 地圖上的日記用牛皮紙小卡，和帳本色的圓點分開 */
+export const KRAFT = { fill: "#D8C29E", edge: "#7E5F3A", ink: "#5E4A30" };
 
 /** 地圖上的金額一律換算成新台幣（帳本的基準幣） */
 const BASE = "TWD";
@@ -79,6 +88,101 @@ export function MapExpenseRow({
   );
 }
 
+/** 牛皮紙小卡加鉛筆：地球上的日記標記、清單裡日記的圖示 */
+export function KraftCard({
+  width,
+  height,
+  tilt,
+  ring,
+}: {
+  width: number;
+  height: number;
+  tilt: number;
+  /** 標記外面要不要加一圈紙色與描邊（地球上的標記才加） */
+  ring?: "plain" | "marked";
+}) {
+  const theme = useTheme();
+  return (
+    <View
+      style={{
+        width,
+        height,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: KRAFT.fill,
+        borderTopLeftRadius: 3,
+        borderTopRightRadius: 5,
+        borderBottomRightRadius: 4,
+        borderBottomLeftRadius: 6,
+        boxShadow:
+          ring === "marked"
+            ? `0px 0px 0px 3px ${theme.surface}, 0px 0px 0px 5px ${KRAFT.edge}, 2px 3px 0px rgba(58,51,45,0.22)`
+            : ring === "plain"
+              ? `0px 0px 0px 2px ${theme.surface}, 0px 0px 0px 3.2px ${KRAFT.edge}, 2px 3px 0px rgba(58,51,45,0.22)`
+              : `0px 0px 0px 1.2px ${KRAFT.edge}`,
+        transform: [{ rotate: `${tilt}deg` }],
+      }}
+    >
+      <PencilIcon
+        color={theme.text}
+        size={Math.round(Math.min(width, height) * 0.58)}
+        strokeWidth={2}
+      />
+    </View>
+  );
+}
+
+/** 一篇有地點的日記：牛皮紙小卡、標題、「日記 · 地點 · 日期」，右邊一個「日記」小章 */
+export function MapEntryRow({
+  entry,
+  selected = false,
+  accessibilityHint,
+  onPress,
+}: {
+  entry: MapEntry;
+  selected?: boolean;
+  accessibilityHint: string;
+  onPress: () => void;
+}) {
+  const theme = useTheme();
+  const places = [...new Set(entry.pins.map((p) => p.placeName))].join("、");
+  const sub = `${places} · ${formatLocalDate(entry.date)}`;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      accessibilityLabel={`日記：${entry.title}，${sub}`}
+      accessibilityHint={accessibilityHint}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.row,
+        {
+          backgroundColor: selected ? "#EFE5D2" : "transparent",
+          opacity: pressed ? 0.7 : 1,
+        },
+      ]}
+    >
+      <View style={styles.kraftSlot}>
+        <KraftCard width={30} height={32} tilt={-6} />
+      </View>
+      <View style={styles.main}>
+        <Text numberOfLines={1} style={[styles.title, { color: theme.text }]}>
+          {entry.title}
+        </Text>
+        <Text
+          numberOfLines={1}
+          style={[styles.sub, { color: theme.textMuted }]}
+        >
+          {sub}
+        </Text>
+      </View>
+      <View style={styles.badge}>
+        <Text style={styles.badgeText}>日記</Text>
+      </View>
+    </Pressable>
+  );
+}
+
 /** 好幾本帳本的消費列在一起時，每本前面的小標：帳本色圓點加名稱 */
 export function LedgerSectionHeader({ ledger }: { ledger: MapLedger }) {
   const theme = useTheme();
@@ -91,7 +195,7 @@ export function LedgerSectionHeader({ ledger }: { ledger: MapLedger }) {
         ]}
       />
       <Text style={[styles.sectionName, { color: theme.textMuted }]}>
-        {ledger.kind === "personal" ? "個人記帳" : ledger.name}
+        {mapLedgerName(ledger)}
       </Text>
     </View>
   );
@@ -133,6 +237,25 @@ const styles = StyleSheet.create({
   converted: {
     fontFamily: fonts.regular,
     fontSize: 11.5,
+  },
+  kraftSlot: {
+    width: 32,
+    alignItems: "center",
+  },
+  badge: {
+    paddingHorizontal: 7,
+    paddingVertical: 1,
+    borderWidth: 1.2,
+    borderColor: KRAFT.edge,
+    borderTopLeftRadius: 9,
+    borderTopRightRadius: 7,
+    borderBottomRightRadius: 10,
+    borderBottomLeftRadius: 8,
+  },
+  badgeText: {
+    fontFamily: fonts.regular,
+    fontSize: 11.5,
+    color: KRAFT.ink,
   },
   sectionHead: {
     flexDirection: "row",

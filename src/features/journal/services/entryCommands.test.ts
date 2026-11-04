@@ -22,7 +22,10 @@ const PAGE: EntryInput = {
   weather: "sunny",
   mood: null,
   photos: [],
+  places: [],
 };
+
+const KIYOMIZU = { latitude: 34.9949, longitude: 135.785 };
 
 async function setup() {
   const db = await createTestDatabase();
@@ -40,12 +43,13 @@ async function setup() {
 }
 
 describe("entry commands", () => {
-  it("writes an entry with trimmed text, its photos and no places yet", async () => {
+  it("writes an entry with trimmed text, its photos and places", async () => {
     const { db, deps, journal } = await setup();
     const entry = unwrap(
       await writeEntry(deps, journal.id, {
         ...PAGE,
         photos: ["b.jpg", "a.jpg"],
+        places: [{ name: " 清水寺 ", location: KIYOMIZU }],
       }),
     );
     expect(entry).toMatchObject({
@@ -56,7 +60,7 @@ describe("entry commands", () => {
       weather: "sunny",
       mood: null,
       photos: ["b.jpg", "a.jpg"],
-      places: [],
+      places: [{ name: "清水寺", location: KIYOMIZU }],
       deletedAt: null,
     });
     expect(
@@ -73,6 +77,29 @@ describe("entry commands", () => {
     // A stamp or a photo alone is enough
     unwrap(await writeEntry(deps, journal.id, { ...blank, mood: "tired" }));
     unwrap(await writeEntry(deps, journal.id, { ...blank, photos: ["a.jpg"] }));
+    // So is a place
+    unwrap(
+      await writeEntry(deps, journal.id, {
+        ...blank,
+        places: [{ name: "清水寺", location: KIYOMIZU }],
+      }),
+    );
+    expect(
+      unwrapErr(
+        await writeEntry(deps, journal.id, {
+          ...PAGE,
+          places: [{ name: "  ", location: KIYOMIZU }],
+        }),
+      ),
+    ).toEqual({ code: "EMPTY_PLACE_NAME" });
+    expect(
+      unwrapErr(
+        await writeEntry(deps, journal.id, {
+          ...PAGE,
+          places: [{ name: "字".repeat(41), location: KIYOMIZU }],
+        }),
+      ),
+    ).toEqual({ code: "TEXT_TOO_LONG", field: "placeName", max: 40 });
     const tenPhotos = Array.from({ length: 10 }, (_, i) => `p${i}.jpg`);
     expect(
       unwrapErr(
@@ -102,19 +129,20 @@ describe("entry commands", () => {
     );
   });
 
-  it("updates the text, stamps and photos but keeps places", async () => {
-    const { db, deps, journal } = await setup();
-    const entry = unwrap(await writeEntry(deps, journal.id, PAGE));
-    const repos = createRepositories(db);
-    const place = {
-      name: "清水寺",
-      location: { latitude: 35, longitude: 135 },
+  it("updates the text, stamps, photos and places", async () => {
+    const { deps, journal } = await setup();
+    const place = { name: "清水寺", location: KIYOMIZU };
+    const entry = unwrap(
+      await writeEntry(deps, journal.id, {
+        ...PAGE,
+        photos: ["a.jpg"],
+        places: [place],
+      }),
+    );
+    const arashiyama = {
+      name: "嵐山",
+      location: { latitude: 35.0094, longitude: 135.6668 },
     };
-    await repos.journalEntries.update({
-      ...entry,
-      photos: ["a.jpg"],
-      places: [place],
-    });
 
     const updated = unwrap(
       await updateEntry(deps, entry.id, {
@@ -124,6 +152,7 @@ describe("entry commands", () => {
         weather: null,
         mood: "moved",
         photos: ["c.jpg", "a.jpg"],
+        places: [arashiyama, place],
       }),
     );
     expect(updated).toMatchObject({
@@ -132,7 +161,7 @@ describe("entry commands", () => {
       weather: null,
       mood: "moved",
       photos: ["c.jpg", "a.jpg"],
-      places: [place],
+      places: [arashiyama, place],
       createdAt: entry.createdAt,
     });
     expect(updated.updatedAt > entry.updatedAt).toBe(true);
