@@ -16,7 +16,7 @@ import type {
   ResolveFxRateError,
 } from "../services/resolveFxRate";
 
-type DisplayableError =
+export type DisplayableError =
   | LedgerCommandError
   | JournalCommandError
   | LedgerSummaryError
@@ -54,6 +54,12 @@ export function describeError(error: DisplayableError): string {
       return "找不到這本手帳，可能已被刪除";
     case "LEDGER_HAS_JOURNAL":
       return `這本帳本已經綁了手帳「${error.journalName}」`;
+    case "ENTRY_NOT_FOUND":
+      return "找不到這篇日記，可能已被刪除";
+    case "INVALID_ENTRY_DATE":
+      return "日期的格式不對";
+    case "EMPTY_ENTRY":
+      return "寫點什麼再儲存，或蓋個天氣、心情印章也可以";
     case "EXPENSE_NOT_FOUND":
       return "找不到這筆消費，可能已被刪除";
     case "SETTLEMENT_NOT_FOUND":

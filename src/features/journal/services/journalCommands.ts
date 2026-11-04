@@ -30,7 +30,11 @@ export type JournalCommandError =
       readonly code: "LEDGER_HAS_JOURNAL";
       readonly ledgerId: string;
       readonly journalName: string;
-    };
+    }
+  | { readonly code: "ENTRY_NOT_FOUND"; readonly entryId: string }
+  | { readonly code: "INVALID_ENTRY_DATE"; readonly date: string }
+  /** 標題、內容、天氣、心情都沒有 */
+  | { readonly code: "EMPTY_ENTRY" };
 
 export type JournalCommandResult<T> = Promise<Result<T, JournalCommandError>>;
 

@@ -2,6 +2,12 @@ import { useCallback } from "react";
 
 import { useFocusedQuery } from "../../../shared/hooks/useFocusedQuery";
 import { useDatabase } from "../../database/DatabaseProvider";
+import { toLocalIsoString } from "../../ledger/services/localTimestamp";
+import {
+  loadDeletedEntries,
+  loadEntry,
+  loadEntryForm,
+} from "../services/entryCommands";
 import {
   loadJournal,
   loadJournalShelf,
@@ -28,6 +34,42 @@ export function useLedgerChoices(selfJournalId: string | null) {
   const load = useCallback(
     () => loadLedgerChoices(db, selfJournalId),
     [db, selfJournalId],
+  );
+  return useFocusedQuery(load);
+}
+
+/** 一篇日記（日記頁），data 是 Result；刪除的日記讀不到 */
+export function useEntry(entryId: string) {
+  const db = useDatabase();
+  const load = useCallback(() => loadEntry(db, entryId), [db, entryId]);
+  return useFocusedQuery(load);
+}
+
+/**
+ * 寫日記／編輯日記表單的資料，data 是 Result。entryId 為 null 時是寫新日記，
+ * 預設日期用手機上的今天推算。
+ */
+export function useEntryForm(journalId: string, entryId: string | null) {
+  const db = useDatabase();
+  const load = useCallback(
+    () =>
+      loadEntryForm(
+        db,
+        journalId,
+        entryId,
+        toLocalIsoString(new Date()).slice(0, 10),
+      ),
+    [db, journalId, entryId],
+  );
+  return useFocusedQuery(load);
+}
+
+/** 一本手帳裡刪除的日記，最近刪除的在前 */
+export function useDeletedEntries(journalId: string) {
+  const db = useDatabase();
+  const load = useCallback(
+    () => loadDeletedEntries(db, journalId),
+    [db, journalId],
   );
   return useFocusedQuery(load);
 }
