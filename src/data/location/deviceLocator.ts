@@ -2,7 +2,7 @@ import * as Location from "expo-location";
 
 import type { GeoPoint } from "../../domain/ledger";
 import type { DeviceLocator } from "../../domain/location";
-import { formatPlaceName } from "./placeName";
+import { formatCity, formatPlaceName } from "./placeName";
 
 /** 室內或訊號差時定位可能很久，逾時後改用最近一次已知位置 */
 export const CURRENT_POSITION_TIMEOUT_MS = 10_000;
@@ -38,6 +38,9 @@ export function createDeviceLocator(): DeviceLocator {
     },
     async placeNameAt(point) {
       return formatPlaceName(await Location.reverseGeocodeAsync(point));
+    },
+    async cityAt(point) {
+      return formatCity(await Location.reverseGeocodeAsync(point));
     },
   };
 }

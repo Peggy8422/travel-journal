@@ -17,6 +17,8 @@ export interface DeviceLocator {
   lastKnownPosition(): Promise<GeoPoint | null>;
   /** 座標轉成地名；查不到時回傳 null，離線或服務錯誤時應 throw */
   placeNameAt(point: GeoPoint): Promise<string | null>;
+  /** 座標所在的城市（例如「京都市」），收藏地點依城市分組用；查不到時回傳 null，離線或服務錯誤時應 throw */
+  cityAt(point: GeoPoint): Promise<string | null>;
 }
 
 /** 搜尋到的一個地點 */

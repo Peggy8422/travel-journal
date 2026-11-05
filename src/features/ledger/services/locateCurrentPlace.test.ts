@@ -16,6 +16,7 @@ function fakeLocator(overrides: Partial<DeviceLocator> = {}): DeviceLocator {
     currentPosition: jest.fn().mockResolvedValue(shibuya),
     lastKnownPosition: jest.fn().mockResolvedValue(lastKnown),
     placeNameAt: jest.fn().mockResolvedValue("渋谷駅"),
+    cityAt: jest.fn().mockResolvedValue("渋谷区"),
     ...overrides,
   };
 }

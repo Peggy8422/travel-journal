@@ -43,6 +43,17 @@ export function formatPlaceName(
   return clean(address.country);
 }
 
+/** 反查地址的城市；沒有城市時往上用次級行政區、行政區（例如東京都），都沒有回傳 null */
+export function formatCity(
+  addresses: readonly GeocodedAddress[],
+): string | null {
+  const address = addresses[0];
+  if (!address) return null;
+  return (
+    clean(address.city) ?? clean(address.subregion) ?? clean(address.region)
+  );
+}
+
 function clean(value: string | null): string | null {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;

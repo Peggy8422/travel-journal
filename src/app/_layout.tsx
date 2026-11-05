@@ -126,6 +126,27 @@ export default function RootLayout() {
               name="illustrations/draw"
               options={{ title: "畫插圖", presentation: "fullScreenModal" }}
             />
+            {/* 收藏清單、地點頁、評分項目自己畫頁首；收藏／編輯地點和消費表單一樣是 modal */}
+            <Stack.Screen
+              name="places/index"
+              options={{ title: "收藏清單", headerShown: false }}
+            />
+            <Stack.Screen
+              name="places/[id]/index"
+              options={{ title: "地點", headerShown: false }}
+            />
+            <Stack.Screen
+              name="places/criteria"
+              options={{ title: "評分項目", headerShown: false }}
+            />
+            <Stack.Screen
+              name="places/new"
+              options={{ title: "收藏地點", presentation: "modal" }}
+            />
+            <Stack.Screen
+              name="places/[id]/edit"
+              options={{ title: "編輯地點", presentation: "modal" }}
+            />
             <Stack.Screen
               name="ledger/[id]/add-expense"
               options={{ title: "新增消費", presentation: "modal" }}

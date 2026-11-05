@@ -11,6 +11,7 @@ import type {
   JournalRestoreReport,
 } from "../../journal/services/journalBackup";
 import type { PlaceRestoreReport } from "../../places/services/placeBackup";
+import type { PlaceCommandError } from "../../places/services/placeCommands";
 import type { RestoreReport } from "../services/backupCommands";
 import type { LedgerCommandError } from "../services/ledgerCommands";
 import type { LedgerSummaryError } from "../services/ledgerSummary";
@@ -28,7 +29,8 @@ export type DisplayableError =
   | ResolveFxRateError
   | BackupFileError
   | LocateError
-  | PlaceSearchError;
+  | PlaceSearchError
+  | PlaceCommandError;
 
 const TEXT_FIELD_LABELS: Readonly<Record<LimitedTextField, string>> = {
   ledgerName: "帳本名稱",
@@ -81,6 +83,16 @@ export function describeError(error: DisplayableError): string {
       return `一張插圖最多 ${error.maxStrokes} 筆，先存起來，剩下的畫在另一張吧`;
     case "TOO_MANY_STICKERS":
       return `一篇日記最多貼 ${error.maxStickers} 張插圖`;
+    case "PLACE_NOT_FOUND":
+      return "找不到這個地點，可能已被刪除";
+    case "RATING_CRITERION_NOT_FOUND":
+      return "找不到這個評分項目，請重新整理再試一次";
+    case "EMPTY_CRITERION_LABEL":
+      return "請輸入評分項目的名稱";
+    case "DUPLICATE_CRITERION_LABEL":
+      return `已經有「${error.label}」這個評分項目了`;
+    case "TOO_MANY_CRITERIA":
+      return `評分項目最多 ${error.max} 個，先封存一個再新增`;
     case "EXPENSE_NOT_FOUND":
       return "找不到這筆消費，可能已被刪除";
     case "SETTLEMENT_NOT_FOUND":
