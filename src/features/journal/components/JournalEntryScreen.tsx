@@ -10,6 +10,7 @@ import { useTheme } from "../../../shared/ui/theme";
 import { describeError } from "../../ledger/components/messages";
 import { UNBOUND_JOURNALS_ID } from "../../map/services/mapData";
 import { useEntry } from "../hooks/useJournalQueries";
+import { DaySpendingCard } from "./DaySpendingCard";
 import { entryHeading, monthDayLabel } from "../services/journalDates";
 import { PhotoCollage, PhotoViewer } from "./EntryPhotos";
 import { GlobeIcon, PlacePinIcon } from "./EntryPlaces";
@@ -19,7 +20,8 @@ import { TAPE_COLORS } from "./tapes";
 
 /**
  * 一篇日記（只能看）：橫線信紙上寫日期、印章、標題、照片、內容與去過的地方，
- * 右上角「編輯」才進表單。點照片全螢幕看，可以左右滑；「在地圖上看」打開這天的詳細地圖。
+ * 有綁帳本時最下面列出這天的消費。右上角「編輯」才進表單。
+ * 點照片全螢幕看，可以左右滑；「在地圖上看」打開這天的詳細地圖。
  * 導覽列隱藏，返回鍵自己畫。
  */
 export function JournalEntryScreen({ entryId }: { entryId: string }) {
@@ -43,7 +45,7 @@ export function JournalEntryScreen({ entryId }: { entryId: string }) {
     );
   }
 
-  const { entry, journal, dayNumber } = data.value;
+  const { entry, journal, dayNumber, daySpending } = data.value;
   return (
     <View style={[styles.fill, { backgroundColor: theme.background }]}>
       <PaperBackground />
@@ -159,6 +161,7 @@ export function JournalEntryScreen({ entryId }: { entryId: string }) {
               ))}
             </View>
           )}
+          {daySpending && <DaySpendingCard spending={daySpending} />}
         </RuledPaper>
       </ScrollView>
       {viewing !== null && (

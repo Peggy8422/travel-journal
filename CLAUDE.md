@@ -31,6 +31,7 @@ src/app/  →  src/features/  →  src/domain/
   - 封面是固定的牛皮紙筆記本（`JournalCover`），使用者只挑紙膠帶顏色和要不要貼照片，不沿用帳本的 `NotebookCover`。
   - 手帳封面和日記的照片與帳本照片封面放在同一個資料夾（`CoverPhotoStore`）。`pruneCoverPhotos` 會一起看帳本封面、手帳封面、日記照片（含已刪除的日記，才能復原），之後新增存照片的地方，`usedPhotoNames` 和 `backupPhotoNames`（`features/ledger/services/coverPhotos.ts`）都要補。日記照片要能全螢幕看，存長邊 1600px（`pickEntryPhotos`，封面只存 600px 寬），一篇最多 `ENTRY_PHOTO_LIMIT` 張，因為照片會整包放進備份檔。
   - 日記的地點（名稱＋座標，不存設計稿上的「京都・東山區」這類區域）每一個是地圖上的一個 `JournalMapPin`（`domain/map/types.ts`），`ledgerId` 是手帳綁定的帳本，所以選了帳本就一起出現；沒綁帳本的手帳共用 `UNBOUND_JOURNALS_ID`（`features/map/services/mapData.ts`），地球右側多一張「手帳」索引籤（有日記才出現）。地球上日記是牛皮紙小卡、和消費分開合併；卡片清單一篇日記一列（`entriesOf`）。路線（`routeOf`）只連消費，日記沒有時間。日記頁的「在地圖上看」打開 `/map?ledgers=…&date=…`。
+  - 有綁帳本時，日記頁最下面列出「這天的消費」（`daySpendingOf`，`features/journal/services/daySpending.ts`）：只讀帳本、不另存，日期比的是消費當地日期（`occurredAt` 前 10 碼），不是臺灣時間；合計同一幣別就用那個幣別，混了幣別才換算成帳本的基準幣。
   - 備份第 6 版多了最外層的 `journals`；還原時先還原帳本再還原手帳，綁的帳本不在手機上或已經綁給別本手帳時，改成不綁定。
 - 共用 UI 元件與主題色在 `src/shared/ui/`（只用 React Native 內建元件，不用 `@expo/ui`）。
 - 日系手繪風格（設計稿：https://claude.ai/artifact/Bq5DkRzceSM8V5rzqG2HPD）：

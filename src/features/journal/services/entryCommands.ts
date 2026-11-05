@@ -16,6 +16,7 @@ import type {
   JournalCommandError,
   JournalCommandResult,
 } from "./journalCommands";
+import { loadDaySpending, type DaySpending } from "./daySpending";
 import { dayNumber, suggestEntryDate } from "./journalDates";
 
 /*
@@ -156,6 +157,8 @@ export interface EntryDetail {
   readonly entry: JournalEntryRecord;
   /** 這本手帳的第幾天（最早一篇的日期是 Day 1） */
   readonly dayNumber: number;
+  /** 綁定的帳本這天的消費；沒綁帳本時為 null */
+  readonly daySpending: DaySpending | null;
 }
 
 /** 刪除的日記讀不到（日記頁直接當作不存在） */
@@ -172,11 +175,17 @@ export async function loadEntry(
   if (!journal) {
     return err({ code: "JOURNAL_NOT_FOUND", journalId: entry.journalId });
   }
-  const entries = await repos.journalEntries.listByJournal(journal.id);
+  const [entries, daySpending] = await Promise.all([
+    repos.journalEntries.listByJournal(journal.id),
+    journal.ledgerId === null
+      ? null
+      : loadDaySpending(repos, journal.ledgerId, entry.date),
+  ]);
   return ok({
     journal,
     entry,
     dayNumber: dayNumber(entries[0]?.date ?? entry.date, entry.date),
+    daySpending,
   });
 }
 

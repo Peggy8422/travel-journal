@@ -9,7 +9,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import Svg, { Defs, Pattern, Rect } from "react-native-svg";
+import Svg, { Defs, Path, Pattern, Rect } from "react-native-svg";
 
 import {
   JOURNAL_MOODS,
@@ -313,6 +313,8 @@ function Form({ form }: { form: EntryForm }) {
         <EntryPlaceField places={places} error={errorFor("places")} />
       </View>
 
+      {form.ledger && <LedgerHint name={form.ledger.name} />}
+
       {entry && (
         <TextButton
           title="刪除這篇日記"
@@ -322,6 +324,32 @@ function Form({ form }: { form: EntryForm }) {
         />
       )}
     </Screen>
+  );
+}
+
+/** 綁了帳本時告訴使用者消費不用另外寫，日記頁會自己列出來 */
+function LedgerHint({ name }: { name: string }) {
+  const theme = useTheme();
+  return (
+    <View style={[styles.ledgerHint, { backgroundColor: theme.chip }]}>
+      <Svg
+        width={20}
+        height={20}
+        viewBox="0 0 26 26"
+        fill="none"
+        stroke={theme.textMuted}
+        strokeWidth={1.6}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        style={styles.ledgerHintIcon}
+      >
+        <Path d="M6.2 3.8h12.4c1 0 1.7.8 1.7 1.7l-.2 15.2c0 1-.7 1.6-1.6 1.6H6.1z" />
+        <Path d="M9.2 3.9l-.1 18.3" />
+      </Svg>
+      <Text style={[styles.ledgerHintText, { color: theme.textMuted }]}>
+        日記頁會自動列出這天在「{name}」記的消費，不用另外輸入。
+      </Text>
+    </View>
   );
 }
 
@@ -465,6 +493,26 @@ function fromDeviceDate(date: Date): string {
 }
 
 const styles = StyleSheet.create({
+  ledgerHint: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 14,
+    borderBottomRightRadius: 9,
+    borderBottomLeftRadius: 15,
+  },
+  ledgerHintIcon: {
+    marginTop: 1,
+  },
+  ledgerHintText: {
+    flex: 1,
+    fontFamily: fonts.regular,
+    fontSize: 13.5,
+    lineHeight: 21,
+  },
   content: {
     gap: 22,
     paddingTop: 18,

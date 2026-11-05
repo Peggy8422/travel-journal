@@ -1,7 +1,12 @@
 import { createTestDatabase } from "../../../data/db/testDatabase";
 import { createRepositories } from "../../../data/repositories";
 import { unwrap, unwrapErr } from "../../../domain/ledger/testFixtures";
-import { addExpense, createLedger } from "../../ledger/services/ledgerCommands";
+import {
+  addExpense,
+  createLedger,
+  deleteExpense,
+  type ExpenseInput,
+} from "../../ledger/services/ledgerCommands";
 import {
   deleteEntry,
   loadDeletedEntries,
@@ -200,6 +205,96 @@ describe("entry commands", () => {
     expect(unwrapErr(await restoreEntry(deps, "missing")).code).toBe(
       "ENTRY_NOT_FOUND",
     );
+  });
+});
+
+describe("the day's spending", () => {
+  function spend(
+    payerId: string,
+    title: string,
+    amountMinor: number,
+    occurredAt: string,
+    currency: "JPY" | "TWD" = "JPY",
+  ): ExpenseInput {
+    return {
+      payerId,
+      amountMinor,
+      currency,
+      fx: currency === "JPY" ? { rateToBase: "0.2", source: "manual" } : null,
+      split: { kind: "equal", participantIds: [payerId] },
+      title,
+      note: null,
+      category: "food",
+      placeName: null,
+      location: null,
+      occurredAt,
+    };
+  }
+
+  it("lists the bound ledger's expenses on the entry's local day", async () => {
+    const { db, deps } = await setup();
+    const { ledger, members } = unwrap(
+      await createLedger(deps, { name: "京都", memberNames: ["我", "小明"] }),
+    );
+    const [me, ming] = members.map((m) => m.id);
+    const add = (input: ExpenseInput) => addExpense(deps, ledger.id, input);
+    unwrap(await add(spend(ming, "拉麵", 1500, "2025-11-22T12:30:00+09:00")));
+    unwrap(await add(spend(me, "早餐", 1000, "2025-11-22T08:00:00+09:00")));
+    // Local dates decide the day, not Taiwan time
+    unwrap(await add(spend(me, "宵夜", 800, "2025-11-21T23:50:00+09:00")));
+    unwrap(await add(spend(me, "隔天", 500, "2025-11-23T00:10:00+09:00")));
+    const gone = unwrap(
+      await add(spend(me, "刪掉的", 300, "2025-11-22T15:00:00+09:00")),
+    );
+    unwrap(await deleteExpense(deps, gone.id));
+
+    const journal = unwrap(
+      await createJournal(deps, {
+        name: "京都",
+        ledgerId: ledger.id,
+        cover: COVER,
+      }),
+    );
+    const entry = unwrap(await writeEntry(deps, journal.id, PAGE));
+    const { daySpending } = unwrap(await loadEntry(db, entry.id));
+    expect(
+      daySpending?.rows.map((r) => [r.expense.title, r.payerName, r.baseMinor]),
+    ).toEqual([
+      ["早餐", "我", 200],
+      ["拉麵", "小明", 300],
+    ]);
+    expect(daySpending?.total).toEqual({ currency: "JPY", amountMinor: 2500 });
+
+    // Mixed currencies add up in the ledger's base currency
+    unwrap(
+      await add(spend(me, "伴手禮", 100, "2025-11-22T18:00:00+09:00", "TWD")),
+    );
+    const mixed = unwrap(await loadEntry(db, entry.id)).daySpending;
+    expect(mixed?.rows).toHaveLength(3);
+    expect(mixed?.total).toEqual({ currency: "TWD", amountMinor: 600 });
+  });
+
+  it("has nothing to list for an unbound journal or a quiet day", async () => {
+    const { db, deps, journal } = await setup();
+    const entry = unwrap(await writeEntry(deps, journal.id, PAGE));
+    expect(unwrap(await loadEntry(db, entry.id)).daySpending).toBeNull();
+
+    const { ledger } = unwrap(
+      await createLedger(deps, { name: "大阪", memberNames: ["我"] }),
+    );
+    const bound = unwrap(
+      await createJournal(deps, {
+        name: "大阪",
+        ledgerId: ledger.id,
+        cover: COVER,
+      }),
+    );
+    const quiet = unwrap(await writeEntry(deps, bound.id, PAGE));
+    expect(unwrap(await loadEntry(db, quiet.id)).daySpending).toMatchObject({
+      ledger: { id: ledger.id },
+      rows: [],
+      total: null,
+    });
   });
 });
 
