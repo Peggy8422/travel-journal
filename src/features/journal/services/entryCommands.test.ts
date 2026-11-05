@@ -175,6 +175,53 @@ describe("entry commands", () => {
     );
   });
 
+  it("moves an entry to another journal with its photos and places", async () => {
+    const { db, deps, journal } = await setup();
+    const osaka = unwrap(
+      await createJournal(deps, { name: "大阪", ledgerId: null, cover: COVER }),
+    );
+    unwrap(await writeEntry(deps, osaka.id, { ...PAGE, date: "2025-11-20" }));
+    const kept = unwrap(await writeEntry(deps, journal.id, PAGE));
+    const entry = unwrap(
+      await writeEntry(deps, journal.id, {
+        ...PAGE,
+        date: "2025-11-21",
+        photos: ["a.jpg"],
+        places: [{ name: "通天閣", location: KIYOMIZU }],
+      }),
+    );
+
+    const moved = unwrap(
+      await updateEntry(
+        deps,
+        entry.id,
+        {
+          ...PAGE,
+          date: "2025-11-21",
+          photos: ["a.jpg"],
+          places: entry.places,
+        },
+        osaka.id,
+      ),
+    );
+    expect(moved).toMatchObject({
+      journalId: osaka.id,
+      photos: ["a.jpg"],
+      places: entry.places,
+    });
+    // Day N follows the journal it now belongs to
+    expect(unwrap(await loadEntry(db, entry.id))).toMatchObject({
+      journal: { id: osaka.id },
+      dayNumber: 2,
+    });
+    expect(unwrap(await loadEntry(db, kept.id)).dayNumber).toBe(1);
+
+    expect(
+      unwrapErr(await updateEntry(deps, entry.id, PAGE, "missing")).code,
+    ).toBe("JOURNAL_NOT_FOUND");
+    expect(unwrap(await loadEntry(db, entry.id)).journal.id).toBe(osaka.id);
+  });
+
   it("soft deletes an entry and puts it back", async () => {
     const { db, deps, journal } = await setup();
     const kept = unwrap(await writeEntry(deps, journal.id, PAGE));
@@ -321,11 +368,40 @@ describe("entry form", () => {
       entry: { id: first.id },
       date: "2025-11-22",
       otherDates: ["2025-11-24"],
+      moveTargets: [],
     });
+    expect(fresh.moveTargets).toEqual([]);
     expect(
       unwrapErr(await loadEntryForm(db, journal.id, "missing", "2026-11-03"))
         .code,
     ).toBe("ENTRY_NOT_FOUND");
+  });
+
+  it("offers the other journals to move an entry to", async () => {
+    const { db, deps, journal } = await setup();
+    const { ledger } = unwrap(
+      await createLedger(deps, { name: "首爾", memberNames: ["我"] }),
+    );
+    const seoul = unwrap(
+      await createJournal(deps, {
+        name: "首爾",
+        ledgerId: ledger.id,
+        cover: COVER,
+      }),
+    );
+    unwrap(await writeEntry(deps, seoul.id, { ...PAGE, date: "2026-03-06" }));
+    const entry = unwrap(await writeEntry(deps, journal.id, PAGE));
+
+    const form = unwrap(
+      await loadEntryForm(db, journal.id, entry.id, "2026-11-03"),
+    );
+    expect(form.moveTargets).toEqual([
+      {
+        journal: seoul,
+        ledger: expect.objectContaining({ id: ledger.id }),
+        otherDates: ["2026-03-06"],
+      },
+    ]);
   });
 
   it("starts a bound journal on the day of the first expense", async () => {

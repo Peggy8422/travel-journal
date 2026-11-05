@@ -62,23 +62,31 @@ export async function writeEntry(
   return ok(entry);
 }
 
-/** 拿掉的照片之後由 tidyCoverPhotos 清掉 */
+/**
+ * 修改日記；journalId 和原本的不同時，把這篇日記移到那本手帳（照片、地點跟著走）。
+ * 拿掉的照片之後由 tidyCoverPhotos 清掉
+ */
 export async function updateEntry(
   deps: JournalCommandDeps,
   entryId: string,
   input: EntryInput,
+  journalId?: string,
 ): JournalCommandResult<JournalEntryRecord> {
   const checked = checkEntry(input);
   if (!checked.ok) return checked;
-  const entry = await createRepositories(deps.db).journalEntries.findById(
-    entryId,
-  );
+  const repos = createRepositories(deps.db);
+  const entry = await repos.journalEntries.findById(entryId);
   if (!entry || entry.deletedAt !== null) {
     return err({ code: "ENTRY_NOT_FOUND", entryId });
+  }
+  const target = journalId ?? entry.journalId;
+  if (target !== entry.journalId && !(await repos.journals.findById(target))) {
+    return err({ code: "JOURNAL_NOT_FOUND", journalId: target });
   }
   const updated: JournalEntryRecord = {
     ...entry,
     ...checked.value,
+    journalId: target,
     updatedAt: deps.now().toISOString(),
   };
   await deps.db.transaction((tx) =>
@@ -189,14 +197,20 @@ export async function loadEntry(
   });
 }
 
-/** 寫日記／編輯日記表單需要的資料 */
-export interface EntryForm {
+/** 一本手帳在表單上需要的資料：換手帳時 Day N 與帳本提示跟著換 */
+export interface EntryFormJournal {
   readonly journal: JournalRecord;
   readonly ledger: LedgerRecord | null;
+  /** 這本手帳裡其他日記的日期（由舊到新），用來算表單上的 Day N */
+  readonly otherDates: readonly string[];
+}
+
+/** 寫日記／編輯日記表單需要的資料 */
+export interface EntryForm extends EntryFormJournal {
   /** 正在編輯的日記；寫新日記時為 null */
   readonly entry: JournalEntryRecord | null;
-  /** 其他日記的日期（由舊到新），用來算表單上的 Day N */
-  readonly otherDates: readonly string[];
+  /** 編輯時可以把日記移過去的其他手帳（依建立時間由新到舊）；寫新日記時是空的 */
+  readonly moveTargets: readonly EntryFormJournal[];
   /** 寫新日記時預設的日期；編輯時是原本的日期 */
   readonly date: string;
 }
@@ -223,11 +237,28 @@ export async function loadEntryForm(
   if (entryId !== null) {
     const entry = entries.find((e) => e.id === entryId);
     if (!entry) return err({ code: "ENTRY_NOT_FOUND", entryId });
+    const others = (await repos.journals.list()).filter(
+      (j) => j.id !== journal.id,
+    );
+    const moveTargets = await Promise.all(
+      others.map(async (other) => {
+        const [otherEntries, otherLedger] = await Promise.all([
+          repos.journalEntries.listByJournal(other.id),
+          other.ledgerId ? repos.ledgers.findById(other.ledgerId) : undefined,
+        ]);
+        return {
+          journal: other,
+          ledger: otherLedger ?? null,
+          otherDates: otherEntries.map((e) => e.date),
+        };
+      }),
+    );
     return ok({
       journal,
       ledger: ledger ?? null,
       entry,
       otherDates,
+      moveTargets,
       date: entry.date,
     });
   }
@@ -240,6 +271,7 @@ export async function loadEntryForm(
     ledger: ledger ?? null,
     entry: null,
     otherDates,
+    moveTargets: [],
     date: suggestEntryDate({
       lastDate: otherDates[otherDates.length - 1] ?? null,
       firstExpenseDate: firstExpense?.occurredAt.slice(0, 10) ?? null,

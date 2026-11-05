@@ -28,6 +28,7 @@ src/app/  →  src/features/  →  src/domain/
   - 名稱存手帳自己的：建立時還沒自己打字就跟著選的帳本填入，之後兩邊各改各的。手帳設定改綁帳本、名稱還是舊帳本名稱時，名稱欄下面出現 `RenameSuggestion`，不跳 `Alert`。
   - 日記日期是旅行當地的 `YYYY-MM-DD`（`isLocalDate`），使用者自己選，不換算時區。天氣、心情、紙膠帶代碼在 `domain/journal`，和分類一樣只能新增。
   - 點一篇日記開的是整頁的日記頁（`/journal/[id]/entry/[entryId]`，和設計稿一樣不是消費明細那種 formSheet），「編輯」與「寫日記」是 modal。刪除日記和消費一樣是軟刪除、有「復原」和「最近刪除」（`DeletedFold` 共用）；從編輯表單刪除後用 `dismissTo` 回到手帳，日記頁也一起關掉。
+  - 日記可以搬到別本手帳：編輯表單最上面的「手帳」欄（有其他手帳才出現），按「儲存」才移（`updateEntry` 的 `journalId`），Day N、這天的消費都跟著新手帳。
   - 封面是固定的牛皮紙筆記本（`JournalCover`），使用者只挑紙膠帶顏色和要不要貼照片，不沿用帳本的 `NotebookCover`。
   - 手帳封面和日記的照片與帳本照片封面放在同一個資料夾（`CoverPhotoStore`）。`pruneCoverPhotos` 會一起看帳本封面、手帳封面、日記照片（含已刪除的日記，才能復原），之後新增存照片的地方，`usedPhotoNames` 和 `backupPhotoNames`（`features/ledger/services/coverPhotos.ts`）都要補。日記照片要能全螢幕看，存長邊 1600px（`pickEntryPhotos`，封面只存 600px 寬），一篇最多 `ENTRY_PHOTO_LIMIT` 張，因為照片會整包放進備份檔。
   - 日記的地點（名稱＋座標，不存設計稿上的「京都・東山區」這類區域）每一個是地圖上的一個 `JournalMapPin`（`domain/map/types.ts`），`ledgerId` 是手帳綁定的帳本，所以選了帳本就一起出現；沒綁帳本的手帳共用 `UNBOUND_JOURNALS_ID`（`features/map/services/mapData.ts`），地球右側多一張「手帳」索引籤（有日記才出現）。地球上日記是牛皮紙小卡、和消費分開合併；卡片清單一篇日記一列（`entriesOf`）。路線（`routeOf`）只連消費，日記沒有時間。日記頁的「在地圖上看」打開 `/map?ledgers=…&date=…`。

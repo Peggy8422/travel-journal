@@ -141,10 +141,11 @@ export function createJournalEntryRepository(
 
     async update(entry) {
       await db.runAsync(
-        `UPDATE journal_entries SET entry_date = ?, title = ?, body = ?,
-           weather = ?, mood = ?, updated_at = ?
+        `UPDATE journal_entries SET journal_id = ?, entry_date = ?, title = ?,
+           body = ?, weather = ?, mood = ?, updated_at = ?
          WHERE id = ?`,
         [
+          entry.journalId,
           entry.date,
           entry.title,
           entry.body,

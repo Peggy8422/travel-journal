@@ -14,12 +14,14 @@ import { DashedLine } from "../../../shared/ui/handDrawn";
 import { useTheme } from "../../../shared/ui/theme";
 import { appCoverPhotos } from "../../ledger/services/appCoverPhotos";
 import { saveCoverPhoto } from "../../ledger/services/coverPhotos";
+import type { EntryFormJournal } from "../services/entryCommands";
 import type { LedgerChoice } from "../services/journalCommands";
 import { JournalCover } from "./JournalCover";
 import { ledgerDotColor, TAPE_COLORS } from "./tapes";
 
 /*
- * 建立手帳與手帳設定共用的欄位：封面（照片、紙膠帶）、綁定帳本的清單。
+ * 建立手帳與手帳設定共用的欄位：封面（照片、紙膠帶）、綁定帳本的清單；
+ * 還有編輯日記時挑手帳的清單。
  */
 
 /**
@@ -205,6 +207,61 @@ export function LedgerChoiceList({
                     {sub}
                   </Text>
                 )}
+              </View>
+              {isSelected && <CheckIcon color={theme.primary} />}
+            </Pressable>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+/** 編輯日記時挑這篇日記要收在哪本手帳；圓點是手帳封面的紙膠帶色 */
+export function JournalChoiceList({
+  choices,
+  selected,
+  onSelect,
+}: {
+  choices: readonly EntryFormJournal[];
+  selected: string;
+  onSelect: (choice: EntryFormJournal) => void;
+}) {
+  const theme = useTheme();
+  return (
+    <View
+      accessibilityRole="radiogroup"
+      style={[styles.list, { backgroundColor: theme.surface }]}
+    >
+      {choices.map((choice, index) => {
+        const { journal, ledger } = choice;
+        const isSelected = journal.id === selected;
+        return (
+          <View key={journal.id}>
+            {index > 0 && <DashedLine dotted />}
+            <Pressable
+              accessibilityRole="radio"
+              accessibilityState={{ selected: isSelected }}
+              onPress={() => onSelect(choice)}
+              style={({ pressed }) => [
+                styles.row,
+                { opacity: pressed ? 0.7 : 1 },
+              ]}
+            >
+              <View
+                style={[
+                  styles.ledgerDot,
+                  { backgroundColor: TAPE_COLORS[journal.cover.tape].color },
+                ]}
+              />
+              <View style={styles.rowText}>
+                <Text style={[styles.rowName, { color: theme.text }]}>
+                  {journal.name}
+                </Text>
+                <Text style={[styles.rowSub, { color: theme.textMuted }]}>
+                  {choice.otherDates.length} 篇日記
+                  {ledger ? `・帳本「${ledger.name}」` : ""}
+                </Text>
               </View>
               {isSelected && <CheckIcon color={theme.primary} />}
             </Pressable>

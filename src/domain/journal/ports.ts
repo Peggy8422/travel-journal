@@ -22,7 +22,7 @@ export interface JournalRepository {
 export interface JournalEntryRepository {
   /** 連同照片與地點一起寫入；要和其他寫入一致時請在 transaction 裡使用 */
   insert(entry: JournalEntryRecord): Promise<void>;
-  /** 以 id 覆寫整篇日記，照片與地點整批換掉（createdAt 不變） */
+  /** 以 id 覆寫整篇日記（包含所屬的手帳），照片與地點整批換掉（createdAt 不變） */
   update(entry: JournalEntryRecord): Promise<void>;
   softDelete(id: string, deletedAt: string): Promise<void>;
   restore(id: string, updatedAt: string): Promise<void>;

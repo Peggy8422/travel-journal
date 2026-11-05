@@ -25,6 +25,7 @@ import {
   HeaderAction,
   MessageScreen,
   Screen,
+  SmallButton,
   TextButton,
   TextField,
 } from "../../../shared/ui/components";
@@ -42,6 +43,7 @@ import {
   updateEntry,
   writeEntry,
   type EntryForm,
+  type EntryFormJournal,
   type EntryInput,
 } from "../services/entryCommands";
 import {
@@ -52,7 +54,9 @@ import {
 } from "../services/journalDates";
 import { EntryPhotoField, useEntryPhotos } from "./EntryPhotos";
 import { EntryPlaceField, useEntryPlaces } from "./EntryPlaces";
+import { JournalChoiceList } from "./JournalFields";
 import { JournalStamp } from "./JournalStamp";
+import { TAPE_COLORS } from "./tapes";
 import { MOOD_STAMPS, STAMP_TILTS, WEATHER_STAMPS } from "./stamps";
 
 type FormField = "title" | "photos" | "body" | "places";
@@ -79,6 +83,8 @@ function Form({ form }: { form: EntryForm }) {
   const toast = useToast();
   const scroller = useFieldScroller();
   const { journal, entry } = form;
+  // The journal the entry is kept in; editing can move it to another one
+  const [home, setHome] = useState<EntryFormJournal>(form);
   const [date, setDate] = useState(form.date);
   const [title, setTitle] = useState(entry?.title ?? "");
   const [body, setBody] = useState(entry?.body ?? "");
@@ -97,7 +103,7 @@ function Form({ form }: { form: EntryForm }) {
     fieldError?.field === field ? fieldError.message : null;
 
   // Day 1 is the earliest page, which may be the one being written
-  const earliest = form.otherDates[0];
+  const earliest = home.otherDates[0];
   const first = earliest !== undefined && earliest < date ? earliest : date;
 
   function fail(field: FormField, message: string) {
@@ -120,7 +126,7 @@ function Form({ form }: { form: EntryForm }) {
         places: places.toPlaces(),
       };
       const result = entry
-        ? await updateEntry(deps, entry.id, input)
+        ? await updateEntry(deps, entry.id, input, home.journal.id)
         : await writeEntry(deps, journal.id, input);
       if (!result.ok) {
         const error = result.error;
@@ -150,7 +156,11 @@ function Form({ form }: { form: EntryForm }) {
       tidyCoverPhotos(deps.db);
       if (entry) {
         router.back();
-        toast("已儲存日記");
+        toast(
+          home.journal.id === journal.id
+            ? "已儲存日記"
+            : `已移到「${home.journal.name}」`,
+        );
       } else {
         // The new page opens right away, like turning to it in the notebook
         router.replace({
@@ -245,6 +255,15 @@ function Form({ form }: { form: EntryForm }) {
         }}
       />
 
+      {entry && form.moveTargets.length > 0 && (
+        <EntryJournalField
+          choices={[form, ...form.moveTargets]}
+          home={home}
+          moved={home.journal.id !== journal.id}
+          onChange={setHome}
+        />
+      )}
+
       <DateField
         label="日期"
         value={toDeviceDate(date)}
@@ -313,7 +332,7 @@ function Form({ form }: { form: EntryForm }) {
         <EntryPlaceField places={places} error={errorFor("places")} />
       </View>
 
-      {form.ledger && <LedgerHint name={form.ledger.name} />}
+      {home.ledger && <LedgerHint name={home.ledger.name} />}
 
       {entry && (
         <TextButton
@@ -324,6 +343,64 @@ function Form({ form }: { form: EntryForm }) {
         />
       )}
     </Screen>
+  );
+}
+
+/**
+ * 這篇日記收在哪本手帳：平常只顯示名稱，按「換一本」展開清單。
+ * 選了別本要按「儲存」才會移過去，Day N 與帳本提示先跟著換。
+ */
+function EntryJournalField({
+  choices,
+  home,
+  moved,
+  onChange,
+}: {
+  choices: readonly EntryFormJournal[];
+  home: EntryFormJournal;
+  moved: boolean;
+  onChange: (choice: EntryFormJournal) => void;
+}) {
+  const theme = useTheme();
+  const [open, setOpen] = useState(false);
+  return (
+    <View style={styles.group}>
+      <Text style={[styles.label, { color: theme.text }]}>手帳</Text>
+      <View style={styles.journalRow}>
+        <View
+          style={[
+            styles.journalDot,
+            { backgroundColor: TAPE_COLORS[home.journal.cover.tape].color },
+          ]}
+        />
+        <Text
+          numberOfLines={1}
+          style={[styles.journalName, { color: theme.text }]}
+        >
+          {home.journal.name}
+        </Text>
+        <SmallButton
+          title={open ? "收起" : "換一本"}
+          accessibilityLabel={open ? "收起手帳清單" : "把這篇日記換到其他手帳"}
+          onPress={() => setOpen((o) => !o)}
+        />
+      </View>
+      {open && (
+        <JournalChoiceList
+          choices={choices}
+          selected={home.journal.id}
+          onSelect={(choice) => {
+            onChange(choice);
+            setOpen(false);
+          }}
+        />
+      )}
+      {moved && (
+        <Text style={[styles.hint, { color: theme.textMuted }]}>
+          按「儲存」後，這篇日記會移到「{home.journal.name}」。
+        </Text>
+      )}
+    </View>
   );
 }
 
@@ -493,6 +570,21 @@ function fromDeviceDate(date: Date): string {
 }
 
 const styles = StyleSheet.create({
+  journalRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  journalDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  journalName: {
+    flex: 1,
+    fontFamily: fonts.regular,
+    fontSize: 15.5,
+  },
   ledgerHint: {
     flexDirection: "row",
     alignItems: "flex-start",
