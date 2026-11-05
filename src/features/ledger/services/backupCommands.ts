@@ -21,10 +21,16 @@ import {
   type JournalRestoreReport,
 } from "../../journal/services/journalBackup";
 import {
+  collectPlaces,
+  restorePlaces,
+  type PlaceRestoreReport,
+} from "../../places/services/placeBackup";
+import {
   backupPhotoNames,
   collectCoverPhotos,
   prepareCoverPhotos,
   prepareJournalPhotos,
+  preparePlacePhotos,
   pruneCoverPhotos,
 } from "./coverPhotos";
 
@@ -165,7 +171,7 @@ async function insertLedgerBackup(
   }
 }
 
-/** 產生完整備份檔的檔名與內容（含帳本、手帳與日記的照片，以及手繪插圖） */
+/** 產生完整備份檔的檔名與內容（含帳本、手帳與日記的照片、手繪插圖，以及收藏地點） */
 export async function buildBackupFile(
   db: SqlExecutor,
   photoStore: CoverPhotoStore,
@@ -174,9 +180,10 @@ export async function buildBackupFile(
   const ledgers = await collectBackup(db);
   const journals = await collectJournalBackups(db);
   const illustrations = await collectIllustrations(db);
+  const { places, ratingCriteria } = await collectPlaces(db);
   const photos = await collectCoverPhotos(
     photoStore,
-    backupPhotoNames(ledgers, journals),
+    backupPhotoNames(ledgers, journals, places),
   );
   const date = toTaipeiDate(now.toISOString());
   return {
@@ -186,15 +193,18 @@ export async function buildBackupFile(
       ledgers,
       journals,
       illustrations,
+      places,
+      ratingCriteria,
       photos,
     }),
   };
 }
 
-/** 備份檔整份還原的結果：帳本加上手帳與插圖 */
+/** 備份檔整份還原的結果：帳本加上手帳、插圖與收藏地點 */
 export interface BackupRestoreReport extends RestoreReport {
   readonly journals: JournalRestoreReport;
   readonly illustrations: IllustrationRestoreReport;
+  readonly places: PlaceRestoreReport;
 }
 
 /**
@@ -220,16 +230,27 @@ export async function restoreFromBackupText(
     parsed.value.journals,
     photos,
   );
+  const places = await preparePlacePhotos(
+    photoStore,
+    parsed.value.places,
+    photos,
+  );
   const report = await restoreBackup(db, ledgers);
   const illustrationReport = await restoreIllustrations(
     db,
     parsed.value.illustrations,
   );
   const journalReport = await restoreJournalBackups(db, journals);
+  const placeReport = await restorePlaces(
+    db,
+    places,
+    parsed.value.ratingCriteria,
+  );
   await pruneCoverPhotos(db, photoStore);
   return ok({
     ...report,
     journals: journalReport,
     illustrations: illustrationReport,
+    places: placeReport,
   });
 }

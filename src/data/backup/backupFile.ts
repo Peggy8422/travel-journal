@@ -26,6 +26,13 @@ import {
   type MemberRecord,
   type SettlementRecord,
 } from "../../domain/ledger";
+import {
+  isPlaceKind,
+  isPlaceStatus,
+  parseRating,
+  type RatingCriterionRecord,
+  type SavedPlaceRecord,
+} from "../../domain/places";
 import { decodeSplitRule } from "../db/splitRuleJson";
 
 /*
@@ -47,10 +54,12 @@ export const BACKUP_FORMAT = "travel-journal-backup";
  *    讀取 1～5 版時沒有手帳。
  * 7：手繪插圖：最外層多一個 illustrations（筆畫），日記多一個 stickers（貼在頁上的插圖）。
  *    讀取 1～6 版時沒有插圖，日記沒有貼紙。
+ * 8：收藏地點：最外層多一個 places（地點、照片檔名、分數）與 ratingCriteria（評分項目），
+ *    地點的照片也放在 photos。讀取 1～7 版時沒有收藏地點與評分項目。
  */
-export const BACKUP_VERSION = 7;
+export const BACKUP_VERSION = 8;
 /** 可以讀取的版本 */
-const READABLE_VERSIONS: readonly unknown[] = [1, 2, 3, 4, 5, 6, 7];
+const READABLE_VERSIONS: readonly unknown[] = [1, 2, 3, 4, 5, 6, 7, 8];
 
 export interface BackupContents {
   /** 匯出時間，ISO 8601 UTC */
@@ -58,7 +67,9 @@ export interface BackupContents {
   readonly ledgers: readonly LedgerBackup[];
   readonly journals: readonly JournalBackup[];
   readonly illustrations: readonly IllustrationRecord[];
-  /** 照片的檔案（帳本與手帳的封面、日記的照片）：檔名 → base64 的 JPEG */
+  readonly places: readonly SavedPlaceRecord[];
+  readonly ratingCriteria: readonly RatingCriterionRecord[];
+  /** 照片的檔案（帳本與手帳的封面、日記與收藏地點的照片）：檔名 → base64 的 JPEG */
   readonly photos: Readonly<Record<string, string>>;
 }
 
@@ -75,6 +86,8 @@ export function serializeBackup(contents: BackupContents): string {
       ledgers: contents.ledgers,
       journals: contents.journals,
       illustrations: contents.illustrations,
+      places: contents.places,
+      ratingCriteria: contents.ratingCriteria,
       photos: contents.photos,
     },
     null,
@@ -123,6 +136,15 @@ export function parseBackup(
     parseIllustration,
   );
   if (!illustrations.ok) return invalid(illustrations.error);
+  // 1～7 版沒有收藏地點與評分項目
+  const places = parseList(value.places ?? [], "places", parseSavedPlace);
+  if (!places.ok) return invalid(places.error);
+  const ratingCriteria = parseList(
+    value.ratingCriteria ?? [],
+    "ratingCriteria",
+    parseCriterion,
+  );
+  if (!ratingCriteria.ok) return invalid(ratingCriteria.error);
   const photos = parsePhotos(value.photos);
   if (!photos.ok) return invalid(photos.error);
   return ok({
@@ -130,6 +152,8 @@ export function parseBackup(
     ledgers,
     journals: journals.value,
     illustrations: illustrations.value,
+    places: places.value,
+    ratingCriteria: ratingCriteria.value,
     photos: photos.value,
   });
 }
@@ -429,6 +453,66 @@ function parseIllustration(value: unknown): Parsed<IllustrationRecord> {
   });
 }
 
+function parseSavedPlace(value: unknown): Parsed<SavedPlaceRecord> {
+  if (!isObject(value)) return err("not an object");
+  const missing = firstMissing(value, {
+    id: isString,
+    name: isString,
+    city: isString,
+    note: isString,
+    createdAt: isString,
+    updatedAt: isString,
+    deletedAt: isNullableString,
+  });
+  if (missing) return err(missing);
+  const location = parseLocation(value.location);
+  if (!location.ok) return location;
+  if (location.value === null) return err("missing location");
+  if (!Array.isArray(value.photos)) return err("photos must be an array");
+  if (!Array.isArray(value.ratings)) return err("ratings must be an array");
+  return ok({
+    id: value.id as string,
+    name: value.name as string,
+    location: location.value,
+    city: value.city as string,
+    // 類型、狀態、分數、還想再去只影響外觀：認不得的退回預設、數值不對的分數丟掉，
+    // 不拒絕整份備份
+    kind: isPlaceKind(value.kind) ? value.kind : "other",
+    status: isPlaceStatus(value.status) ? value.status : "want",
+    note: value.note as string,
+    ratings: value.ratings
+      .map(parseRating)
+      .flatMap((rating) => (rating.ok ? [rating.value] : [])),
+    revisit: value.revisit === true,
+    // 檔名格式不對的照片不收，免得指到資料夾外面
+    photos: value.photos.filter(isCoverPhotoName),
+    createdAt: value.createdAt as string,
+    updatedAt: value.updatedAt as string,
+    deletedAt: value.deletedAt as string | null,
+  });
+}
+
+function parseCriterion(value: unknown): Parsed<RatingCriterionRecord> {
+  if (!isObject(value)) return err("not an object");
+  const missing = firstMissing(value, {
+    id: isString,
+    label: isString,
+    sortOrder: isFiniteNumber,
+    archivedAt: isNullableString,
+    createdAt: isString,
+    updatedAt: isString,
+  });
+  if (missing) return err(missing);
+  return ok({
+    id: value.id as string,
+    label: value.label as string,
+    sortOrder: value.sortOrder as number,
+    archivedAt: value.archivedAt as string | null,
+    createdAt: value.createdAt as string,
+    updatedAt: value.updatedAt as string,
+  });
+}
+
 function parsePlace(value: unknown): Parsed<JournalPlace> {
   if (!isObject(value) || !isString(value.name)) return err("invalid name");
   const location = parseLocation(value.location);
@@ -481,6 +565,10 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 function isString(value: unknown): value is string {
   return typeof value === "string";
+}
+
+function isFiniteNumber(value: unknown): boolean {
+  return typeof value === "number" && Number.isFinite(value);
 }
 
 function isNullableString(value: unknown): boolean {

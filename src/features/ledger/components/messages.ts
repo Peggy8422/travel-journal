@@ -10,6 +10,7 @@ import type {
   IllustrationRestoreReport,
   JournalRestoreReport,
 } from "../../journal/services/journalBackup";
+import type { PlaceRestoreReport } from "../../places/services/placeBackup";
 import type { RestoreReport } from "../services/backupCommands";
 import type { LedgerCommandError } from "../services/ledgerCommands";
 import type { LedgerSummaryError } from "../services/ledgerSummary";
@@ -38,6 +39,9 @@ const TEXT_FIELD_LABELS: Readonly<Record<LimitedTextField, string>> = {
   journalName: "手帳名稱",
   entryTitle: "日記標題",
   entryBody: "日記內容",
+  city: "城市",
+  placeNote: "心得",
+  ratingLabel: "評分項目",
 };
 
 /** 錯誤代碼轉成給使用者看的訊息 */
@@ -197,6 +201,7 @@ export function describeRestoreReport(
   report: RestoreReport & {
     readonly journals?: JournalRestoreReport;
     readonly illustrations?: IllustrationRestoreReport;
+    readonly places?: PlaceRestoreReport;
   },
 ): string {
   const shared = (ledgers: readonly LedgerRecord[]) =>
@@ -253,6 +258,9 @@ export function describeRestoreReport(
   // Skipped illustrations are not worth a line: nothing on the phone changed
   if (report.illustrations && report.illustrations.restored > 0) {
     lines.push(`已還原 ${report.illustrations.restored} 張手繪插圖`);
+  }
+  if (report.places && report.places.restored > 0) {
+    lines.push(`已還原 ${report.places.restored} 個收藏地點`);
   }
   // 備份是空的，或只有個人記帳而且消費手機上都已經有了
   return lines.length > 0 ? lines.join("\n") : "備份裡沒有需要還原的資料";

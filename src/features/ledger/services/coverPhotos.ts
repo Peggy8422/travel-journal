@@ -1,6 +1,7 @@
 import type { SqlExecutor } from "../../../data/db/sqlDatabase";
 import { createRepositories } from "../../../data/repositories";
 import type { JournalBackup } from "../../../domain/journal";
+import type { SavedPlaceRecord } from "../../../domain/places";
 import type {
   CoverPhotoStore,
   LedgerBackup,
@@ -30,15 +31,17 @@ export async function saveCoverPhoto(
  */
 async function usedPhotoNames(db: SqlExecutor): Promise<Set<string>> {
   const repos = createRepositories(db);
-  const [ledgers, journals, entryPhotos] = await Promise.all([
+  const [ledgers, journals, entryPhotos, placePhotos] = await Promise.all([
     repos.ledgers.list(),
     repos.journals.list(),
     repos.journalEntries.listPhotoNames(),
+    repos.savedPlaces.listPhotoNames(),
   ]);
   return new Set([
     ...ledgers.flatMap((l) => (l.cover?.photo ? [l.cover.photo] : [])),
     ...journals.flatMap((j) => (j.cover.photo ? [j.cover.photo] : [])),
     ...entryPhotos,
+    ...placePhotos,
   ]);
 }
 
@@ -57,10 +60,11 @@ export async function pruneCoverPhotos(
   return removed;
 }
 
-/** 備份要帶的照片檔名：帳本封面、手帳封面、日記的照片 */
+/** 備份要帶的照片檔名：帳本封面、手帳封面、日記與收藏地點的照片 */
 export function backupPhotoNames(
   ledgers: readonly LedgerBackup[],
   journals: readonly JournalBackup[],
+  places: readonly SavedPlaceRecord[],
 ): string[] {
   return [
     ...ledgers.flatMap(({ ledger }) =>
@@ -70,6 +74,7 @@ export function backupPhotoNames(
       ...(journal.cover.photo ? [journal.cover.photo] : []),
       ...entries.flatMap((e) => e.photos),
     ]),
+    ...places.flatMap((p) => p.photos),
   ];
 }
 
@@ -156,6 +161,33 @@ export async function prepareJournalPhotos(
       journal: { ...journal, cover: { ...journal.cover, photo } },
       entries: kept,
     });
+  }
+  return prepared;
+}
+
+/**
+ * 還原前先把收藏地點的照片寫回手機；備份裡沒有檔案的照片從地點上拿掉。
+ * 和 prepareJournalPhotos 一樣，同一個檔名只寫一次。
+ */
+export async function preparePlacePhotos(
+  store: CoverPhotoStore,
+  places: readonly SavedPlaceRecord[],
+  photos: Readonly<Record<string, string>>,
+): Promise<SavedPlaceRecord[]> {
+  const written = new Set<string>();
+  const prepared: SavedPlaceRecord[] = [];
+  for (const place of places) {
+    const kept: string[] = [];
+    for (const name of place.photos) {
+      const data = photos[name];
+      if (data === undefined) continue;
+      if (!written.has(name)) {
+        await store.writeBase64(name, data);
+        written.add(name);
+      }
+      kept.push(name);
+    }
+    prepared.push({ ...place, photos: kept });
   }
   return prepared;
 }

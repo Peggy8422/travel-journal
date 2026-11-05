@@ -29,6 +29,10 @@ describe("initializeDatabase", () => {
       "journals",
       "ledgers",
       "members",
+      "rating_criteria",
+      "saved_place_photos",
+      "saved_place_ratings",
+      "saved_places",
       "settlements",
     ]);
   });

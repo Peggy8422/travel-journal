@@ -41,6 +41,10 @@ src/app/  →  src/features/  →  src/domain/
   - 日記頁右上「貼插圖」在同一頁切換成貼插圖模式（`StickerEditor`，按「完成」才用 `saveEntryStickers` 一次存全部），不另開路由：要對著真正的頁面擺。手勢放在 `useStickerBoard` 的 class：整層 `StickerLayer` 用 `box-only` 接觸控、自己判斷點到哪張（`hitSticker`），沒點到就回傳 false 讓頁面照常捲動；按住貼紙時 `scrollEnabled` 關掉，第二根手指落在哪都算捏合。貼插圖時關掉返回手勢（`gestureEnabled`），不然從左邊拖貼紙會變成離開頁面。頁面的 `minHeight` 照最下面的貼紙撐高（`stickersBottom`），窄手機上貼紙也不會被切掉。
   - 備份第 7 版多了最外層的 `illustrations`，日記多了 `stickers`；還原順序是帳本 → 插圖 → 手帳，插圖不在手機上的貼紙直接丟掉。
   - 備份第 6 版多了最外層的 `journals`；還原時先還原帳本再還原手帳，綁的帳本不在手機上或已經綁給別本手帳時，改成不綁定。
+- 收藏地點（`domain/places`、`features/places`）：想去／去過的餐廳與景點，一份獨立清單、依城市分組，不屬於任何手帳或帳本。類型、狀態代碼和分類一樣只能新增（資料表不加 CHECK，讀回時認不得的退回 `other`／`want`）。
+  - 評分是使用者自己訂的評分項目（`rating_criteria`）：預設「好吃、氣氛、CP值」由 migration 008 建立，用固定 id（`taste`、`vibe`、`value`），每支手機都一樣，還原別支手機的備份才不會多出重複的項目。評分項目不能刪除只能封存（分數的外鍵指向它，不 CASCADE），使用中的最多 `ACTIVE_CRITERIA_LIMIT` 個。分數只存有打的項目，改回「想去」時分數照樣保留、畫面不顯示；「還想再去」是另外一個標記，不算總分。
+  - 照片和日記一樣放在 `CoverPhotoStore`，`usedPhotoNames`、`backupPhotoNames` 已經算進去（含已刪除的地點）。
+  - 備份第 8 版多了最外層的 `places` 與 `ratingCriteria`；還原時手機上沒有的評分項目接在最後，使用中的超過上限時多的改成封存，指向不存在的評分項目的分數丟掉。
 - 共用 UI 元件與主題色在 `src/shared/ui/`（只用 React Native 內建元件，不用 `@expo/ui`）。
 - 日系手繪風格（設計稿：https://claude.ai/artifact/Bq5DkRzceSM8V5rzqG2HPD）：
   - 這一版固定和紙淺色（`app.json` 的 `userInterfaceStyle` 也是 `light`），`useTheme()` 不跟系統切換。
