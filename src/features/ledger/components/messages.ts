@@ -75,6 +75,8 @@ export function describeError(error: DisplayableError): string {
       return "還沒畫任何東西";
     case "ILLUSTRATION_TOO_BIG":
       return `一張插圖最多 ${error.maxStrokes} 筆，先存起來，剩下的畫在另一張吧`;
+    case "TOO_MANY_STICKERS":
+      return `一篇日記最多貼 ${error.maxStickers} 張插圖`;
     case "EXPENSE_NOT_FOUND":
       return "找不到這筆消費，可能已被刪除";
     case "SETTLEMENT_NOT_FOUND":

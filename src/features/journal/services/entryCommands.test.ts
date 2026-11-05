@@ -13,10 +13,12 @@ import {
   loadEntry,
   loadEntryForm,
   restoreEntry,
+  saveEntryStickers,
   updateEntry,
   writeEntry,
   type EntryInput,
 } from "./entryCommands";
+import { deleteIllustration, saveIllustration } from "./illustrationCommands";
 import { createJournal, type JournalCommandDeps } from "./journalCommands";
 
 const COVER = { tape: "sakura", photo: null } as const;
@@ -439,5 +441,78 @@ describe("entry form", () => {
       ledger: { id: ledger.id },
       date: "2026-03-06",
     });
+  });
+});
+
+describe("entry stickers", () => {
+  const LINE = {
+    tool: "pen",
+    ink: "sumi",
+    width: 10,
+    points: [
+      [0, 0],
+      [100, 50],
+    ],
+  } as const;
+
+  it("sticks drawings on a page, tidies them and loads their art", async () => {
+    const { db, deps, journal } = await setup();
+    const entry = unwrap(await writeEntry(deps, journal.id, PAGE));
+    const art = unwrap(await saveIllustration(deps, null, [LINE]));
+    const saved = unwrap(
+      await saveEntryStickers(deps, entry.id, [
+        { illustrationId: art.id, x: 1.4, y: 0.5, size: 0.3, rotation: 200 },
+        { illustrationId: art.id, x: 0.2, y: 1, size: 0.2, rotation: 0 },
+      ]),
+    );
+    expect(saved.stickers).toEqual([
+      { illustrationId: art.id, x: 1, y: 0.5, size: 0.3, rotation: -160 },
+      { illustrationId: art.id, x: 0.2, y: 1, size: 0.2, rotation: 0 },
+    ]);
+    expect(saved.title).toBe(entry.title);
+    const detail = unwrap(await loadEntry(db, entry.id));
+    expect(detail.entry.stickers).toEqual(saved.stickers);
+    expect(detail.illustrations).toEqual({ [art.id]: art });
+
+    // Edits from the form keep the stickers
+    const edited = unwrap(
+      await updateEntry(deps, entry.id, { ...PAGE, body: "改過" }),
+    );
+    expect(edited.stickers).toEqual(saved.stickers);
+
+    // Deleting the drawing takes it off the page
+    unwrap(await deleteIllustration(deps, art.id));
+    expect(unwrap(await loadEntry(db, entry.id))).toMatchObject({
+      entry: { stickers: [] },
+      illustrations: {},
+    });
+  });
+
+  it("refuses a missing drawing, too many stickers and a missing page", async () => {
+    const { deps, journal } = await setup();
+    const entry = unwrap(await writeEntry(deps, journal.id, PAGE));
+    const art = unwrap(await saveIllustration(deps, null, [LINE]));
+    const sticker = {
+      illustrationId: art.id,
+      x: 0.5,
+      y: 0.5,
+      size: 0.3,
+      rotation: 0,
+    };
+    expect(
+      unwrapErr(
+        await saveEntryStickers(deps, entry.id, [
+          { ...sticker, illustrationId: "gone" },
+        ]),
+      ),
+    ).toEqual({ code: "ILLUSTRATION_NOT_FOUND", illustrationId: "gone" });
+    expect(
+      unwrapErr(
+        await saveEntryStickers(deps, entry.id, Array(21).fill(sticker)),
+      ),
+    ).toEqual({ code: "TOO_MANY_STICKERS", maxStickers: 20 });
+    expect(
+      unwrapErr(await saveEntryStickers(deps, "nope", [sticker])).code,
+    ).toBe("ENTRY_NOT_FOUND");
   });
 });

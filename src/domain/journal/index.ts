@@ -34,6 +34,7 @@ export {
   type IllustrationTool,
 } from "./illustration";
 export {
+  hitSticker,
   strokePath,
   strokesBounds,
   thinPoints,

@@ -38,6 +38,7 @@ src/app/  →  src/features/  →  src/domain/
   - 橡皮擦也是一筆筆畫（工具 `eraser`），只擦掉它之前畫的東西被劃過的地方：`IllustrationArt` 預設用 `Mask` 挖掉（貼紙底下的頁面透得出來），畫板傳 `paper` 直接用紙色蓋掉。畫板把已完成的筆畫和手指正在畫的那一筆分成兩層 Svg，移動時只重畫那一筆；連續的橡皮擦、連續的鉛筆各共用一個 `Mask`，不要改成一筆一個。範圍（`strokesBounds`）和「有沒有畫東西」（`hasInk`）都不算橡皮擦。
   - 鉛筆（`pencil.ts`）是淡底色加兩道抖動的細筆跡，顆粒用 `Mask` 挖小點；亂數種子取自起點、每道筆跡各自一條亂數，畫到一半筆畫變長時前面不會跳動。
   - 貼在日記上的插圖是 `JournalEntryRecord.stickers`（`journal_entry_stickers` 子表）：位置以日記頁寬為單位（x、size 是頁寬比例，y 是離頁首幾個頁寬），換手機尺寸也貼在同一處。刪除插圖是 `ON DELETE CASCADE`，已刪除日記上的貼紙也一起消失。`updateEntry` 用 `...entry` 展開，表單沒有的欄位（貼紙）不會被洗掉。
+  - 日記頁右上「貼插圖」在同一頁切換成貼插圖模式（`StickerEditor`，按「完成」才用 `saveEntryStickers` 一次存全部），不另開路由：要對著真正的頁面擺。手勢放在 `useStickerBoard` 的 class：整層 `StickerLayer` 用 `box-only` 接觸控、自己判斷點到哪張（`hitSticker`），沒點到就回傳 false 讓頁面照常捲動；按住貼紙時 `scrollEnabled` 關掉，第二根手指落在哪都算捏合。貼插圖時關掉返回手勢（`gestureEnabled`），不然從左邊拖貼紙會變成離開頁面。頁面的 `minHeight` 照最下面的貼紙撐高（`stickersBottom`），窄手機上貼紙也不會被切掉。
   - 備份第 7 版多了最外層的 `illustrations`，日記多了 `stickers`；還原順序是帳本 → 插圖 → 手帳，插圖不在手機上的貼紙直接丟掉。
   - 備份第 6 版多了最外層的 `journals`；還原時先還原帳本再還原手帳，綁的帳本不在手機上或已經綁給別本手帳時，改成不綁定。
 - 共用 UI 元件與主題色在 `src/shared/ui/`（只用 React Native 內建元件，不用 `@expo/ui`）。

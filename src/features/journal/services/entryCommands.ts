@@ -1,7 +1,11 @@
 import { err, ok, type Result } from "../../../domain/common/result";
 import {
   ENTRY_PHOTO_LIMIT,
+  ENTRY_STICKER_LIMIT,
   isLocalDate,
+  parseSticker,
+  type EntrySticker,
+  type IllustrationRecord,
   type JournalEntryRecord,
   type JournalMood,
   type JournalPlace,
@@ -96,6 +100,48 @@ export async function updateEntry(
   return ok(updated);
 }
 
+/**
+ * 換掉一篇日記上貼的插圖（日記頁的「貼插圖」）。位置、大小、角度照 parseSticker
+ * 夾回範圍內；貼的插圖都要還在。
+ */
+export async function saveEntryStickers(
+  deps: JournalCommandDeps,
+  entryId: string,
+  stickers: readonly EntrySticker[],
+): JournalCommandResult<JournalEntryRecord> {
+  if (stickers.length > ENTRY_STICKER_LIMIT) {
+    return err({ code: "TOO_MANY_STICKERS", maxStickers: ENTRY_STICKER_LIMIT });
+  }
+  const repos = createRepositories(deps.db);
+  const entry = await repos.journalEntries.findById(entryId);
+  if (!entry || entry.deletedAt !== null) {
+    return err({ code: "ENTRY_NOT_FOUND", entryId });
+  }
+  const tidied: EntrySticker[] = [];
+  for (const sticker of stickers) {
+    const parsed = parseSticker(sticker);
+    if (
+      !parsed.ok ||
+      !(await repos.illustrations.findById(sticker.illustrationId))
+    ) {
+      return err({
+        code: "ILLUSTRATION_NOT_FOUND",
+        illustrationId: sticker.illustrationId,
+      });
+    }
+    tidied.push(parsed.value);
+  }
+  const updated: JournalEntryRecord = {
+    ...entry,
+    stickers: tidied,
+    updatedAt: deps.now().toISOString(),
+  };
+  await deps.db.transaction((tx) =>
+    createRepositories(tx).journalEntries.update(updated),
+  );
+  return ok(updated);
+}
+
 export async function deleteEntry(
   deps: JournalCommandDeps,
   entryId: string,
@@ -168,6 +214,8 @@ export interface EntryDetail {
   readonly dayNumber: number;
   /** 綁定的帳本這天的消費；沒綁帳本時為 null */
   readonly daySpending: DaySpending | null;
+  /** 貼在這篇日記上的插圖，以 id 查 */
+  readonly illustrations: Readonly<Record<string, IllustrationRecord>>;
 }
 
 /** 刪除的日記讀不到（日記頁直接當作不存在） */
@@ -184,17 +232,24 @@ export async function loadEntry(
   if (!journal) {
     return err({ code: "JOURNAL_NOT_FOUND", journalId: entry.journalId });
   }
-  const [entries, daySpending] = await Promise.all([
+  const ids = [...new Set(entry.stickers.map((s) => s.illustrationId))];
+  const [entries, daySpending, art] = await Promise.all([
     repos.journalEntries.listByJournal(journal.id),
     journal.ledgerId === null
       ? null
       : loadDaySpending(repos, journal.ledgerId, entry.date),
+    Promise.all(ids.map((id) => repos.illustrations.findById(id))),
   ]);
+  const illustrations: Record<string, IllustrationRecord> = {};
+  for (const illustration of art) {
+    if (illustration) illustrations[illustration.id] = illustration;
+  }
   return ok({
     journal,
     entry,
     dayNumber: dayNumber(entries[0]?.date ?? entry.date, entry.date),
     daySpending,
+    illustrations,
   });
 }
 

@@ -1,5 +1,5 @@
 import { unwrap } from "../ledger/testFixtures";
-import { strokePath, strokesBounds, thinPoints } from "./drawing";
+import { hitSticker, strokePath, strokesBounds, thinPoints } from "./drawing";
 import {
   hasInk,
   ILLUSTRATION_STROKE_LIMIT,
@@ -152,6 +152,30 @@ describe("hasInk", () => {
     expect(hasInk([])).toBe(false);
     expect(hasInk([{ ...pen([[1, 1]]), tool: "eraser" }])).toBe(false);
     expect(hasInk([{ ...pen([[1, 1]]), tool: "pencil" }])).toBe(true);
+  });
+});
+
+describe("hitSticker", () => {
+  const sticker = (x: number, rotation = 0) => ({
+    illustrationId: "a",
+    x,
+    y: 0.5,
+    size: 0.2,
+    rotation,
+  });
+
+  it("finds the topmost sticker, turning the point into the sticker's frame", () => {
+    // A wide drawing: 0.2 wide, 0.1 tall
+    const aspect = () => 0.5;
+    const stickers = [sticker(0.5), sticker(0.55)];
+    expect(hitSticker(stickers, aspect, [0.52, 0.5], 0)).toBe(1);
+    expect(hitSticker(stickers, aspect, [0.42, 0.5], 0)).toBe(0);
+    expect(hitSticker(stickers, aspect, [0.5, 0.58], 0)).toBeNull();
+    expect(hitSticker(stickers, aspect, [0.5, 0.58], 0.05)).toBe(1);
+    // Turned a quarter, the tall side is now across
+    const turned = [sticker(0.5, 90)];
+    expect(hitSticker(turned, aspect, [0.5, 0.58], 0)).toBe(0);
+    expect(hitSticker(turned, aspect, [0.58, 0.5], 0)).toBeNull();
   });
 });
 

@@ -1,4 +1,8 @@
-import type { DrawPoint, IllustrationStroke } from "./illustration";
+import type {
+  DrawPoint,
+  EntrySticker,
+  IllustrationStroke,
+} from "./illustration";
 
 /*
  * 畫插圖用的幾何計算，畫板與貼紙共用。座標都是畫布單位。
@@ -53,6 +57,34 @@ export function strokesBounds(
   }
   if (minX === Infinity) return null;
   return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+}
+
+/**
+ * 日記頁上點到的是哪一張貼紙：從最上面（陣列最後）往下找。座標都以頁寬為單位；
+ * 貼紙寬是 size、高是 size × aspectOf（插圖的高寬比），先把點轉回貼紙沒旋轉時的方向再比，
+ * slop 是框外再放寬多少。都沒點到時回傳 null。
+ */
+export function hitSticker(
+  stickers: readonly EntrySticker[],
+  aspectOf: (illustrationId: string) => number,
+  point: DrawPoint,
+  slop: number,
+): number | null {
+  for (let i = stickers.length - 1; i >= 0; i--) {
+    const sticker = stickers[i]!;
+    const angle = (sticker.rotation * Math.PI) / 180;
+    const dx = point[0] - sticker.x;
+    const dy = point[1] - sticker.y;
+    const along = dx * Math.cos(angle) + dy * Math.sin(angle);
+    const across = -dx * Math.sin(angle) + dy * Math.cos(angle);
+    const halfWidth = sticker.size / 2 + slop;
+    const halfHeight =
+      (sticker.size * aspectOf(sticker.illustrationId)) / 2 + slop;
+    if (Math.abs(along) <= halfWidth && Math.abs(across) <= halfHeight) {
+      return i;
+    }
+  }
+  return null;
 }
 
 /**

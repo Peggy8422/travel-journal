@@ -41,7 +41,9 @@ export type JournalCommandError =
   /** 畫布上什麼都沒畫 */
   | { readonly code: "EMPTY_ILLUSTRATION" }
   /** 筆畫太多或一筆太長 */
-  | { readonly code: "ILLUSTRATION_TOO_BIG"; readonly maxStrokes: number };
+  | { readonly code: "ILLUSTRATION_TOO_BIG"; readonly maxStrokes: number }
+  /** 一篇日記貼太多插圖 */
+  | { readonly code: "TOO_MANY_STICKERS"; readonly maxStickers: number };
 
 export type JournalCommandResult<T> = Promise<Result<T, JournalCommandError>>;
 

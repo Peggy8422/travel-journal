@@ -5,6 +5,7 @@ import {
   ILLUSTRATION_CANVAS,
   strokePath,
   strokesBounds,
+  type DrawBounds,
   type IllustrationStroke,
 } from "../../../domain/journal";
 import { INK_COLORS, WASH_OPACITY } from "./inks";
@@ -173,14 +174,36 @@ function viewBoxOf(
   strokes: readonly IllustrationStroke[],
   crop: boolean,
 ): string {
-  const bounds = crop ? strokesBounds(strokes) : null;
-  if (!bounds) return `0 0 ${ILLUSTRATION_CANVAS} ${ILLUSTRATION_CANVAS}`;
+  const box = crop
+    ? cropBoxOf(strokes)
+    : { x: 0, y: 0, width: ILLUSTRATION_CANVAS, height: ILLUSTRATION_CANVAS };
+  return [box.x, box.y, box.width, box.height].join(" ");
+}
+
+/** 貼紙拖曳時每一格都要用到範圍，同一份筆畫只算一次 */
+const cropBoxes = new WeakMap<readonly IllustrationStroke[], DrawBounds>();
+
+/** 裁切後的範圍（畫布單位）：有畫的地方再留一點邊；沒有筆畫時是整張畫布 */
+export function cropBoxOf(strokes: readonly IllustrationStroke[]): DrawBounds {
+  const cached = cropBoxes.get(strokes);
+  if (cached) return cached;
+  const bounds = strokesBounds(strokes);
   // A little air around the drawing so round caps are not clipped
-  const pad = Math.max(bounds.width, bounds.height) * 0.04 + 2;
-  return [
-    bounds.x - pad,
-    bounds.y - pad,
-    bounds.width + pad * 2,
-    bounds.height + pad * 2,
-  ].join(" ");
+  const pad = bounds ? Math.max(bounds.width, bounds.height) * 0.04 + 2 : 0;
+  const box = bounds
+    ? {
+        x: bounds.x - pad,
+        y: bounds.y - pad,
+        width: bounds.width + pad * 2,
+        height: bounds.height + pad * 2,
+      }
+    : { x: 0, y: 0, width: ILLUSTRATION_CANVAS, height: ILLUSTRATION_CANVAS };
+  cropBoxes.set(strokes, box);
+  return box;
+}
+
+/** 裁切後的高寬比，貼紙的高是寬乘上它 */
+export function aspectOf(strokes: readonly IllustrationStroke[]): number {
+  const box = cropBoxOf(strokes);
+  return box.height / box.width;
 }
