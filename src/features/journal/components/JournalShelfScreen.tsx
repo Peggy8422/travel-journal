@@ -12,6 +12,7 @@ import {
   Button,
   FloatingAddButton,
   Screen,
+  SmallButton,
 } from "../../../shared/ui/components";
 import { fonts } from "../../../shared/ui/fonts";
 import { RuledPaper } from "../../../shared/ui/handDrawn";
@@ -63,9 +64,15 @@ export function JournalShelfScreen() {
         )}
         {data && data.length > 0 && (
           <>
-            <Text style={[styles.summary, { color: theme.textMuted }]}>
-              {data.length} 本手帳 · {entryTotal} 篇日記
-            </Text>
+            <View style={styles.summaryRow}>
+              <Text style={[styles.summary, { color: theme.textMuted }]}>
+                {data.length} 本手帳 · {entryTotal} 篇日記
+              </Text>
+              <SmallButton
+                title="我的插圖"
+                onPress={() => router.push("/illustrations")}
+              />
+            </View>
             <View style={styles.grid}>
               {data.map((overview) => (
                 <ShelfBook
@@ -155,7 +162,14 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: SIDE,
   },
+  summaryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
   summary: {
+    flexShrink: 1,
     fontFamily: fonts.regular,
     fontSize: 13.5,
   },

@@ -1,6 +1,7 @@
 import { unwrap } from "../ledger/testFixtures";
-import { hitStroke, strokePath, strokesBounds, thinPoints } from "./drawing";
+import { strokePath, strokesBounds, thinPoints } from "./drawing";
 import {
+  hasInk,
   ILLUSTRATION_STROKE_LIMIT,
   normalizeAngle,
   parseSticker,
@@ -128,7 +129,7 @@ describe("strokePath", () => {
 });
 
 describe("strokesBounds", () => {
-  it("covers every point plus half the width", () => {
+  it("covers every drawn point plus half the width, not erasers", () => {
     expect(
       strokesBounds([
         pen(
@@ -139,36 +140,18 @@ describe("strokesBounds", () => {
           20,
         ),
         pen([[50, 400]], 4),
+        { ...pen([[900, 900]], 50), tool: "eraser" },
       ]),
     ).toEqual({ x: 48, y: 190, width: 262, height: 212 });
     expect(strokesBounds([])).toBeNull();
   });
 });
 
-describe("hitStroke", () => {
-  const strokes = [
-    pen(
-      [
-        [0, 0],
-        [100, 0],
-      ],
-      10,
-    ),
-    pen(
-      [
-        [50, -50],
-        [50, 50],
-      ],
-      10,
-    ),
-  ];
-
-  it("finds the topmost stroke under the finger", () => {
-    expect(hitStroke(strokes, [50, 2], 0)).toBe(1);
-    expect(hitStroke(strokes, [90, 4], 0)).toBe(0);
-    expect(hitStroke(strokes, [90, 12], 4)).toBeNull();
-    expect(hitStroke(strokes, [90, 12], 8)).toBe(0);
-    expect(hitStroke([pen([[10, 10]], 6)], [12, 12], 0)).toBe(0);
+describe("hasInk", () => {
+  it("does not count eraser strokes as drawing", () => {
+    expect(hasInk([])).toBe(false);
+    expect(hasInk([{ ...pen([[1, 1]]), tool: "eraser" }])).toBe(false);
+    expect(hasInk([{ ...pen([[1, 1]]), tool: "pencil" }])).toBe(true);
   });
 });
 

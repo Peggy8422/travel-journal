@@ -17,8 +17,12 @@ export const ILLUSTRATION_INKS = [
   "ai",
 ] as const;
 
-/** pen 是一般的筆；wash 是水彩，畫面上用半透明的粗筆刷塗色 */
-export const ILLUSTRATION_TOOLS = ["pen", "wash"] as const;
+/**
+ * pen 是一般的筆；wash 是水彩，畫面上用半透明的粗筆刷塗色；pencil 是有紙紋顆粒的鉛筆；
+ * eraser 是橡皮擦，擦掉它之前畫的筆畫被劃過的地方（之後畫的不受影響），ink 沒有作用。
+ * 只能新增代碼，不要改名或刪除。
+ */
+export const ILLUSTRATION_TOOLS = ["pen", "wash", "pencil", "eraser"] as const;
 
 export type IllustrationInk = (typeof ILLUSTRATION_INKS)[number];
 export type IllustrationTool = (typeof ILLUSTRATION_TOOLS)[number];
@@ -128,6 +132,11 @@ function parseStroke(value: unknown): Result<IllustrationStroke, string> {
     width: clamp(Math.round(value.width), STROKE_WIDTH.min, STROKE_WIDTH.max),
     points,
   });
+}
+
+/** 有沒有畫任何東西（只有橡皮擦的筆畫不算） */
+export function hasInk(strokes: readonly IllustrationStroke[]): boolean {
+  return strokes.some((stroke) => stroke.tool !== "eraser");
 }
 
 /**

@@ -46,4 +46,6 @@ export interface IllustrationRepository {
   list(): Promise<IllustrationRecord[]>;
   /** 永久刪除，貼在日記上的（含已刪除的日記）也一起拿掉 */
   delete(id: string): Promise<void>;
+  /** 每張插圖貼在幾篇日記上（不算已刪除的日記）；沒貼的不會出現 */
+  useCounts(): Promise<Record<string, number>>;
 }

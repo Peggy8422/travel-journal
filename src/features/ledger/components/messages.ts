@@ -69,6 +69,12 @@ export function describeError(error: DisplayableError): string {
       return "地點要有名字，請輸入地名或把這個地點拿掉";
     case "TOO_MANY_PHOTOS":
       return `一篇日記最多 ${error.max} 張照片`;
+    case "ILLUSTRATION_NOT_FOUND":
+      return "找不到這張插圖，可能已被刪除";
+    case "EMPTY_ILLUSTRATION":
+      return "還沒畫任何東西";
+    case "ILLUSTRATION_TOO_BIG":
+      return `一張插圖最多 ${error.maxStrokes} 筆，先存起來，剩下的畫在另一張吧`;
     case "EXPENSE_NOT_FOUND":
       return "找不到這筆消費，可能已被刪除";
     case "SETTLEMENT_NOT_FOUND":

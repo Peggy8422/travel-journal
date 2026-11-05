@@ -32,7 +32,7 @@ export interface DrawBounds {
 
 /**
  * 所有筆畫占的範圍（含筆寬的一半），貼紙用它當 viewBox，只留有畫的地方。
- * 沒有筆畫時回傳 null。
+ * 橡皮擦的筆畫不算；沒有筆畫時回傳 null。
  */
 export function strokesBounds(
   strokes: readonly IllustrationStroke[],
@@ -42,6 +42,7 @@ export function strokesBounds(
   let maxX = -Infinity;
   let maxY = -Infinity;
   for (const stroke of strokes) {
+    if (stroke.tool === "eraser") continue;
     const half = stroke.width / 2;
     for (const [x, y] of stroke.points) {
       minX = Math.min(minX, x - half);
@@ -52,51 +53,6 @@ export function strokesBounds(
   }
   if (minX === Infinity) return null;
   return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
-}
-
-/**
- * 橡皮擦點到的是哪一筆：從最上面（最後畫的）往下找，點離筆畫的距離
- * 在筆寬一半加上 slop 以內就算點到。都沒點到時回傳 null。
- */
-export function hitStroke(
-  strokes: readonly IllustrationStroke[],
-  point: DrawPoint,
-  slop: number,
-): number | null {
-  for (let i = strokes.length - 1; i >= 0; i--) {
-    const stroke = strokes[i]!;
-    const reach = stroke.width / 2 + slop;
-    if (distanceToPolyline(point, stroke.points) <= reach) return i;
-  }
-  return null;
-}
-
-function distanceToPolyline(
-  point: DrawPoint,
-  points: readonly DrawPoint[],
-): number {
-  if (points.length === 1) return distance(point, points[0]!);
-  let best = Infinity;
-  for (let i = 0; i < points.length - 1; i++) {
-    best = Math.min(best, distanceToSegment(point, points[i]!, points[i + 1]!));
-  }
-  return best;
-}
-
-function distanceToSegment(p: DrawPoint, a: DrawPoint, b: DrawPoint): number {
-  const dx = b[0] - a[0];
-  const dy = b[1] - a[1];
-  const lengthSquared = dx * dx + dy * dy;
-  if (lengthSquared === 0) return distance(p, a);
-  const t = Math.max(
-    0,
-    Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / lengthSquared),
-  );
-  return distance(p, [a[0] + t * dx, a[1] + t * dy]);
-}
-
-function distance(a: DrawPoint, b: DrawPoint): number {
-  return Math.hypot(a[0] - b[0], a[1] - b[1]);
 }
 
 /**
@@ -116,6 +72,10 @@ export function thinPoints(
     }
   }
   return kept;
+}
+
+function distance(a: DrawPoint, b: DrawPoint): number {
+  return Math.hypot(a[0] - b[0], a[1] - b[1]);
 }
 
 /** 路徑裡的數字最多一位小數 */

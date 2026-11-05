@@ -102,6 +102,23 @@ describe("IllustrationRepository", () => {
     }
   });
 
+  it("counts the pages each illustration is on, leaving out deleted ones", async () => {
+    const { repos } = await setup();
+    await repos.illustrations.insert(makeIllustration());
+    await repos.illustrations.insert(makeIllustration({ id: "i2" }));
+    await repos.illustrations.insert(makeIllustration({ id: "i3" }));
+    await repos.journalEntries.insert(ENTRY);
+    await repos.journalEntries.insert({ ...ENTRY, id: "n2" });
+    await repos.journalEntries.insert({
+      ...ENTRY,
+      id: "n3",
+      stickers: [ENTRY.stickers[1]!],
+    });
+    await repos.journalEntries.softDelete("n2", T0);
+    // i1 is on n1 twice but counts as one page
+    expect(await repos.illustrations.useCounts()).toEqual({ i1: 1, i2: 2 });
+  });
+
   it("refuses a sticker for an illustration that does not exist", async () => {
     const { repos } = await setup();
     await expect(repos.journalEntries.insert(ENTRY)).rejects.toThrow();

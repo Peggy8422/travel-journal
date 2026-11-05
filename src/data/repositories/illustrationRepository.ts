@@ -60,6 +60,17 @@ export function createIllustrationRepository(
     async delete(id) {
       await db.runAsync("DELETE FROM illustrations WHERE id = ?", [id]);
     },
+
+    async useCounts() {
+      const rows = await db.getAllAsync<{ id: string; count: number }>(
+        `SELECT s.illustration_id AS id, COUNT(DISTINCT s.entry_id) AS count
+         FROM journal_entry_stickers s
+         JOIN journal_entries e ON e.id = s.entry_id
+         WHERE e.deleted_at IS NULL
+         GROUP BY s.illustration_id`,
+      );
+      return Object.fromEntries(rows.map((r) => [r.id, r.count]));
+    },
   };
 }
 

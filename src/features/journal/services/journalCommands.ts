@@ -36,7 +36,12 @@ export type JournalCommandError =
   /** 標題、內容、天氣、心情、照片都沒有 */
   | { readonly code: "EMPTY_ENTRY" }
   | { readonly code: "EMPTY_PLACE_NAME" }
-  | { readonly code: "TOO_MANY_PHOTOS"; readonly max: number };
+  | { readonly code: "TOO_MANY_PHOTOS"; readonly max: number }
+  | { readonly code: "ILLUSTRATION_NOT_FOUND"; readonly illustrationId: string }
+  /** 畫布上什麼都沒畫 */
+  | { readonly code: "EMPTY_ILLUSTRATION" }
+  /** 筆畫太多或一筆太長 */
+  | { readonly code: "ILLUSTRATION_TOO_BIG"; readonly maxStrokes: number };
 
 export type JournalCommandResult<T> = Promise<Result<T, JournalCommandError>>;
 

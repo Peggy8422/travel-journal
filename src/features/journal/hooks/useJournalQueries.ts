@@ -9,6 +9,10 @@ import {
   loadEntryForm,
 } from "../services/entryCommands";
 import {
+  loadIllustration,
+  loadIllustrationLibrary,
+} from "../services/illustrationCommands";
+import {
   loadJournal,
   loadJournalShelf,
   loadLedgerChoices,
@@ -70,6 +74,23 @@ export function useDeletedEntries(journalId: string) {
   const load = useCallback(
     () => loadDeletedEntries(db, journalId),
     [db, journalId],
+  );
+  return useFocusedQuery(load);
+}
+
+/** 「我的插圖」：所有插圖與各貼在幾篇日記上 */
+export function useIllustrationLibrary() {
+  const db = useDatabase();
+  const load = useCallback(() => loadIllustrationLibrary(db), [db]);
+  return useFocusedQuery(load);
+}
+
+/** 一張插圖（改畫用），data 是 Result */
+export function useIllustration(illustrationId: string) {
+  const db = useDatabase();
+  const load = useCallback(
+    () => loadIllustration(db, illustrationId),
+    [db, illustrationId],
   );
   return useFocusedQuery(load);
 }

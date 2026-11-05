@@ -34,6 +34,9 @@ src/app/  →  src/features/  →  src/domain/
   - 日記的地點（名稱＋座標，不存設計稿上的「京都・東山區」這類區域）每一個是地圖上的一個 `JournalMapPin`（`domain/map/types.ts`），`ledgerId` 是手帳綁定的帳本，所以選了帳本就一起出現；沒綁帳本的手帳共用 `UNBOUND_JOURNALS_ID`（`features/map/services/mapData.ts`），地球右側多一張「手帳」索引籤（有日記才出現）。地球上日記是牛皮紙小卡、和消費分開合併；卡片清單一篇日記一列（`entriesOf`）。路線（`routeOf`）只連消費，日記沒有時間。日記頁的「在地圖上看」打開 `/map?ledgers=…&date=…`。
   - 有綁帳本時，日記頁最下面列出「這天的消費」（`daySpendingOf`，`features/journal/services/daySpending.ts`）：只讀帳本、不另存，日期比的是消費當地日期（`occurredAt` 前 10 碼），不是臺灣時間；合計同一幣別就用那個幣別，混了幣別才換算成帳本的基準幣。
   - 手繪插圖（`domain/journal/illustration.ts`、`drawing.ts`）：存筆畫不存圖片，`illustrations.strokes` 是 JSON，點是 1000×1000 畫布上的整數 `[x, y]`；墨水色、工具代碼和分類一樣只能新增。讀回時（資料庫、備份都走 `parseStrokes`／`parseSticker`）只影響外觀的值放寬（認不得的色用墨黑、數值夾回範圍），結構不對才拒絕。
+  - 「我的插圖」（`/illustrations`，入口在手帳書架）與畫板（`/illustrations/draw?id=…`，`DrawingScreen`）：畫板是 `fullScreenModal`、版面不放 `ScrollView`，否則往下畫線會被下滑關閉或捲動搶走。筆畫歷史與手勢放在 `useDrawingPad` 的 class（同地球），每一步存整個筆畫陣列當復原紀錄。墨水色、筆寬在 `features/journal/components/inks.ts`，畫插圖一律用 `IllustrationArt`。
+  - 橡皮擦也是一筆筆畫（工具 `eraser`），只擦掉它之前畫的東西被劃過的地方：`IllustrationArt` 預設用 `Mask` 挖掉（貼紙底下的頁面透得出來），畫板傳 `paper` 直接用紙色蓋掉。畫板把已完成的筆畫和手指正在畫的那一筆分成兩層 Svg，移動時只重畫那一筆；連續的橡皮擦、連續的鉛筆各共用一個 `Mask`，不要改成一筆一個。範圍（`strokesBounds`）和「有沒有畫東西」（`hasInk`）都不算橡皮擦。
+  - 鉛筆（`pencil.ts`）是淡底色加兩道抖動的細筆跡，顆粒用 `Mask` 挖小點；亂數種子取自起點、每道筆跡各自一條亂數，畫到一半筆畫變長時前面不會跳動。
   - 貼在日記上的插圖是 `JournalEntryRecord.stickers`（`journal_entry_stickers` 子表）：位置以日記頁寬為單位（x、size 是頁寬比例，y 是離頁首幾個頁寬），換手機尺寸也貼在同一處。刪除插圖是 `ON DELETE CASCADE`，已刪除日記上的貼紙也一起消失。`updateEntry` 用 `...entry` 展開，表單沒有的欄位（貼紙）不會被洗掉。
   - 備份第 7 版多了最外層的 `illustrations`，日記多了 `stickers`；還原順序是帳本 → 插圖 → 手帳，插圖不在手機上的貼紙直接丟掉。
   - 備份第 6 版多了最外層的 `journals`；還原時先還原帳本再還原手帳，綁的帳本不在手機上或已經綁給別本手帳時，改成不綁定。

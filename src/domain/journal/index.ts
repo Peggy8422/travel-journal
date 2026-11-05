@@ -18,6 +18,7 @@ export {
   ILLUSTRATION_STROKE_LIMIT,
   ILLUSTRATION_TOOLS,
   isIllustrationInk,
+  hasInk,
   isIllustrationTool,
   normalizeAngle,
   parseSticker,
@@ -33,7 +34,6 @@ export {
   type IllustrationTool,
 } from "./illustration";
 export {
-  hitStroke,
   strokePath,
   strokesBounds,
   thinPoints,
