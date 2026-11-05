@@ -6,7 +6,10 @@ import {
 } from "../../../domain/ledger";
 import type { BackupFileError } from "../../../data/backup/backupFile";
 import type { JournalCommandError } from "../../journal/services/journalCommands";
-import type { JournalRestoreReport } from "../../journal/services/journalBackup";
+import type {
+  IllustrationRestoreReport,
+  JournalRestoreReport,
+} from "../../journal/services/journalBackup";
 import type { RestoreReport } from "../services/backupCommands";
 import type { LedgerCommandError } from "../services/ledgerCommands";
 import type { LedgerSummaryError } from "../services/ledgerSummary";
@@ -183,7 +186,10 @@ export function describeAllocationGap(
  * （個人帳本在畫面上不是一本帳本，不列成「個人」）。
  */
 export function describeRestoreReport(
-  report: RestoreReport & { readonly journals?: JournalRestoreReport },
+  report: RestoreReport & {
+    readonly journals?: JournalRestoreReport;
+    readonly illustrations?: IllustrationRestoreReport;
+  },
 ): string {
   const shared = (ledgers: readonly LedgerRecord[]) =>
     ledgers.filter((l) => l.kind === "shared");
@@ -235,6 +241,10 @@ export function describeRestoreReport(
     lines.push(
       `${failedJournals.length} 本手帳資料有誤，沒有還原：${journalNames(failedJournals)}`,
     );
+  }
+  // Skipped illustrations are not worth a line: nothing on the phone changed
+  if (report.illustrations && report.illustrations.restored > 0) {
+    lines.push(`已還原 ${report.illustrations.restored} 張手繪插圖`);
   }
   // 備份是空的，或只有個人記帳而且消費手機上都已經有了
   return lines.length > 0 ? lines.join("\n") : "備份裡沒有需要還原的資料";

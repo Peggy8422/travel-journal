@@ -1,6 +1,7 @@
 import type { SqlExecutor } from "../db/sqlDatabase";
 import { createBotQuoteCacheRepository } from "./botQuoteCacheRepository";
 import { createExpenseRepository } from "./expenseRepository";
+import { createIllustrationRepository } from "./illustrationRepository";
 import { createJournalEntryRepository } from "./journalEntryRepository";
 import { createJournalRepository } from "./journalRepository";
 import { createLedgerRepository } from "./ledgerRepository";
@@ -26,6 +27,7 @@ export function createRepositories(
     botQuotes: createBotQuoteCacheRepository(db, now),
     journals: createJournalRepository(db),
     journalEntries: createJournalEntryRepository(db),
+    illustrations: createIllustrationRepository(db),
   };
 }
 

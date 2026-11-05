@@ -1,5 +1,6 @@
 import type { GeoPoint } from "../ledger";
 import type { JournalCover } from "./cover";
+import type { EntrySticker } from "./illustration";
 import type { JournalMood, JournalWeather } from "./stamps";
 
 /*
@@ -45,6 +46,8 @@ export interface JournalEntryRecord {
   readonly photos: readonly string[];
   /** 依顯示順序 */
   readonly places: readonly JournalPlace[];
+  /** 貼在日記頁上的插圖，後面的蓋在前面的上面 */
+  readonly stickers: readonly EntrySticker[];
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly deletedAt: string | null;

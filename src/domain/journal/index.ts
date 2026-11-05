@@ -6,7 +6,39 @@ export type {
   JournalRecord,
 } from "./records";
 export { ENTRY_PHOTO_LIMIT } from "./records";
-export type { JournalEntryRepository, JournalRepository } from "./ports";
+export type {
+  IllustrationRepository,
+  JournalEntryRepository,
+  JournalRepository,
+} from "./ports";
+export {
+  ENTRY_STICKER_LIMIT,
+  ILLUSTRATION_CANVAS,
+  ILLUSTRATION_INKS,
+  ILLUSTRATION_STROKE_LIMIT,
+  ILLUSTRATION_TOOLS,
+  isIllustrationInk,
+  isIllustrationTool,
+  normalizeAngle,
+  parseSticker,
+  parseStrokes,
+  STICKER_SIZE,
+  STROKE_POINT_LIMIT,
+  STROKE_WIDTH,
+  type DrawPoint,
+  type EntrySticker,
+  type IllustrationInk,
+  type IllustrationRecord,
+  type IllustrationStroke,
+  type IllustrationTool,
+} from "./illustration";
+export {
+  hitStroke,
+  strokePath,
+  strokesBounds,
+  thinPoints,
+  type DrawBounds,
+} from "./drawing";
 export {
   isJournalTape,
   JOURNAL_TAPES,

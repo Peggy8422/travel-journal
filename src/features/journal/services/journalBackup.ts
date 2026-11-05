@@ -1,6 +1,10 @@
 import type { SqlDatabase, SqlExecutor } from "../../../data/db/sqlDatabase";
 import { createRepositories } from "../../../data/repositories";
-import type { JournalBackup, JournalRecord } from "../../../domain/journal";
+import type {
+  IllustrationRecord,
+  JournalBackup,
+  JournalRecord,
+} from "../../../domain/journal";
 
 /** 讀出所有手帳的完整資料（含已刪除的日記），依建立時間由新到舊 */
 export async function collectJournalBackups(
@@ -30,8 +34,8 @@ export interface JournalRestoreReport {
 
 /**
  * 還原手帳，規則和帳本一樣：已經存在的（同一個 id）略過，每本各自一個 transaction。
- * 要在帳本還原之後呼叫：綁定的帳本手機上沒有，或已經綁給別本手帳時，改成不綁定，
- * 手帳和日記照樣還原。
+ * 要在帳本與插圖還原之後呼叫：綁定的帳本手機上沒有，或已經綁給別本手帳時，改成不綁定，
+ * 手帳和日記照樣還原；貼紙用到的插圖手機上沒有時，那張貼紙不還原。
  */
 export async function restoreJournalBackups(
   db: SqlDatabase,
@@ -40,6 +44,9 @@ export async function restoreJournalBackups(
   const restored: JournalRecord[] = [];
   const skipped: JournalRecord[] = [];
   const failed: { journal: JournalRecord; reason: string }[] = [];
+  const illustrationIds = new Set(
+    (await createRepositories(db).illustrations.list()).map((i) => i.id),
+  );
 
   for (const backup of backups) {
     if (await createRepositories(db).journals.findById(backup.journal.id)) {
@@ -58,6 +65,9 @@ export async function restoreJournalBackups(
           await repos.journalEntries.insert({
             ...entry,
             journalId: journal.id,
+            stickers: entry.stickers.filter((s) =>
+              illustrationIds.has(s.illustrationId),
+            ),
           });
         }
         return journal;
@@ -82,4 +92,38 @@ async function bindableLedger(
   const ledger = await repos.ledgers.findById(ledgerId);
   if (!ledger || ledger.kind !== "shared") return null;
   return (await repos.journals.findByLedger(ledgerId)) ? null : ledgerId;
+}
+
+/** 所有插圖，依建立時間由新到舊 */
+export async function collectIllustrations(
+  db: SqlExecutor,
+): Promise<IllustrationRecord[]> {
+  return createRepositories(db).illustrations.list();
+}
+
+export interface IllustrationRestoreReport {
+  readonly restored: number;
+  /** 手機上已經有同一張插圖（同一個 id），沒有動它 */
+  readonly skipped: number;
+}
+
+/** 還原插圖：已經存在的略過；要在手帳之前呼叫，日記上的貼紙才找得到插圖 */
+export async function restoreIllustrations(
+  db: SqlDatabase,
+  illustrations: readonly IllustrationRecord[],
+): Promise<IllustrationRestoreReport> {
+  let restored = 0;
+  let skipped = 0;
+  await db.transaction(async (tx) => {
+    const repos = createRepositories(tx);
+    for (const illustration of illustrations) {
+      if (await repos.illustrations.findById(illustration.id)) {
+        skipped += 1;
+        continue;
+      }
+      await repos.illustrations.insert(illustration);
+      restored += 1;
+    }
+  });
+  return { restored, skipped };
 }

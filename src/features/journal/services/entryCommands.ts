@@ -52,6 +52,7 @@ export async function writeEntry(
     ...checked.value,
     id: deps.newId(),
     journalId,
+    stickers: [],
     createdAt: timestamp,
     updatedAt: timestamp,
     deletedAt: null,

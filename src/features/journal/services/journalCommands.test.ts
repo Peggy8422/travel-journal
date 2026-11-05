@@ -185,6 +185,7 @@ describe("journal queries", () => {
         weather: null,
         mood: null,
         photos: [],
+        stickers: [],
         places: [],
         createdAt: "2026-11-03T00:00:00.000Z",
         updatedAt: "2026-11-03T00:00:00.000Z",

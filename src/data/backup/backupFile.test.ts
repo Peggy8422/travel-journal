@@ -1,4 +1,4 @@
-import type { JournalBackup } from "../../domain/journal";
+import type { IllustrationRecord, JournalBackup } from "../../domain/journal";
 import type { LedgerBackup } from "../../domain/ledger";
 import { unwrap, unwrapErr } from "../../domain/ledger/testFixtures";
 import {
@@ -74,6 +74,9 @@ const journalEntry: JournalBackup = {
       weather: "sunny",
       mood: null,
       photos: ["p1.jpg"],
+      stickers: [
+        { illustrationId: "i1", x: 0.7, y: 0.4, size: 0.3, rotation: -8 },
+      ],
       places: [
         {
           name: "伏見稻荷大社",
@@ -87,10 +90,29 @@ const journalEntry: JournalBackup = {
   ],
 };
 
+const illustration: IllustrationRecord = {
+  id: "i1",
+  strokes: [
+    {
+      tool: "pen",
+      ink: "sumi",
+      width: 8,
+      points: [
+        [120, 300],
+        [480, 260],
+      ],
+    },
+    { tool: "wash", ink: "yamabuki", width: 90, points: [[300, 280]] },
+  ],
+  createdAt: T0,
+  updatedAt: "2026-10-05T00:00:00.000Z",
+};
+
 const contents = {
   exportedAt: "2026-10-21T00:00:00.000Z",
   ledgers: [entry],
   journals: [journalEntry],
+  illustrations: [illustration],
   photos: {},
 };
 
@@ -107,7 +129,13 @@ describe("backup file", () => {
   });
 
   it("round-trips an empty backup", () => {
-    const empty = { exportedAt: T0, ledgers: [], journals: [], photos: {} };
+    const empty = {
+      exportedAt: T0,
+      ledgers: [],
+      journals: [],
+      illustrations: [],
+      photos: {},
+    };
     expect(unwrap(parseBackup(serializeBackup(empty)))).toEqual(empty);
   });
 
@@ -320,6 +348,51 @@ describe("backup file journals", () => {
     [
       "journals that is not a list",
       (r: Record<string, any>) => (r.journals = {}),
+    ],
+  ])("rejects %s", (_, mutate) => {
+    expect(unwrapErr(parseBackup(corrupted(mutate))).code).toBe(
+      "INVALID_BACKUP",
+    );
+  });
+});
+
+describe("backup file illustrations", () => {
+  it("reads backups before version 7 as having no illustrations or stickers", () => {
+    const raw = JSON.parse(serializeBackup(contents));
+    raw.version = 6;
+    delete raw.illustrations;
+    delete raw.journals[0].entries[0].stickers;
+    const parsed = unwrap(parseBackup(JSON.stringify(raw)));
+    expect(parsed.illustrations).toEqual([]);
+    expect(parsed.journals[0]?.entries[0]?.stickers).toEqual([]);
+  });
+
+  it("drops a broken sticker but keeps the rest of the page", () => {
+    const parsed = unwrap(
+      parseBackup(
+        corrupted((r) => {
+          r.journals[0].entries[0].stickers.push({ x: "left" });
+        }),
+      ),
+    );
+    expect(parsed.journals[0]?.entries[0]?.stickers).toEqual(
+      journalEntry.entries[0]?.stickers,
+    );
+  });
+
+  it.each([
+    [
+      "strokes with a broken point",
+      (r: Record<string, any>) =>
+        (r.illustrations[0].strokes[0].points = [[1]]),
+    ],
+    [
+      "an illustration without an id",
+      (r: Record<string, any>) => delete r.illustrations[0].id,
+    ],
+    [
+      "stickers that is not a list",
+      (r: Record<string, any>) => (r.journals[0].entries[0].stickers = {}),
     ],
   ])("rejects %s", (_, mutate) => {
     expect(unwrapErr(parseBackup(corrupted(mutate))).code).toBe(

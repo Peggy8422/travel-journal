@@ -25,6 +25,7 @@ function makeEntry(
     weather: "sunny",
     mood: "happy",
     photos: ["p1.jpg", "p2.jpg"],
+    stickers: [],
     places: [
       {
         name: "伏見稻荷大社",

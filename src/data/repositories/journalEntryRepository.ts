@@ -1,6 +1,8 @@
 import {
   isJournalMood,
   isJournalWeather,
+  parseSticker,
+  type EntrySticker,
   type JournalEntryRecord,
   type JournalEntryRepository,
   type JournalPlace,
@@ -25,6 +27,15 @@ interface PhotoRow {
   photo: string;
 }
 
+interface StickerRow {
+  entry_id: string;
+  illustration_id: string;
+  x: number;
+  y: number;
+  size: number;
+  rotation: number;
+}
+
 interface PlaceRow {
   entry_id: string;
   name: string;
@@ -33,8 +44,8 @@ interface PlaceRow {
 }
 
 /**
- * 日記本身一張表，照片與地點各一張子表（依 sort_order 排列）。
- * 寫入時照片、地點整批重寫，所以 insert／update 要在 transaction 裡呼叫才不會留下一半。
+ * 日記本身一張表，照片、地點、貼紙各一張子表（依 sort_order 排列）。
+ * 寫入時照片、地點、貼紙整批重寫，所以 insert／update 要在 transaction 裡呼叫才不會留下一半。
  */
 export function createJournalEntryRepository(
   db: SqlExecutor,
@@ -46,6 +57,25 @@ export function createJournalEntryRepository(
     await db.runAsync("DELETE FROM journal_entry_places WHERE entry_id = ?", [
       entry.id,
     ]);
+    await db.runAsync("DELETE FROM journal_entry_stickers WHERE entry_id = ?", [
+      entry.id,
+    ]);
+    for (const [index, sticker] of entry.stickers.entries()) {
+      await db.runAsync(
+        `INSERT INTO journal_entry_stickers (entry_id, sort_order,
+           illustration_id, x, y, size, rotation)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          entry.id,
+          index,
+          sticker.illustrationId,
+          sticker.x,
+          sticker.y,
+          sticker.size,
+          sticker.rotation,
+        ],
+      );
+    }
     for (const [index, photo] of entry.photos.entries()) {
       await db.runAsync(
         "INSERT INTO journal_entry_photos (entry_id, sort_order, photo) VALUES (?, ?, ?)",
@@ -72,7 +102,7 @@ export function createJournalEntryRepository(
     if (rows.length === 0) return [];
     const ids = rows.map((r) => r.id);
     const marks = ids.map(() => "?").join(", ");
-    const [photoRows, placeRows] = await Promise.all([
+    const [photoRows, placeRows, stickerRows] = await Promise.all([
       db.getAllAsync<PhotoRow>(
         `SELECT entry_id, photo FROM journal_entry_photos
          WHERE entry_id IN (${marks}) ORDER BY entry_id, sort_order`,
@@ -80,6 +110,12 @@ export function createJournalEntryRepository(
       ),
       db.getAllAsync<PlaceRow>(
         `SELECT entry_id, name, latitude, longitude FROM journal_entry_places
+         WHERE entry_id IN (${marks}) ORDER BY entry_id, sort_order`,
+        ids,
+      ),
+      db.getAllAsync<StickerRow>(
+        `SELECT entry_id, illustration_id, x, y, size, rotation
+         FROM journal_entry_stickers
          WHERE entry_id IN (${marks}) ORDER BY entry_id, sort_order`,
         ids,
       ),
@@ -101,6 +137,21 @@ export function createJournalEntryRepository(
         },
       ]);
     }
+    const stickers = new Map<string, EntrySticker[]>();
+    for (const row of stickerRows) {
+      const sticker = parseSticker({
+        illustrationId: row.illustration_id,
+        x: row.x,
+        y: row.y,
+        size: row.size,
+        rotation: row.rotation,
+      });
+      if (!sticker.ok) continue;
+      stickers.set(row.entry_id, [
+        ...(stickers.get(row.entry_id) ?? []),
+        sticker.value,
+      ]);
+    }
     return rows.map((row) => ({
       id: row.id,
       journalId: row.journal_id,
@@ -111,6 +162,7 @@ export function createJournalEntryRepository(
       mood: isJournalMood(row.mood) ? row.mood : null,
       photos: photos.get(row.id) ?? [],
       places: places.get(row.id) ?? [],
+      stickers: stickers.get(row.id) ?? [],
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       deletedAt: row.deleted_at,

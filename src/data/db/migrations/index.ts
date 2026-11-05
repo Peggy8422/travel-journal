@@ -4,6 +4,7 @@ import { migration003 } from "./003_ledger_cover";
 import { migration004 } from "./004_ledger_trip_month";
 import { migration005 } from "./005_ledger_cover_photo";
 import { migration006 } from "./006_journals";
+import { migration007 } from "./007_illustrations";
 
 export interface Migration {
   readonly version: number;
@@ -18,4 +19,5 @@ export const MIGRATIONS: readonly Migration[] = [
   migration004,
   migration005,
   migration006,
+  migration007,
 ];

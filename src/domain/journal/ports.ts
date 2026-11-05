@@ -1,3 +1,4 @@
+import type { IllustrationRecord } from "./illustration";
 import type { JournalEntryRecord, JournalRecord } from "./records";
 
 /*
@@ -20,9 +21,9 @@ export interface JournalRepository {
 }
 
 export interface JournalEntryRepository {
-  /** 連同照片與地點一起寫入；要和其他寫入一致時請在 transaction 裡使用 */
+  /** 連同照片、地點、貼紙一起寫入；要和其他寫入一致時請在 transaction 裡使用 */
   insert(entry: JournalEntryRecord): Promise<void>;
-  /** 以 id 覆寫整篇日記（包含所屬的手帳），照片與地點整批換掉（createdAt 不變） */
+  /** 以 id 覆寫整篇日記（包含所屬的手帳），照片、地點、貼紙整批換掉（createdAt 不變） */
   update(entry: JournalEntryRecord): Promise<void>;
   softDelete(id: string, deletedAt: string): Promise<void>;
   restore(id: string, updatedAt: string): Promise<void>;
@@ -34,4 +35,15 @@ export interface JournalEntryRepository {
   ): Promise<JournalEntryRecord[]>;
   /** 所有日記（含已刪除的）用到的照片檔名，清理沒人用的照片時用 */
   listPhotoNames(): Promise<string[]>;
+}
+
+export interface IllustrationRepository {
+  insert(illustration: IllustrationRecord): Promise<void>;
+  /** 換掉筆畫與 updatedAt */
+  update(illustration: IllustrationRecord): Promise<void>;
+  findById(id: string): Promise<IllustrationRecord | undefined>;
+  /** 依建立時間由新到舊 */
+  list(): Promise<IllustrationRecord[]>;
+  /** 永久刪除，貼在日記上的（含已刪除的日記）也一起拿掉 */
+  delete(id: string): Promise<void>;
 }

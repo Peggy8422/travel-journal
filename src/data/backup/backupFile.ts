@@ -1,9 +1,14 @@
 import { err, ok, type Result } from "../../domain/common/result";
 import {
+  ENTRY_STICKER_LIMIT,
   isJournalMood,
   isJournalWeather,
   isLocalDate,
   parseJournalCover,
+  parseSticker,
+  parseStrokes,
+  type EntrySticker,
+  type IllustrationRecord,
   type JournalBackup,
   type JournalEntryRecord,
   type JournalPlace,
@@ -40,16 +45,19 @@ export const BACKUP_FORMAT = "travel-journal-backup";
  *    讀取 1～4 版時沒有照片。
  * 6：旅遊手帳：最外層多一個 journals（手帳與日記），手帳封面與日記的照片也放在 photos。
  *    讀取 1～5 版時沒有手帳。
+ * 7：手繪插圖：最外層多一個 illustrations（筆畫），日記多一個 stickers（貼在頁上的插圖）。
+ *    讀取 1～6 版時沒有插圖，日記沒有貼紙。
  */
-export const BACKUP_VERSION = 6;
+export const BACKUP_VERSION = 7;
 /** 可以讀取的版本 */
-const READABLE_VERSIONS: readonly unknown[] = [1, 2, 3, 4, 5, 6];
+const READABLE_VERSIONS: readonly unknown[] = [1, 2, 3, 4, 5, 6, 7];
 
 export interface BackupContents {
   /** 匯出時間，ISO 8601 UTC */
   readonly exportedAt: string;
   readonly ledgers: readonly LedgerBackup[];
   readonly journals: readonly JournalBackup[];
+  readonly illustrations: readonly IllustrationRecord[];
   /** 照片的檔案（帳本與手帳的封面、日記的照片）：檔名 → base64 的 JPEG */
   readonly photos: Readonly<Record<string, string>>;
 }
@@ -66,6 +74,7 @@ export function serializeBackup(contents: BackupContents): string {
       exportedAt: contents.exportedAt,
       ledgers: contents.ledgers,
       journals: contents.journals,
+      illustrations: contents.illustrations,
       photos: contents.photos,
     },
     null,
@@ -107,12 +116,20 @@ export function parseBackup(
     parseJournalBackup,
   );
   if (!journals.ok) return invalid(journals.error);
+  // 1～6 版沒有插圖
+  const illustrations = parseList(
+    value.illustrations ?? [],
+    "illustrations",
+    parseIllustration,
+  );
+  if (!illustrations.ok) return invalid(illustrations.error);
   const photos = parsePhotos(value.photos);
   if (!photos.ok) return invalid(photos.error);
   return ok({
     exportedAt: value.exportedAt,
     ledgers,
     journals: journals.value,
+    illustrations: illustrations.value,
     photos: photos.value,
   });
 }
@@ -358,6 +375,8 @@ function parseJournalEntry(value: unknown): Parsed<JournalEntryRecord> {
   if (!Array.isArray(value.photos)) return err("photos must be an array");
   const places = parseList(value.places, "places", parsePlace);
   if (!places.ok) return places;
+  const stickers = parseStickers(value.stickers);
+  if (!stickers.ok) return stickers;
   return ok({
     id: value.id as string,
     journalId: value.journalId as string,
@@ -370,9 +389,43 @@ function parseJournalEntry(value: unknown): Parsed<JournalEntryRecord> {
     // 檔名格式不對的照片不收，免得指到資料夾外面
     photos: value.photos.filter(isCoverPhotoName),
     places: places.value,
+    stickers: stickers.value,
     createdAt: value.createdAt as string,
     updatedAt: value.updatedAt as string,
     deletedAt: value.deletedAt as string | null,
+  });
+}
+
+/**
+ * 1～6 版的日記沒有 stickers。貼紙只影響外觀，數值不對的那張丟掉、
+ * 超過上限的不收，不拒絕整份備份
+ */
+function parseStickers(value: unknown): Parsed<EntrySticker[]> {
+  if (value === undefined) return ok([]);
+  if (!Array.isArray(value)) return err("stickers must be an array");
+  return ok(
+    value
+      .map(parseSticker)
+      .flatMap((sticker) => (sticker.ok ? [sticker.value] : []))
+      .slice(0, ENTRY_STICKER_LIMIT),
+  );
+}
+
+function parseIllustration(value: unknown): Parsed<IllustrationRecord> {
+  if (!isObject(value)) return err("not an object");
+  const missing = firstMissing(value, {
+    id: isString,
+    createdAt: isString,
+    updatedAt: isString,
+  });
+  if (missing) return err(missing);
+  const strokes = parseStrokes(value.strokes);
+  if (!strokes.ok) return strokes;
+  return ok({
+    id: value.id as string,
+    strokes: strokes.value,
+    createdAt: value.createdAt as string,
+    updatedAt: value.updatedAt as string,
   });
 }
 

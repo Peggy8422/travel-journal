@@ -13,8 +13,11 @@ import type {
   LedgerRecord,
 } from "../../../domain/ledger";
 import {
+  collectIllustrations,
   collectJournalBackups,
+  restoreIllustrations,
   restoreJournalBackups,
+  type IllustrationRestoreReport,
   type JournalRestoreReport,
 } from "../../journal/services/journalBackup";
 import {
@@ -162,7 +165,7 @@ async function insertLedgerBackup(
   }
 }
 
-/** 產生完整備份檔的檔名與內容（含帳本、手帳與日記的照片） */
+/** 產生完整備份檔的檔名與內容（含帳本、手帳與日記的照片，以及手繪插圖） */
 export async function buildBackupFile(
   db: SqlExecutor,
   photoStore: CoverPhotoStore,
@@ -170,6 +173,7 @@ export async function buildBackupFile(
 ): Promise<{ fileName: string; content: string }> {
   const ledgers = await collectBackup(db);
   const journals = await collectJournalBackups(db);
+  const illustrations = await collectIllustrations(db);
   const photos = await collectCoverPhotos(
     photoStore,
     backupPhotoNames(ledgers, journals),
@@ -181,19 +185,21 @@ export async function buildBackupFile(
       exportedAt: now.toISOString(),
       ledgers,
       journals,
+      illustrations,
       photos,
     }),
   };
 }
 
-/** 備份檔整份還原的結果：帳本加上手帳 */
+/** 備份檔整份還原的結果：帳本加上手帳與插圖 */
 export interface BackupRestoreReport extends RestoreReport {
   readonly journals: JournalRestoreReport;
+  readonly illustrations: IllustrationRestoreReport;
 }
 
 /**
  * 解析備份檔內容後還原；檔案格式不對時回傳錯誤，不寫入任何資料。
- * 先還原帳本再還原手帳（手帳要綁的帳本才會在）。
+ * 先還原帳本與插圖再還原手帳（手帳要綁的帳本、日記上貼的插圖才會在）。
  * 照片先寫回手機，還原完再清掉沒有人在用的照片（例如被略過的帳本帶來的）。
  */
 export async function restoreFromBackupText(
@@ -215,7 +221,15 @@ export async function restoreFromBackupText(
     photos,
   );
   const report = await restoreBackup(db, ledgers);
+  const illustrationReport = await restoreIllustrations(
+    db,
+    parsed.value.illustrations,
+  );
   const journalReport = await restoreJournalBackups(db, journals);
   await pruneCoverPhotos(db, photoStore);
-  return ok({ ...report, journals: journalReport });
+  return ok({
+    ...report,
+    journals: journalReport,
+    illustrations: illustrationReport,
+  });
 }

@@ -193,6 +193,7 @@ describe("loadMapData", () => {
       weather: null,
       mood: null,
       photos: [],
+      stickers: [],
       createdAt: T0,
       updatedAt: T0,
       deletedAt: null,
