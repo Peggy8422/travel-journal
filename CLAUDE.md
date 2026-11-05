@@ -24,6 +24,23 @@ src/app/  →  src/features/  →  src/domain/
   - 照片封面是第五種樣式 `photo`：`cover.photo` 只記檔名，照片存在 App 文件資料夾（`data/files/coverPhotoStore.ts`，介面是 `domain/ledger/ports.ts` 的 `CoverPhotoStore`，測試用 `memoryCoverPhotoStore`）。配色照樣要選，用在書背和地球、地圖上的顏色。隨機封面不會抽到照片。
   - 照片在自訂封面按「完成」才存進 App；換封面、刪帳本時不直接刪檔，之後用 `tidyCoverPhotos`／`pruneCoverPhotos` 清掉沒有帳本在用的照片。檔名一律檢查 `isCoverPhotoName`（備份讀回的檔名也是），避免指到資料夾外面。
   - 備份檔第 5 版把照片 base64 放在最外層的 `photos`；還原時照片缺檔的照片封面改成同配色的書衣。
+- 旅遊手帳（`domain/journal`、`features/journal`）：一趟旅行一本手帳，可以綁一本分帳帳本（部分唯一索引保證一本帳本最多一本手帳；帳本刪除時 `ON DELETE SET NULL`，手帳照樣保留）。
+  - 名稱存手帳自己的：建立時還沒自己打字就跟著選的帳本填入，之後兩邊各改各的。手帳設定改綁帳本、名稱還是舊帳本名稱時，名稱欄下面出現 `RenameSuggestion`，不跳 `Alert`。
+  - 日記日期是旅行當地的 `YYYY-MM-DD`（`isLocalDate`），使用者自己選，不換算時區。天氣、心情、紙膠帶代碼在 `domain/journal`，和分類一樣只能新增。
+  - 點一篇日記開的是整頁的日記頁（`/journal/[id]/entry/[entryId]`，和設計稿一樣不是消費明細那種 formSheet），「編輯」與「寫日記」是 modal。刪除日記和消費一樣是軟刪除、有「復原」和「最近刪除」（`DeletedFold` 共用）；從編輯表單刪除後用 `dismissTo` 回到手帳，日記頁也一起關掉。
+  - 日記可以搬到別本手帳：編輯表單最上面的「手帳」欄（有其他手帳才出現），按「儲存」才移（`updateEntry` 的 `journalId`），Day N、這天的消費都跟著新手帳。
+  - 封面是固定的牛皮紙筆記本（`JournalCover`），使用者只挑紙膠帶顏色和要不要貼照片，不沿用帳本的 `NotebookCover`。
+  - 手帳封面和日記的照片與帳本照片封面放在同一個資料夾（`CoverPhotoStore`）。`pruneCoverPhotos` 會一起看帳本封面、手帳封面、日記照片（含已刪除的日記，才能復原），之後新增存照片的地方，`usedPhotoNames` 和 `backupPhotoNames`（`features/ledger/services/coverPhotos.ts`）都要補。日記照片要能全螢幕看，存長邊 1600px（`pickEntryPhotos`，封面只存 600px 寬），一篇最多 `ENTRY_PHOTO_LIMIT` 張，因為照片會整包放進備份檔。
+  - 日記的地點（名稱＋座標，不存設計稿上的「京都・東山區」這類區域）每一個是地圖上的一個 `JournalMapPin`（`domain/map/types.ts`），`ledgerId` 是手帳綁定的帳本，所以選了帳本就一起出現；沒綁帳本的手帳共用 `UNBOUND_JOURNALS_ID`（`features/map/services/mapData.ts`），地球右側多一張「手帳」索引籤（有日記才出現）。地球上日記是牛皮紙小卡、和消費分開合併；卡片清單一篇日記一列（`entriesOf`）。路線（`routeOf`）只連消費，日記沒有時間。日記頁的「在地圖上看」打開 `/map?ledgers=…&date=…`。
+  - 有綁帳本時，日記頁最下面列出「這天的消費」（`daySpendingOf`，`features/journal/services/daySpending.ts`）：只讀帳本、不另存，日期比的是消費當地日期（`occurredAt` 前 10 碼），不是臺灣時間；合計同一幣別就用那個幣別，混了幣別才換算成帳本的基準幣。
+  - 手繪插圖（`domain/journal/illustration.ts`、`drawing.ts`）：存筆畫不存圖片，`illustrations.strokes` 是 JSON，點是 1000×1000 畫布上的整數 `[x, y]`；墨水色、工具代碼和分類一樣只能新增。讀回時（資料庫、備份都走 `parseStrokes`／`parseSticker`）只影響外觀的值放寬（認不得的色用墨黑、數值夾回範圍），結構不對才拒絕。
+  - 「我的插圖」（`/illustrations`，入口在手帳書架）與畫板（`/illustrations/draw?id=…`，`DrawingScreen`）：畫板是 `fullScreenModal`、版面不放 `ScrollView`，否則往下畫線會被下滑關閉或捲動搶走。筆畫歷史與手勢放在 `useDrawingPad` 的 class（同地球），每一步存整個筆畫陣列當復原紀錄。墨水色、筆寬在 `features/journal/components/inks.ts`，畫插圖一律用 `IllustrationArt`。
+  - 橡皮擦也是一筆筆畫（工具 `eraser`），只擦掉它之前畫的東西被劃過的地方：`IllustrationArt` 預設用 `Mask` 挖掉（貼紙底下的頁面透得出來），畫板傳 `paper` 直接用紙色蓋掉。畫板把已完成的筆畫和手指正在畫的那一筆分成兩層 Svg，移動時只重畫那一筆；連續的橡皮擦、連續的鉛筆各共用一個 `Mask`，不要改成一筆一個。範圍（`strokesBounds`）和「有沒有畫東西」（`hasInk`）都不算橡皮擦。
+  - 鉛筆（`pencil.ts`）是淡底色加兩道抖動的細筆跡，顆粒用 `Mask` 挖小點；亂數種子取自起點、每道筆跡各自一條亂數，畫到一半筆畫變長時前面不會跳動。
+  - 貼在日記上的插圖是 `JournalEntryRecord.stickers`（`journal_entry_stickers` 子表）：位置以日記頁寬為單位（x、size 是頁寬比例，y 是離頁首幾個頁寬），換手機尺寸也貼在同一處。刪除插圖是 `ON DELETE CASCADE`，已刪除日記上的貼紙也一起消失。`updateEntry` 用 `...entry` 展開，表單沒有的欄位（貼紙）不會被洗掉。
+  - 日記頁右上「貼插圖」在同一頁切換成貼插圖模式（`StickerEditor`，按「完成」才用 `saveEntryStickers` 一次存全部），不另開路由：要對著真正的頁面擺。手勢放在 `useStickerBoard` 的 class：整層 `StickerLayer` 用 `box-only` 接觸控、自己判斷點到哪張（`hitSticker`），沒點到就回傳 false 讓頁面照常捲動；按住貼紙時 `scrollEnabled` 關掉，第二根手指落在哪都算捏合。貼插圖時關掉返回手勢（`gestureEnabled`），不然從左邊拖貼紙會變成離開頁面。頁面的 `minHeight` 照最下面的貼紙撐高（`stickersBottom`），窄手機上貼紙也不會被切掉。
+  - 備份第 7 版多了最外層的 `illustrations`，日記多了 `stickers`；還原順序是帳本 → 插圖 → 手帳，插圖不在手機上的貼紙直接丟掉。
+  - 備份第 6 版多了最外層的 `journals`；還原時先還原帳本再還原手帳，綁的帳本不在手機上或已經綁給別本手帳時，改成不綁定。
 - 共用 UI 元件與主題色在 `src/shared/ui/`（只用 React Native 內建元件，不用 `@expo/ui`）。
 - 日系手繪風格（設計稿：https://claude.ai/artifact/Bq5DkRzceSM8V5rzqG2HPD）：
   - 這一版固定和紙淺色（`app.json` 的 `userInterfaceStyle` 也是 `light`），`useTheme()` 不跟系統切換。
@@ -31,6 +48,7 @@ src/app/  →  src/features/  →  src/domain/
   - 手繪線條是 react-native-svg 畫的抖動路徑（`shared/ui/sketch.ts` 純函式、`handDrawn.tsx` 元件），不用 SVG 濾鏡：react-native-svg 雖然有 `FeTurbulence`、`FeDisplacementMap` 元件，但都沒有實作（只會警告、不畫任何東西），設計稿裡的鉛筆抖動要用路徑本身做出來。鉛筆的顆粒與印章缺墨則是用 `Mask` 挖掉小點（`HandCircle`、`InkStamp`），小點合成一條 path，不要一點一個 `Circle`。
 - 地圖分頁是手繪地球（`features/map/components/GlobeScreen.tsx`，投影在 `domain/map/globe.ts`，海岸線在 `worldOutline.ts`），只放大到城市大小；城市裡的日期篩選、當天路線、目前位置在「詳細地圖」（`/map?ledgers=…`，react-native-maps），從地球的消費卡片進去。
   - 地球每一格都重新投影整個世界：海岸線先用 `toSphere` 轉成球面向量，投影只剩乘法，路徑字串直接串接；改這段時注意 Hermes 沒有 JIT，比 Node 慢很多。
+  - 選擇地點（`LocationPickerModal`，記帳和日記共用）的搜尋用 Apple 地圖的 `MKLocalSearch`，包在本機原生模組 `modules/place-search`（介面是 `domain/location` 的 `PlaceSearch`）。只有 iOS，Android 和測試裡 `createPlaceSearch()` 回傳 null、不顯示搜尋框。不用 expo-location 的 `geocodeAsync`：它只查得到地址，搜「清水寺」會跑到土城的「清水里」（2026-11-04 實測）。改了 Swift 要重新 `pod install`（終端機要 UTF-8，否則 CocoaPods 會報 Unicode Normalization 錯誤）並重 build，Fast Refresh 不會更新。
   - 地圖上的線（詳細地圖的當天路線）用 SVG 疊在 `MapView` 上，地圖移動時用 `pointForCoordinate` 重新換算位置（`DayMap`）：react-native-maps 的 `Polyline`、`Polygon` 在 iOS 實機上都畫不出來（2026-10-29 確認）。
   - 動畫與拖曳狀態放在 `useGlobeMotion` 的 class 裡，畫面只拿快照：React Compiler 的 lint 不允許 render 時讀 ref（連把 ref 傳給 `PanResponder.create` 也算）。系統開啟「減少動態效果」時不擺動、視角直接跳到目標。
 - 帳本內頁、統計、帳本設定、個人記帳、備份、詳細地圖，以及三個分頁都隱藏導覽列（`src/app/_layout.tsx`、`src/app/(tabs)/_layout.tsx`），頁首自己畫（`shared/ui/PageHeader.tsx`）；這類畫面讀取失敗時要用 `PageMessage`，不然沒有返回鍵可以離開。新增／編輯消費是 modal，保留原生導覽列（左右放取消、儲存）。

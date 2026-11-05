@@ -31,6 +31,7 @@ import {
   Button,
   Chip,
   ErrorText,
+  HeaderAction,
   Label,
   Screen,
   SmallButton,
@@ -227,8 +228,15 @@ export function ExpenseForm({
     if (result?.ok) setPlace((draft) => applyLocatedPlace(draft, result.value));
   }
 
-  async function fillPickedPlace(point: GeoPoint) {
+  async function fillPickedPlace(point: GeoPoint, placeName: string | null) {
     setPickingPlace(false);
+    // A search result already has its name; no need to look one up
+    if (placeName !== null) {
+      setPlace((draft) =>
+        applyLocatedPlace(draft, { location: point, placeName }),
+      );
+      return;
+    }
     // Keep the point even if the name lookup is slow or fails
     setPlace((draft) => ({ ...draft, location: point }));
     const result = await currentPlace.describe(point);
@@ -718,44 +726,6 @@ function FieldLabel({ children }: { children: ReactNode }) {
   const theme = useTheme();
   return (
     <Text style={[styles.fieldLabel, { color: theme.text }]}>{children}</Text>
-  );
-}
-
-/** 導覽列左右的文字按鈕（取消、儲存） */
-function HeaderAction({
-  title,
-  onPress,
-  strong = false,
-  disabled = false,
-}: {
-  title: string;
-  onPress: () => void;
-  strong?: boolean;
-  disabled?: boolean;
-}) {
-  const theme = useTheme();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      disabled={disabled}
-      hitSlop={10}
-      onPress={onPress}
-      style={({ pressed }) => ({
-        opacity: disabled ? 0.45 : pressed ? 0.6 : 1,
-        paddingHorizontal: 4,
-      })}
-    >
-      <Text
-        style={[
-          styles.headerAction,
-          strong
-            ? { color: theme.primary, fontFamily: fonts.bold }
-            : { color: "#5E554C" },
-        ]}
-      >
-        {title}
-      </Text>
-    </Pressable>
   );
 }
 
@@ -1353,9 +1323,5 @@ const styles = StyleSheet.create({
   total: {
     fontFamily: fonts.bold,
     fontSize: 20,
-  },
-  headerAction: {
-    fontFamily: fonts.regular,
-    fontSize: 15,
   },
 });

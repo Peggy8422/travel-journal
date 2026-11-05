@@ -21,6 +21,12 @@ describe("initializeDatabase", () => {
     expect(tables.map((t) => t.name)).toEqual([
       "bot_quotes",
       "expenses",
+      "illustrations",
+      "journal_entries",
+      "journal_entry_photos",
+      "journal_entry_places",
+      "journal_entry_stickers",
+      "journals",
       "ledgers",
       "members",
       "settlements",

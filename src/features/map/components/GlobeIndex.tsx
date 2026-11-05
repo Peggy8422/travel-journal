@@ -4,7 +4,7 @@ import Svg, { Path } from "react-native-svg";
 import { accentOverhang, fonts } from "../../../shared/ui/fonts";
 import { useTheme } from "../../../shared/ui/theme";
 import { COVER_COLORS } from "../../ledger/components/coverStyles";
-import type { MapLedger } from "../services/mapData";
+import { mapLedgerName, type MapLedger } from "../services/mapData";
 import { groupLedgersByYear } from "../services/globeView";
 
 /** 沒選取的索引籤往右縮進螢幕邊緣的距離；這一段看不到，文字要避開 */
@@ -13,14 +13,22 @@ const TUCK = 12;
 /** 個人記帳固定用藍色，和個人分頁的長條一致 */
 const PERSONAL_COLORS = COVER_COLORS.ai;
 
+/** 沒綁帳本的手帳用牛皮紙色 */
+const JOURNAL_COLORS = { deep: "#7E5F3A", tint: "#E6D6B8" };
+
 /** 帳本在地球上的顏色：索引籤底色（tint）與標記、選取條（deep） */
 export function ledgerColors(ledger: MapLedger): {
   deep: string;
   tint: string;
 } {
-  return ledger.kind === "personal"
-    ? PERSONAL_COLORS
-    : COVER_COLORS[ledger.cover.palette];
+  switch (ledger.kind) {
+    case "personal":
+      return PERSONAL_COLORS;
+    case "journals":
+      return JOURNAL_COLORS;
+    case "shared":
+      return COVER_COLORS[ledger.cover.palette];
+  }
 }
 
 /**
@@ -54,6 +62,7 @@ export function GlobeIndex({
 }) {
   const theme = useTheme();
   const personal = ledgers.find((l) => l.kind === "personal");
+  const journals = ledgers.find((l) => l.kind === "journals");
   const years = groupLedgersByYear(ledgers);
 
   return (
@@ -77,6 +86,15 @@ export function GlobeIndex({
           />
         ) : (
           loaded && <EmptyPersonalTab />
+        )}
+        {journals && (
+          <LedgerTab
+            ledger={journals}
+            label="手帳"
+            sub="未綁帳本"
+            selected={picked.includes(journals.id)}
+            onPress={() => onToggleLedger(journals.id)}
+          />
         )}
         {years.map(({ year, ledgers: inYear }) => {
           const open = year === openYear;
@@ -255,9 +273,9 @@ function LedgerTab({
       accessibilityRole="button"
       accessibilityState={{ selected }}
       accessibilityLabel={
-        ledger.kind === "personal"
-          ? "個人記帳"
-          : `${ledger.name}，${ledger.tripMonth.slice(0, 4)} 年 ${Number(ledger.tripMonth.slice(5, 7))} 月`
+        ledger.kind === "shared"
+          ? `${ledger.name}，${ledger.tripMonth.slice(0, 4)} 年 ${Number(ledger.tripMonth.slice(5, 7))} 月`
+          : mapLedgerName(ledger)
       }
       onPress={onPress}
       style={({ pressed }) => [
@@ -296,7 +314,7 @@ function LedgerTab({
         </View>
       )}
       {/*
-        個人記帳的「（無分帳）」比月份長：縮進邊緣時只在看得到的範圍置中，
+        個人記帳的「（無分帳）」、手帳的「未綁帳本」比月份長：縮進邊緣時只在看得到的範圍置中，
         太窄就縮小一點而不是換行
       */}
       <Text

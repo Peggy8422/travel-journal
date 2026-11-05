@@ -1,2 +1,2 @@
 // 定位模組的公開 API
-export type { DeviceLocator } from "./ports";
+export type { DeviceLocator, FoundPlace, PlaceSearch } from "./ports";

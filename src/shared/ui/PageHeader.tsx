@@ -6,19 +6,16 @@ import { DashedLine, PaperBackground } from "./handDrawn";
 import { accentOverhang, fonts } from "./fonts";
 import { spacing, useTheme } from "./theme";
 
-/** 紙色小膠囊加左箭頭；label 寫回到哪裡（例如「帳本」或帳本名稱） */
-export function BackButton({
-  label,
-  onPress,
-}: {
-  label: string;
-  onPress: () => void;
-}) {
+/**
+ * 紙色小膠囊加左箭頭，一律寫「返回」：同一個畫面可能從不同地方進來，
+ * 寫目的地的名稱反而會和實際回到的畫面對不上。
+ */
+export function BackButton({ onPress }: { onPress: () => void }) {
   const theme = useTheme();
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`返回${label}`}
+      accessibilityLabel="返回"
       onPress={onPress}
       style={({ pressed }) => [
         styles.back,
@@ -38,7 +35,7 @@ export function BackButton({
         <Path d="M11.2 3.8 C9 6 7.2 7.7 5.6 9.1 C7.4 10.6 9.2 12.3 11.4 14.4" />
       </Svg>
       <Text numberOfLines={1} style={[styles.backText, { color: theme.text }]}>
-        {label}
+        返回
       </Text>
     </Pressable>
   );
@@ -49,13 +46,11 @@ export function BackButton({
  * 返回鍵下面是 Caveat 小字與大標題，divider 會在下緣畫一條虛線。
  */
 export function PageHeader({
-  backLabel,
   onBack,
   kicker,
   title,
   divider = false,
 }: {
-  backLabel: string;
   onBack: () => void;
   kicker: string;
   title: string;
@@ -65,7 +60,7 @@ export function PageHeader({
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
-      <BackButton label={backLabel} onPress={onBack} />
+      <BackButton onPress={onBack} />
       <View>
         <Text style={[styles.kicker, { color: theme.textMuted }]}>
           {kicker}
@@ -88,11 +83,9 @@ export function PageHeader({
 
 /** 隱藏導覽列的畫面讀取失敗時用：只有返回鍵和一段說明，避免使用者卡在沒有返回鍵的畫面 */
 export function PageMessage({
-  backLabel,
   onBack,
   text,
 }: {
-  backLabel: string;
   onBack: () => void;
   text: string;
 }) {
@@ -109,7 +102,7 @@ export function PageMessage({
       ]}
     >
       <PaperBackground />
-      <BackButton label={backLabel} onPress={onBack} />
+      <BackButton onPress={onBack} />
       <Text style={[styles.messageText, { color: theme.textMuted }]}>
         {text}
       </Text>

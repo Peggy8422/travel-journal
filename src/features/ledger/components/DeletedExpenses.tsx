@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
 
+import type { Result } from "../../../domain/common/result";
 import { formatMinorAmount, type ExpenseRecord } from "../../../domain/ledger";
 import { notifyDataChanged } from "../../../shared/hooks/useFocusedQuery";
 import { ErrorText, SmallButton } from "../../../shared/ui/components";
@@ -12,10 +13,10 @@ import { useToast } from "../../../shared/ui/Toast";
 import { useLedgerCommandDeps } from "../../database/DatabaseProvider";
 import { useDeletedExpenses } from "../hooks/useLedgerQueries";
 import { useDeletedPersonalExpenses } from "../hooks/usePersonalQueries";
-import { restoreExpense, type CommandResult } from "../services/ledgerCommands";
+import { restoreExpense } from "../services/ledgerCommands";
 import { toLocalIsoString } from "../services/localTimestamp";
 import { restorePersonalExpense } from "../services/personalCommands";
-import { describeError } from "./messages";
+import { describeError, type DisplayableError } from "./messages";
 
 /** 帳本內頁消費列表最下面的「最近刪除」；沒有刪除的消費時不顯示 */
 export function DeletedExpensesFold({ ledgerId }: { ledgerId: string }) {
@@ -23,7 +24,7 @@ export function DeletedExpensesFold({ ledgerId }: { ledgerId: string }) {
   const { data } = useDeletedExpenses(ledgerId);
   return (
     <DeletedFold
-      expenses={data}
+      items={data?.map(expenseItem)}
       hint="還原後會放回帳本"
       restore={(id) => restoreExpense(deps, id)}
     />
@@ -36,25 +37,46 @@ export function DeletedPersonalExpensesFold() {
   const { data } = useDeletedPersonalExpenses();
   return (
     <DeletedFold
-      expenses={data}
+      items={data?.map(expenseItem)}
       hint="還原後會放回個人記帳"
       restore={(id) => restorePersonalExpense(deps, id)}
     />
   );
 }
 
+/** 「最近刪除」裡的一列 */
+export interface DeletedItem {
+  readonly id: string;
+  readonly title: string;
+  /** 標題下面的小字（例如金額），後面會接刪除的日期 */
+  readonly detail: string | null;
+  readonly deletedAt: string | null;
+}
+
+function expenseItem(expense: ExpenseRecord): DeletedItem {
+  return {
+    id: expense.id,
+    title: expense.title,
+    detail: `${expense.currency} ${formatMinorAmount(expense.amountMinor, expense.currency)}`,
+    deletedAt: expense.deletedAt,
+  };
+}
+
 /**
  * 平常只是一行淡色的「最近刪除 N 筆」，點一下在原地展開，每筆都能還原。
  * 偶爾才用得到，所以不搶列表的版面。
  */
-function DeletedFold({
-  expenses,
+export function DeletedFold({
+  items,
   hint,
   restore,
+  unit = "筆",
 }: {
-  expenses: readonly ExpenseRecord[] | undefined;
+  items: readonly DeletedItem[] | undefined;
   hint: string;
-  restore: (id: string) => CommandResult<void>;
+  restore: (id: string) => Promise<Result<void, DisplayableError>>;
+  /** 「最近刪除 3 筆」的量詞 */
+  unit?: string;
 }) {
   const theme = useTheme();
   const toast = useToast();
@@ -62,20 +84,20 @@ function DeletedFold({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  if (!expenses || expenses.length === 0) return null;
+  if (!items || items.length === 0) return null;
 
-  async function restoreOne(expense: ExpenseRecord) {
+  async function restoreOne(item: DeletedItem) {
     setError(null);
-    setBusyId(expense.id);
+    setBusyId(item.id);
     try {
-      const result = await restore(expense.id);
+      const result = await restore(item.id);
       if (!result.ok) {
         setError(describeError(result.error));
         return;
       }
       // The list above and its totals change too, not just this fold
       notifyDataChanged();
-      toast(`「${expense.title}」放回來了`);
+      toast(`「${item.title}」放回來了`);
     } catch {
       setError("還原失敗，請再試一次");
     } finally {
@@ -89,12 +111,12 @@ function DeletedFold({
       <Pressable
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
-        accessibilityLabel={`最近刪除 ${expenses.length} 筆`}
+        accessibilityLabel={`最近刪除 ${items.length} ${unit}`}
         onPress={() => setOpen((v) => !v)}
         style={({ pressed }) => [styles.toggle, { opacity: pressed ? 0.6 : 1 }]}
       >
         <Text style={[styles.toggleText, { color: theme.textMuted }]}>
-          最近刪除 {expenses.length} 筆
+          最近刪除 {items.length} {unit}
         </Text>
         <Svg
           width={14}
@@ -113,27 +135,29 @@ function DeletedFold({
       {open && (
         <View style={styles.list}>
           <Text style={[styles.hint, { color: theme.textMuted }]}>{hint}</Text>
-          {expenses.map((expense) => (
-            <View key={expense.id} style={styles.row}>
+          {items.map((item) => (
+            <View key={item.id} style={styles.row}>
               <View style={styles.text}>
                 <Text
                   numberOfLines={1}
                   style={[styles.title, { color: theme.text }]}
                 >
-                  {expense.title}
+                  {item.title}
                 </Text>
                 <Text style={[styles.sub, { color: theme.textMuted }]}>
-                  {`${expense.currency} ${formatMinorAmount(expense.amountMinor, expense.currency)}`}
-                  {expense.deletedAt
-                    ? ` · ${deletedDay(expense.deletedAt)} 刪除`
-                    : ""}
+                  {[
+                    item.detail,
+                    item.deletedAt && `${deletedDay(item.deletedAt)} 刪除`,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
                 </Text>
               </View>
               <SmallButton
                 title="還原"
-                accessibilityLabel={`還原「${expense.title}」`}
+                accessibilityLabel={`還原「${item.title}」`}
                 disabled={busyId !== null}
-                onPress={() => restoreOne(expense)}
+                onPress={() => restoreOne(item)}
               />
             </View>
           ))}

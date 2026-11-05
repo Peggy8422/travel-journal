@@ -24,9 +24,7 @@ export function LedgerStatsScreen({ ledgerId }: { ledgerId: string }) {
   const { data, error } = useLedgerStats(ledgerId);
 
   if (error) {
-    return (
-      <PageMessage backLabel="帳本" onBack={router.back} text="讀取帳本失敗" />
-    );
+    return <PageMessage onBack={router.back} text="讀取帳本失敗" />;
   }
   if (!data) {
     return (
@@ -35,11 +33,7 @@ export function LedgerStatsScreen({ ledgerId }: { ledgerId: string }) {
   }
   if (!data.ok) {
     return (
-      <PageMessage
-        backLabel="帳本"
-        onBack={router.back}
-        text={describeError(data.error)}
-      />
+      <PageMessage onBack={router.back} text={describeError(data.error)} />
     );
   }
 
@@ -55,12 +49,7 @@ export function LedgerStatsScreen({ ledgerId }: { ledgerId: string }) {
   return (
     <View style={[styles.fill, { backgroundColor: theme.background }]}>
       <PaperBackground />
-      <PageHeader
-        backLabel={ledger.name}
-        onBack={router.back}
-        kicker="Stats"
-        title="統計"
-      />
+      <PageHeader onBack={router.back} kicker="Stats" title="統計" />
       {stats.totalMinor === 0 ? (
         <Text style={[styles.empty, { color: theme.textMuted }]}>
           還沒有消費，記帳後就能看到統計。

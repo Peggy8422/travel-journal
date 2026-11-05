@@ -30,23 +30,33 @@ import { describeMapLocateError } from "../../ledger/components/messages";
 import { formatLocalDate } from "../../ledger/services/localTimestamp";
 import { useMapData } from "../hooks/useMapData";
 import { useUserLocation } from "../hooks/useUserLocation";
+import { countLabel, entriesOf } from "../services/globeView";
 import {
   filterPins,
-  type MapExpense,
+  mapLedgerName,
+  type MapItem,
   type MapLedger,
   type PinFilter,
 } from "../services/mapData";
-import { LedgerSectionHeader, MapExpenseRow } from "./MapExpenseRow";
+import {
+  KRAFT,
+  LedgerSectionHeader,
+  MapEntryRow,
+  MapExpenseRow,
+} from "./MapExpenseRow";
 
 /**
- * 詳細地圖：從地球的消費卡片進來，只看選取的帳本。
- * 可以依帳本、日期篩選，選了某一天會畫出當天的路線；也可以顯示目前位置。
+ * 詳細地圖：從地球的消費卡片或日記頁進來，只看選取的帳本（日記的地點跟著手帳綁定的帳本）。
+ * 可以依帳本、日期篩選，選了某一天會畫出當天消費的路線；也可以顯示目前位置。
  */
 export function MapDetailScreen({
   ledgerIds,
+  initialDate,
 }: {
   /** 地球上選取的帳本 */
   ledgerIds: readonly string[];
+  /** 一打開就只看這一天（日記頁的「在地圖上看」）；那天沒有地點時看全部日期 */
+  initialDate?: string;
 }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -55,18 +65,12 @@ export function MapDetailScreen({
   /** null 代表全部選取的帳本 */
   const [ledgerId, setLedgerId] = useState<string | null>(null);
   /** 當地日期 YYYY-MM-DD；null 代表全部日期 */
-  const [date, setDate] = useState<string | null>(null);
+  const [date, setDate] = useState<string | null>(initialDate ?? null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const userLocation = useUserLocation();
 
   if (error) {
-    return (
-      <PageMessage
-        backLabel="地球"
-        onBack={router.back}
-        text="讀取地圖資料失敗"
-      />
-    );
+    return <PageMessage onBack={router.back} text="讀取地圖資料失敗" />;
   }
   if (!data) {
     return (
@@ -82,9 +86,8 @@ export function MapDetailScreen({
   if (pins.length === 0) {
     return (
       <PageMessage
-        backLabel="地球"
         onBack={router.back}
-        text="這幾本帳本還沒有標記地點的消費。新增消費時按「使用目前位置」，足跡就會出現在地圖上。"
+        text="這幾本帳本還沒有標記地點的消費或日記。新增消費時按「使用目前位置」，足跡就會出現在地圖上。"
       />
     );
   }
@@ -105,11 +108,10 @@ export function MapDetailScreen({
   const selected = groups.find((g) => g.key === selectedKey);
   // 只有選了某一天才畫路線，全部日期連在一起沒有意義
   const route = activeDate === null ? [] : routeOf(visiblePins);
+  const dayHasExpenses = visiblePins.some((p) => p.kind === "expense");
   const title =
     ledgers.length === 1
-      ? ledgers[0].kind === "personal"
-        ? "個人記帳"
-        : ledgers[0].name
+      ? mapLedgerName(ledgers[0])
       : `${ledgers.length} 本帳本`;
 
   function applyFilter(filter: PinFilter) {
@@ -152,7 +154,7 @@ export function MapDetailScreen({
           },
         ]}
       >
-        <BackButton label="地球" onPress={router.back} />
+        <BackButton onPress={router.back} />
         <View style={styles.titleBlock}>
           <Text style={[styles.kicker, { color: theme.textMuted }]}>Map</Text>
           <Text
@@ -210,7 +212,7 @@ export function MapDetailScreen({
               {ledgers.map((ledger) => (
                 <Chip
                   key={ledger.id}
-                  label={ledgerName(ledger)}
+                  label={mapLedgerName(ledger)}
                   selected={ledger.id === activeLedgerId}
                   onPress={() =>
                     selectLedger(
@@ -254,7 +256,9 @@ export function MapDetailScreen({
             <Text style={[styles.routeNote, { color: theme.textMuted }]}>
               {route.length >= 2
                 ? `依消費時間連起當天 ${route.length} 個地點`
-                : "這天的消費都在同一個地點，沒有路線"}
+                : dayHasExpenses
+                  ? "這天的消費都在同一個地點，沒有路線"
+                  : "這天只有日記的地點，日記沒有時間，所以不畫路線"}
             </Text>
           )}
         </View>
@@ -264,7 +268,11 @@ export function MapDetailScreen({
       <View style={styles.fill}>
         <DayMap
           mapRef={mapRef}
-          initialRegion={regionForPoints(pins.map((p) => p.point))}
+          initialRegion={regionForPoints(
+            filterPins(pins, { ledgerId: null, date: activeDate }).map(
+              (p) => p.point,
+            ),
+          )}
           groups={groups}
           selectedKey={selectedKey}
           onSelect={setSelectedKey}
@@ -286,10 +294,6 @@ export function MapDetailScreen({
   );
 }
 
-function ledgerName(ledger: MapLedger): string {
-  return ledger.kind === "personal" ? "個人記帳" : ledger.name;
-}
-
 /**
  * 地圖本體與當天路線。路線用 SVG 畫在地圖上方，地圖移動時重新換算各點在畫面上的位置：
  * react-native-maps 的 Polyline、Polygon 在 iOS 實機上都沒有畫出來（2026-10-29）。
@@ -305,7 +309,7 @@ function DayMap({
 }: {
   mapRef: RefObject<MapView | null>;
   initialRegion: Region | undefined;
-  groups: readonly PinGroup[];
+  groups: readonly PinGroup<MapItem>[];
   selectedKey: string | null;
   onSelect: (key: string | null) => void;
   /** 按過「顯示目前位置」取得權限後才顯示，打開頁面不會跳出權限詢問 */
@@ -372,7 +376,13 @@ function DayMap({
           <Marker
             key={group.key}
             coordinate={group.point}
-            pinColor={group.key === selectedKey ? theme.primary : undefined}
+            pinColor={
+              group.key === selectedKey
+                ? theme.primary
+                : group.pins.every((p) => p.kind === "journal")
+                  ? KRAFT.edge
+                  : undefined
+            }
             onPress={() => onSelect(group.key)}
           />
         ))}
@@ -419,7 +429,7 @@ function PinGroupCard({
   bottom,
   onClose,
 }: {
-  group: PinGroup<MapExpense>;
+  group: PinGroup<MapItem>;
   ledgers: readonly MapLedger[];
   /** 顯示全部帳本時，依帳本分段並標出帳本名稱 */
   showLedger: boolean;
@@ -427,30 +437,43 @@ function PinGroupCard({
   onClose: () => void;
 }) {
   const theme = useTheme();
-  // Same order as the ledger chips
+  // Same order as the ledger chips; entries before expenses, as on the globe
   const sections = ledgers
-    .map((ledger) => ({
-      ledger,
-      pins: group.pins.filter((p) => p.ledgerId === ledger.id),
-    }))
-    .filter((s) => s.pins.length > 0);
+    .map((ledger) => {
+      const pins = group.pins.filter((p) => p.ledgerId === ledger.id);
+      return {
+        ledger,
+        entries: entriesOf(pins),
+        expenses: pins.filter((p) => p.kind === "expense"),
+      };
+    })
+    .filter((s) => s.entries.length + s.expenses.length > 0);
 
   return (
     <View style={[styles.card, { bottom, backgroundColor: theme.surface }]}>
       <SketchFrame radius={12} />
       <Row>
-        <Label muted>
-          {group.pins.length > 1
-            ? `這裡有 ${group.pins.length} 筆消費`
-            : "消費"}
-        </Label>
+        <Label muted>{`這裡有 ${countLabel(group.pins)}`}</Label>
         <CloseButton onPress={onClose} />
       </Row>
       <ScrollView style={styles.cardList}>
-        {sections.map(({ ledger, pins }) => (
+        {sections.map(({ ledger, entries, expenses }) => (
           <View key={ledger.id}>
             {showLedger && <LedgerSectionHeader ledger={ledger} />}
-            {pins.map((pin) => (
+            {entries.map((entry) => (
+              <MapEntryRow
+                key={entry.entryId}
+                entry={entry}
+                accessibilityHint="打開這篇日記"
+                onPress={() =>
+                  router.push({
+                    pathname: "/journal/[id]/entry/[entryId]",
+                    params: { id: entry.journalId, entryId: entry.entryId },
+                  })
+                }
+              />
+            ))}
+            {expenses.map((pin) => (
               <MapExpenseRow
                 key={pin.id}
                 expense={pin}

@@ -373,6 +373,44 @@ export function CloseButton({
   );
 }
 
+/** 導覽列左右的文字按鈕（取消、儲存） */
+export function HeaderAction({
+  title,
+  onPress,
+  strong = false,
+  disabled = false,
+}: {
+  title: string;
+  onPress: () => void;
+  strong?: boolean;
+  disabled?: boolean;
+}) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      disabled={disabled}
+      hitSlop={10}
+      onPress={onPress}
+      style={({ pressed }) => ({
+        opacity: disabled ? 0.45 : pressed ? 0.6 : 1,
+        paddingHorizontal: 4,
+      })}
+    >
+      <Text
+        style={[
+          styles.headerAction,
+          strong
+            ? { color: theme.primary, fontFamily: fonts.bold }
+            : { color: "#5E554C" },
+        ]}
+      >
+        {title}
+      </Text>
+    </Pressable>
+  );
+}
+
 /**
  * 右下角固定的朱色新增鈕（「新增消費」「記一筆」），bottom 由呼叫端加上安全區域。
  * 按下時會先收起鍵盤。
@@ -381,10 +419,13 @@ export function FloatingAddButton({
   title,
   onPress,
   bottom,
+  icon,
 }: {
   title: string;
   onPress: () => void;
   bottom: number;
+  /** 換掉預設的加號（例如「寫日記」的鉛筆），用 onPrimary 的顏色畫 */
+  icon?: ReactNode;
 }) {
   const theme = useTheme();
   return (
@@ -396,15 +437,17 @@ export function FloatingAddButton({
         { bottom, backgroundColor: theme.primary, opacity: pressed ? 0.85 : 1 },
       ]}
     >
-      <Svg width={20} height={20} viewBox="0 0 26 26">
-        <Path
-          d="M13 4.5 C13.3 9 12.8 17 13.1 21.5 M4.5 13.2 C9 12.8 17 13.4 21.5 12.9"
-          fill="none"
-          stroke={theme.onPrimary}
-          strokeWidth={2.6}
-          strokeLinecap="round"
-        />
-      </Svg>
+      {icon ?? (
+        <Svg width={20} height={20} viewBox="0 0 26 26">
+          <Path
+            d="M13 4.5 C13.3 9 12.8 17 13.1 21.5 M4.5 13.2 C9 12.8 17 13.4 21.5 12.9"
+            fill="none"
+            stroke={theme.onPrimary}
+            strokeWidth={2.6}
+            strokeLinecap="round"
+          />
+        </Svg>
+      )}
       <Text style={[styles.floatingAddText, { color: theme.onPrimary }]}>
         {title}
       </Text>
@@ -670,6 +713,10 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 15,
     borderBottomRightRadius: 16.5,
     borderBottomLeftRadius: 15.5,
+  },
+  headerAction: {
+    fontFamily: fonts.regular,
+    fontSize: 15,
   },
   floatingAdd: {
     position: "absolute",

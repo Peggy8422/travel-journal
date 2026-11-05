@@ -1,5 +1,9 @@
-import { groupByLocation } from "../../../domain/map";
-import type { MapData, MapExpense, MapLedger } from "./mapData";
+import {
+  groupByLocation,
+  localDateOf,
+  type JournalMapPin,
+} from "../../../domain/map";
+import type { MapData, MapExpense, MapItem, MapLedger } from "./mapData";
 
 /*
  * 地球分頁的整理（純函式）：右側索引籤的年份分組、下方消費卡片的內容、畫面上標記的合併。
@@ -22,23 +26,44 @@ export function groupLedgersByYear(
     .map(([year, list]) => ({ year, ledgers: list }));
 }
 
+/** 一篇有地點的日記；記了好幾個地點也只列一次 */
+export interface MapEntry {
+  readonly entryId: string;
+  readonly journalId: string;
+  readonly title: string;
+  /** 日記的日期 YYYY-MM-DD */
+  readonly date: string;
+  /** 依日記裡的順序；第一個是點這篇日記時地球要轉過去的地方 */
+  readonly pins: readonly JournalMapPin[];
+}
+
+/** 消費卡片清單的一列 */
+export type SheetRow =
+  | { readonly kind: "expense"; readonly expense: MapExpense }
+  | { readonly kind: "entry"; readonly entry: MapEntry };
+
 export interface GlobeSheetContent {
-  /** 有消費要列出的帳本，依索引籤的順序；每本的消費依時間由舊到新 */
+  /**
+   * 有東西要列出的帳本，依索引籤的順序；每本依日期由舊到新，
+   * 同一天的日記排在消費前面，消費依時間由舊到新
+   */
   readonly sections: readonly {
     readonly ledger: MapLedger;
-    readonly expenses: readonly MapExpense[];
+    readonly rows: readonly SheetRow[];
   }[];
-  /** 選取帳本裡所有有地點的消費（不受 placeIds 影響），給標題與地球用 */
+  /** 選取帳本裡所有有地點的消費（不受 placeIds 影響），給標題的筆數與合計用 */
   readonly expenses: readonly MapExpense[];
-  /** 不同座標的數量（同一家店的多筆消費算一個） */
+  /** 選取帳本裡有地點的日記篇數（不受 placeIds 影響） */
+  readonly entryCount: number;
+  /** 不同座標的數量（同一家店的多筆消費、同一個地方的日記算一個） */
   readonly placeCount: number;
   /** 換算成新台幣的合計；匯率資料有誤的消費不算進去 */
   readonly totalBaseMinor: number;
 }
 
 /**
- * 消費卡片的內容。placeIds 是在地球上點的那一群消費：有的話清單只列這幾筆，
- * 標題的筆數與合計仍然是整本（幾本）帳本的。
+ * 消費卡片的內容。placeIds 是在地球上點的那一群 pin：有的話清單只列這幾筆消費、
+ * 這幾篇日記，標題的筆數與合計仍然是整本（幾本）帳本的。
  */
 export function globeSheet(
   data: MapData,
@@ -46,21 +71,77 @@ export function globeSheet(
   placeIds: readonly string[] | null,
 ): GlobeSheetContent {
   const picked = data.ledgers.filter((l) => pickedIds.includes(l.id));
-  const expenses = data.pins.filter((p) => pickedIds.includes(p.ledgerId));
-  const shown = placeIds
-    ? expenses.filter((e) => placeIds.includes(e.id))
-    : expenses;
+  const pins = data.pins.filter((p) => pickedIds.includes(p.ledgerId));
+  const expenses = pins.filter((p) => p.kind === "expense");
+  const entries = entriesOf(pins);
+  const rows = sheetRows(expenses, entries).filter((row) =>
+    placeIds === null
+      ? true
+      : row.kind === "expense"
+        ? placeIds.includes(row.expense.id)
+        : row.entry.pins.some((p) => placeIds.includes(p.id)),
+  );
   return {
     sections: picked
       .map((ledger) => ({
         ledger,
-        expenses: shown.filter((e) => e.ledgerId === ledger.id),
+        rows: rows.filter((r) => rowLedgerId(r) === ledger.id),
       }))
-      .filter((s) => s.expenses.length > 0),
+      .filter((s) => s.rows.length > 0),
     expenses,
-    placeCount: groupByLocation(expenses).length,
+    entryCount: entries.length,
+    placeCount: groupByLocation(pins).length,
     totalBaseMinor: expenses.reduce((sum, e) => sum + (e.baseMinor ?? 0), 0),
   };
+}
+
+/** 日記的地點依日記合成一列，保持各篇第一次出現的順序 */
+export function entriesOf(pins: readonly MapItem[]): MapEntry[] {
+  const entries = new Map<string, MapEntry & { pins: JournalMapPin[] }>();
+  for (const pin of pins) {
+    if (pin.kind !== "journal") continue;
+    const entry = entries.get(pin.entryId);
+    if (entry) {
+      entry.pins.push(pin);
+    } else {
+      entries.set(pin.entryId, {
+        entryId: pin.entryId,
+        journalId: pin.journalId,
+        title: pin.title,
+        date: pin.date,
+        pins: [pin],
+      });
+    }
+  }
+  return [...entries.values()];
+}
+
+function sheetRows(
+  expenses: readonly MapExpense[],
+  entries: readonly MapEntry[],
+): SheetRow[] {
+  const keyed = [
+    ...entries.map((entry) => ({
+      date: entry.date,
+      rank: 0,
+      row: { kind: "entry", entry } as const,
+    })),
+    ...expenses.map((expense) => ({
+      date: localDateOf(expense),
+      rank: 1,
+      row: { kind: "expense", expense } as const,
+    })),
+  ];
+  // sort is stable, so expenses keep their time order within a day
+  return keyed
+    .sort((a, b) => a.date.localeCompare(b.date) || a.rank - b.rank)
+    .map((k) => k.row);
+}
+
+function rowLedgerId(row: SheetRow): string {
+  return row.kind === "expense"
+    ? row.expense.ledgerId
+    : row.entry.pins[0].ledgerId;
 }
 
 /** 在畫面上合在一起的標記 */
@@ -89,13 +170,25 @@ export function clusterOnScreen<T>(
 }
 
 /** 標記旁的小標籤：地名（沒填地名用消費名稱），不只一個地方時寫「… 等」 */
-export function clusterLabel(items: readonly MapExpense[]): string {
+export function clusterLabel(items: readonly MapItem[]): string {
   const names = [...new Set(items.map((e) => e.placeName ?? e.title))];
   return names.length === 1 ? names[0] : `${names[0]} 等`;
 }
 
 /** 讀給螢幕閱讀器的標記說明 */
-export function clusterDescription(items: readonly MapExpense[]): string {
+export function clusterDescription(items: readonly MapItem[]): string {
   const names = [...new Set(items.map((e) => e.placeName ?? e.title))];
-  return `${names.join("、")}，${items.length} 筆消費`;
+  return `${names.join("、")}，${countLabel(items)}`;
+}
+
+/** 「2 篇日記、3 筆消費」；沒有的那一種不寫 */
+export function countLabel(items: readonly MapItem[]): string {
+  const expenses = items.filter((p) => p.kind === "expense").length;
+  const entries = entriesOf(items).length;
+  return [
+    entries > 0 ? `${entries} 篇日記` : null,
+    expenses > 0 ? `${expenses} 筆消費` : null,
+  ]
+    .filter((part) => part !== null)
+    .join("、");
 }

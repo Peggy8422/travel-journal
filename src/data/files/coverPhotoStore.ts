@@ -13,6 +13,9 @@ import type { CoverPhotoStore } from "../../domain/ledger";
 const COVER_WIDTH = 600;
 /** 壓到每張約 100～200 KB，備份檔才不會太大 */
 const COVER_COMPRESS = 0.7;
+/** 日記照片要能全螢幕看：長邊 1600px，每張約 300～500 KB */
+const ENTRY_LONG_SIDE = 1600;
+const ENTRY_COMPRESS = 0.8;
 
 function folder(): Directory {
   const dir = new Directory(Paths.document, "cover-photos");
@@ -76,4 +79,37 @@ export async function pickCoverPhoto(): Promise<string | null> {
     compress: COVER_COMPRESS,
   });
   return saved.uri;
+}
+
+/**
+ * 讓使用者從相簿挑最多 limit 張日記照片（照選的順序），每張縮到長邊 1600px、壓成 JPEG，
+ * 回傳暫存檔的位址；取消時回傳空陣列。
+ */
+export async function pickEntryPhotos(limit: number): Promise<string[]> {
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ["images"],
+    quality: 1,
+    allowsMultipleSelection: true,
+    selectionLimit: limit,
+    orderedSelection: true,
+  });
+  if (result.canceled) return [];
+  const uris: string[] = [];
+  for (const asset of result.assets.slice(0, limit)) {
+    const context = ImageManipulator.manipulate(asset.uri);
+    if (Math.max(asset.width, asset.height) > ENTRY_LONG_SIDE) {
+      context.resize(
+        asset.width >= asset.height
+          ? { width: ENTRY_LONG_SIDE }
+          : { height: ENTRY_LONG_SIDE },
+      );
+    }
+    const image = await context.renderAsync();
+    const saved = await image.saveAsync({
+      format: SaveFormat.JPEG,
+      compress: ENTRY_COMPRESS,
+    });
+    uris.push(saved.uri);
+  }
+  return uris;
 }

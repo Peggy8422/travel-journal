@@ -30,10 +30,12 @@ import {
   globeSheet,
   groupLedgersByYear,
 } from "../services/globeView";
-import type { MapData, MapExpense } from "../services/mapData";
+import type { MapEntry } from "../services/globeView";
+import type { MapData, MapExpense, MapItem } from "../services/mapData";
 import { GlobeArt } from "./GlobeArt";
 import { GlobeIndex, ledgerColors } from "./GlobeIndex";
 import { GlobeSheet } from "./GlobeSheet";
+import { KraftCard } from "./MapExpenseRow";
 
 /** 右側索引籤的寬度 */
 const INDEX_WIDTH = 76;
@@ -43,10 +45,13 @@ const SHEET_CLOSED = 236;
 const CLUSTER_DISTANCE = 22;
 /** 選了帳本、標記不多時，每個標記旁都寫地名 */
 const MAX_TAGGED_CLUSTERS = 6;
+/** 日記標記和消費標記靠在一起時，日記往右上挪開這麼多（px），兩個都點得到 */
+const JOURNAL_NUDGE = 13;
 
 /**
  * 地圖分頁：手繪地球。沒選帳本時在台灣附近慢慢擺動；
- * 從右側索引籤選帳本（可複選），地球轉到那趟旅行並放大，下方卡片列出有地點的消費。
+ * 從右側索引籤選帳本（可複選），地球轉到那趟旅行並放大，下方卡片列出有地點的消費與日記。
+ * 日記的地點跟著手帳綁定的帳本出現，沒綁帳本的手帳另有一張「手帳」索引籤。
  * 城市裡的細節（日期、路線、目前位置）在「詳細地圖」看。
  */
 export function GlobeScreen() {
@@ -193,7 +198,23 @@ function GlobeStage({
     });
   }
 
-  function pickCluster(items: readonly MapExpense[]) {
+  /** 標出這篇日記的第一個地點並打開日記頁 */
+  function openEntry(entry: MapEntry) {
+    const first = entry.pins[0];
+    setFocusId(first.id);
+    motion.jumpTo({
+      lon: first.point.longitude,
+      lat: first.point.latitude,
+      k: view.k,
+      cy: cySheet,
+    });
+    router.push({
+      pathname: "/journal/[id]/entry/[entryId]",
+      params: { id: entry.journalId, entryId: entry.entryId },
+    });
+  }
+
+  function pickCluster(items: readonly MapItem[]) {
     const ids = items.map((e) => e.id);
     if (placeIds && placeIds.join(",") === ids.join(",")) {
       setPlaceIds(null);
@@ -211,27 +232,40 @@ function GlobeStage({
     });
   }
 
-  // Pins of the picked ledgers on the visible side, merged when they overlap
+  // Pins of the picked ledgers on the visible side, merged when they overlap.
+  // Expenses and journal places are merged apart, as they are drawn differently
   const projection = globeProjection(view, { cx, radius });
-  const clusters = clusterOnScreen(
-    pins
-      .filter((p) => pickedIdList.includes(p.ledgerId))
-      .flatMap((pin) => {
-        const [x, y, z] = orthographic(
-          projection,
-          pin.point.longitude,
-          pin.point.latitude,
-        );
-        // Points right at the rim are too squashed to tap
-        if (z < 0.06) return [];
-        const s = toScreen(projection, x, y);
-        if (s.x < -30 || s.x > width + 30 || s.y < -30 || s.y > height + 30) {
-          return [];
-        }
-        return [{ item: pin, ...s }];
-      }),
+  const onScreen = pins
+    .filter((p) => pickedIdList.includes(p.ledgerId))
+    .flatMap((pin) => {
+      const [x, y, z] = orthographic(
+        projection,
+        pin.point.longitude,
+        pin.point.latitude,
+      );
+      // Points right at the rim are too squashed to tap
+      if (z < 0.06) return [];
+      const s = toScreen(projection, x, y);
+      if (s.x < -30 || s.x > width + 30 || s.y < -30 || s.y > height + 30) {
+        return [];
+      }
+      return [{ item: pin, ...s }];
+    });
+  const expenseClusters = clusterOnScreen(
+    onScreen.filter((p) => p.item.kind === "expense"),
     CLUSTER_DISTANCE,
   );
+  const journalClusters = clusterOnScreen(
+    onScreen.filter((p) => p.item.kind === "journal"),
+    CLUSTER_DISTANCE,
+  ).map((c) =>
+    expenseClusters.some(
+      (e) => Math.hypot(e.x - c.x, e.y - c.y) < CLUSTER_DISTANCE,
+    )
+      ? { ...c, x: c.x + JOURNAL_NUDGE, y: c.y - JOURNAL_NUDGE }
+      : c,
+  );
+  const clusters = [...expenseClusters, ...journalClusters];
   const [hx, hy, hz] = orthographic(projection, GLOBE_HOME.lon, GLOBE_HOME.lat);
   const home = toScreen(projection, hx, hy);
   const showHome =
@@ -300,6 +334,7 @@ function GlobeStage({
           return (
             <GlobePin
               key={ids[0]}
+              journal={cluster.items[0].kind === "journal"}
               x={cluster.x}
               y={cluster.y}
               count={cluster.items.length}
@@ -434,6 +469,7 @@ function GlobeStage({
           }}
           focusId={focusId}
           onOpen={openExpense}
+          onOpenEntry={openEntry}
           onOpenDetail={() =>
             router.push({
               pathname: "/map",
@@ -446,8 +482,12 @@ function GlobeStage({
   );
 }
 
-/** 地球上的標記：帳本色圓點，多筆合在一起時寫筆數；旁邊可以掛一個地名小標籤 */
+/**
+ * 地球上的標記：消費是帳本色圓點，多筆合在一起時寫筆數；日記是牛皮紙小卡。
+ * 旁邊可以掛一個地名小標籤
+ */
 function GlobePin({
+  journal,
   x,
   y,
   count,
@@ -458,6 +498,7 @@ function GlobePin({
   accessibilityLabel,
   onPress,
 }: {
+  journal: boolean;
   x: number;
   y: number;
   count: number;
@@ -478,28 +519,37 @@ function GlobePin({
       onPress={onPress}
       style={[styles.pin, { left: x - 22, top: y - 22 }]}
     >
-      <View
-        style={{
-          width: size,
-          height: size,
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: color,
-          borderTopLeftRadius: size / 2,
-          borderTopRightRadius: size * 0.46,
-          borderBottomRightRadius: size * 0.52,
-          borderBottomLeftRadius: size * 0.48,
-          boxShadow: marked
-            ? `0px 0px 0px 3px ${theme.surface}, 0px 0px 0px 5px ${color}, 2px 3px 0px rgba(58,51,45,0.22)`
-            : `0px 0px 0px 2px ${theme.surface}, 0px 0px 0px 3.2px rgba(58,51,45,0.7), 2px 3px 0px rgba(58,51,45,0.22)`,
-        }}
-      >
-        {count > 1 && (
-          <Text style={[styles.pinCount, { color: theme.surface }]}>
-            {count}
-          </Text>
-        )}
-      </View>
+      {journal ? (
+        <KraftCard
+          width={count > 1 ? 26 : 22}
+          height={count > 1 ? 28 : 24}
+          tilt={-8}
+          ring={marked ? "marked" : "plain"}
+        />
+      ) : (
+        <View
+          style={{
+            width: size,
+            height: size,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: color,
+            borderTopLeftRadius: size / 2,
+            borderTopRightRadius: size * 0.46,
+            borderBottomRightRadius: size * 0.52,
+            borderBottomLeftRadius: size * 0.48,
+            boxShadow: marked
+              ? `0px 0px 0px 3px ${theme.surface}, 0px 0px 0px 5px ${color}, 2px 3px 0px rgba(58,51,45,0.22)`
+              : `0px 0px 0px 2px ${theme.surface}, 0px 0px 0px 3.2px rgba(58,51,45,0.7), 2px 3px 0px rgba(58,51,45,0.22)`,
+          }}
+        >
+          {count > 1 && (
+            <Text style={[styles.pinCount, { color: theme.surface }]}>
+              {count}
+            </Text>
+          )}
+        </View>
+      )}
       {tag !== null && (
         // An absolute child only gets the space left in the 44pt button unless
         // it has its own width, so the slot is fixed and the label shrinks to fit

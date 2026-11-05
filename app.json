@@ -8,7 +8,8 @@
     "scheme": "traveljournal",
     "userInterfaceStyle": "light",
     "ios": {
-      "bundleIdentifier": "com.peggychuang.traveljournal"
+      "bundleIdentifier": "com.peggychuang.traveljournal",
+      "appleTeamId": "B9P5V63AAH"
     },
     "android": {
       "adaptiveIcon": {

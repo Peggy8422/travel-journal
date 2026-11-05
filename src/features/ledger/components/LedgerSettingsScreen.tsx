@@ -67,9 +67,7 @@ export function LedgerSettingsScreen({ ledgerId }: { ledgerId: string }) {
   const [pickingCover, setPickingCover] = useState(false);
 
   if (error) {
-    return (
-      <PageMessage backLabel="帳本" onBack={router.back} text="讀取帳本失敗" />
-    );
+    return <PageMessage onBack={router.back} text="讀取帳本失敗" />;
   }
   if (!data) {
     return (
@@ -78,11 +76,7 @@ export function LedgerSettingsScreen({ ledgerId }: { ledgerId: string }) {
   }
   if (!data.ok) {
     return (
-      <PageMessage
-        backLabel="帳本"
-        onBack={router.back}
-        text={describeError(data.error)}
-      />
+      <PageMessage onBack={router.back} text={describeError(data.error)} />
     );
   }
   const { ledger, members, expenses, settlements } = data.value;
@@ -250,7 +244,6 @@ export function LedgerSettingsScreen({ ledgerId }: { ledgerId: string }) {
     <Screen
       header={
         <PageHeader
-          backLabel={ledger.name}
           onBack={router.back}
           kicker="Settings"
           title="帳本設定"

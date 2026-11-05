@@ -5,7 +5,7 @@ import {
   T0,
 } from "../../../data/repositories/testRecords";
 import { coverFromId } from "../../../domain/ledger";
-import { filterPins, loadMapData } from "./mapData";
+import { filterPins, loadMapData, UNBOUND_JOURNALS_ID } from "./mapData";
 
 const shinjuku = { latitude: 35.6905, longitude: 139.7024 };
 const kyoto = { latitude: 35.0116, longitude: 135.7681 };
@@ -177,6 +177,114 @@ describe("loadMapData", () => {
     expect((await loadMapData(db)).ledgers).toEqual([
       expect.objectContaining({ id: "personal", kind: "personal" }),
       expect.objectContaining({ id: "ledger-1", kind: "shared" }),
+    ]);
+  });
+
+  it("puts journal places under the bound ledger or the journals tab", async () => {
+    const { db, repos } = await setupLedger();
+    const journal = {
+      cover: { tape: "sakura", photo: null },
+      createdAt: T0,
+      updatedAt: T0,
+    } as const;
+    const entry = {
+      title: "",
+      body: "",
+      weather: null,
+      mood: null,
+      photos: [],
+      stickers: [],
+      createdAt: T0,
+      updatedAt: T0,
+      deletedAt: null,
+    };
+    await repos.journals.insert({
+      ...journal,
+      id: "bound",
+      name: "東京",
+      ledgerId: "ledger-1",
+    });
+    await repos.journals.insert({
+      ...journal,
+      id: "loose",
+      name: "台南",
+      ledgerId: null,
+    });
+    await repos.journalEntries.insert({
+      ...entry,
+      id: "walk",
+      journalId: "bound",
+      date: "2026-10-13",
+      title: "散步",
+      places: [
+        { name: "新宿御苑", location: shinjuku },
+        { name: "清水寺", location: kyoto },
+      ],
+    });
+    await repos.journalEntries.insert({
+      ...entry,
+      id: "noodles",
+      journalId: "loose",
+      date: "2026-09-12",
+      places: [{ name: "牛肉湯", location: kyoto }],
+    });
+    await repos.journalEntries.insert({
+      ...entry,
+      id: "gone",
+      journalId: "loose",
+      date: "2026-09-13",
+      places: [{ name: "神農街", location: kyoto }],
+      deletedAt: T0,
+    });
+
+    const { pins, ledgers } = await loadMapData(db);
+
+    // Oldest entry first; deleted entries are left out
+    expect(pins).toEqual([
+      {
+        kind: "journal",
+        id: "noodles:0",
+        entryId: "noodles",
+        journalId: "loose",
+        ledgerId: UNBOUND_JOURNALS_ID,
+        // No title, so the date stands in
+        title: "9月12日",
+        placeName: "牛肉湯",
+        point: kyoto,
+        date: "2026-09-12",
+      },
+      expect.objectContaining({
+        id: "walk:0",
+        ledgerId: "ledger-1",
+        title: "散步",
+        placeName: "新宿御苑",
+      }),
+      expect.objectContaining({ id: "walk:1", placeName: "清水寺" }),
+    ]);
+    // The journals tab counts the entries of unbound journals
+    expect(ledgers).toEqual([
+      expect.objectContaining({
+        id: UNBOUND_JOURNALS_ID,
+        kind: "journals",
+        expenseCount: 1,
+      }),
+      expect.objectContaining({ id: "ledger-1", kind: "shared" }),
+    ]);
+  });
+
+  it("has no journals tab when every journal is bound or empty", async () => {
+    const { db, repos } = await setupLedger();
+    await repos.journals.insert({
+      id: "loose",
+      name: "台南",
+      ledgerId: null,
+      cover: { tape: "sakura", photo: null },
+      createdAt: T0,
+      updatedAt: T0,
+    });
+
+    expect((await loadMapData(db)).ledgers.map((l) => l.kind)).toEqual([
+      "shared",
     ]);
   });
 });

@@ -1,4 +1,5 @@
 import type { GeoPoint } from "../ledger";
+import type { MapRegion } from "../map";
 
 /*
  * 取得裝置位置與地名的介面（只有型別，不含任何 I/O）。
@@ -16,4 +17,21 @@ export interface DeviceLocator {
   lastKnownPosition(): Promise<GeoPoint | null>;
   /** 座標轉成地名；查不到時回傳 null，離線或服務錯誤時應 throw */
   placeNameAt(point: GeoPoint): Promise<string | null>;
+}
+
+/** 搜尋到的一個地點 */
+export interface FoundPlace {
+  readonly name: string;
+  /** 簡短地址；和名稱一樣或沒有時為 null */
+  readonly address: string | null;
+  readonly location: GeoPoint;
+}
+
+/** 用關鍵字找地點（店名、景點、地址） */
+export interface PlaceSearch {
+  /**
+   * near 是地圖目前看的範圍，附近的地點排前面。
+   * 找不到時回傳空陣列；離線或服務錯誤時應 throw。
+   */
+  search(query: string, near: MapRegion | null): Promise<readonly FoundPlace[]>;
 }

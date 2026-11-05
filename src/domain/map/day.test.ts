@@ -21,12 +21,34 @@ function pin(
   };
 }
 
+function journalPin(
+  id: string,
+  date: string,
+  point: MapPin["point"] = asakusa,
+): MapPin {
+  return {
+    kind: "journal",
+    id,
+    entryId: id,
+    journalId: "journal-1",
+    ledgerId: "ledger-1",
+    title: id,
+    placeName: id,
+    point,
+    date,
+  };
+}
+
 describe("localDateOf", () => {
   it("uses the date where the expense happened, not the device time zone", () => {
     // 23:30 in Tokyo is still 10/12 there, though already 10/13 in Hawaii
     expect(localDateOf(pin("late", "2026-10-12T23:30:00+09:00"))).toBe(
       "2026-10-12",
     );
+  });
+
+  it("uses the entry date for a journal place", () => {
+    expect(localDateOf(journalPin("temple", "2026-10-13"))).toBe("2026-10-13");
   });
 });
 
@@ -76,6 +98,16 @@ describe("routeOf", () => {
         pin("back", "2026-10-12T18:00:00+09:00", shinjuku),
       ]),
     ).toEqual([shinjuku, shibuya, shinjuku]);
+  });
+
+  it("leaves journal places out, as they have no time", () => {
+    expect(
+      routeOf([
+        pin("breakfast", "2026-10-12T08:00:00+09:00", shinjuku),
+        journalPin("temple", "2026-10-12", asakusa),
+        pin("lunch", "2026-10-12T12:00:00+09:00", shibuya),
+      ]),
+    ).toEqual([shinjuku, shibuya]);
   });
 
   it("has no route with fewer than two places", () => {

@@ -5,21 +5,29 @@ import {
   type LimitedTextField,
 } from "../../../domain/ledger";
 import type { BackupFileError } from "../../../data/backup/backupFile";
+import type { JournalCommandError } from "../../journal/services/journalCommands";
+import type {
+  IllustrationRestoreReport,
+  JournalRestoreReport,
+} from "../../journal/services/journalBackup";
 import type { RestoreReport } from "../services/backupCommands";
 import type { LedgerCommandError } from "../services/ledgerCommands";
 import type { LedgerSummaryError } from "../services/ledgerSummary";
 import type { LocateError } from "../services/locateCurrentPlace";
+import type { PlaceSearchError } from "../services/searchPlaces";
 import type {
   ManualReason,
   ResolveFxRateError,
 } from "../services/resolveFxRate";
 
-type DisplayableError =
+export type DisplayableError =
   | LedgerCommandError
+  | JournalCommandError
   | LedgerSummaryError
   | ResolveFxRateError
   | BackupFileError
-  | LocateError;
+  | LocateError
+  | PlaceSearchError;
 
 const TEXT_FIELD_LABELS: Readonly<Record<LimitedTextField, string>> = {
   ledgerName: "帳本名稱",
@@ -27,6 +35,9 @@ const TEXT_FIELD_LABELS: Readonly<Record<LimitedTextField, string>> = {
   expenseTitle: "消費名稱",
   placeName: "地名",
   note: "備註",
+  journalName: "手帳名稱",
+  entryTitle: "日記標題",
+  entryBody: "日記內容",
 };
 
 /** 錯誤代碼轉成給使用者看的訊息 */
@@ -44,6 +55,28 @@ export function describeError(error: DisplayableError): string {
       return `已經有「${error.name}」了，換個名字吧`;
     case "LEDGER_NOT_FOUND":
       return "找不到這本帳本";
+    case "JOURNAL_NOT_FOUND":
+      return "找不到這本手帳，可能已被刪除";
+    case "LEDGER_HAS_JOURNAL":
+      return `這本帳本已經綁了手帳「${error.journalName}」`;
+    case "ENTRY_NOT_FOUND":
+      return "找不到這篇日記，可能已被刪除";
+    case "INVALID_ENTRY_DATE":
+      return "日期的格式不對";
+    case "EMPTY_ENTRY":
+      return "寫點什麼再儲存，或蓋個印章、貼張照片、記個地點也可以";
+    case "EMPTY_PLACE_NAME":
+      return "地點要有名字，請輸入地名或把這個地點拿掉";
+    case "TOO_MANY_PHOTOS":
+      return `一篇日記最多 ${error.max} 張照片`;
+    case "ILLUSTRATION_NOT_FOUND":
+      return "找不到這張插圖，可能已被刪除";
+    case "EMPTY_ILLUSTRATION":
+      return "還沒畫任何東西";
+    case "ILLUSTRATION_TOO_BIG":
+      return `一張插圖最多 ${error.maxStrokes} 筆，先存起來，剩下的畫在另一張吧`;
+    case "TOO_MANY_STICKERS":
+      return `一篇日記最多貼 ${error.maxStickers} 張插圖`;
     case "EXPENSE_NOT_FOUND":
       return "找不到這筆消費，可能已被刪除";
     case "SETTLEMENT_NOT_FOUND":
@@ -107,6 +140,8 @@ export function describeError(error: DisplayableError): string {
       return "沒有定位權限，請到系統設定開啟，或直接輸入地名";
     case "LOCATION_UNAVAILABLE":
       return "目前無法定位，請確認定位服務已開啟，或直接輸入地名";
+    case "PLACE_SEARCH_FAILED":
+      return "搜尋失敗，請確認網路連線後再試一次，或直接點地圖放置標記";
     default:
       return `資料有誤（${error.code}）`;
   }
@@ -158,7 +193,12 @@ export function describeAllocationGap(
  * 還原結果的說明：分帳帳本分成還原、略過、失敗三段，個人記帳另外說明
  * （個人帳本在畫面上不是一本帳本，不列成「個人」）。
  */
-export function describeRestoreReport(report: RestoreReport): string {
+export function describeRestoreReport(
+  report: RestoreReport & {
+    readonly journals?: JournalRestoreReport;
+    readonly illustrations?: IllustrationRestoreReport;
+  },
+): string {
   const shared = (ledgers: readonly LedgerRecord[]) =>
     ledgers.filter((l) => l.kind === "shared");
   const names = (ledgers: readonly LedgerRecord[]) =>
@@ -190,6 +230,29 @@ export function describeRestoreReport(report: RestoreReport): string {
   }
   if (failed.some((l) => l.kind === "personal")) {
     lines.push("個人記帳的資料有誤，沒有還原");
+  }
+  const journals = report.journals;
+  const journalNames = (items: readonly { readonly name: string }[]) =>
+    items.map((j) => `「${j.name}」`).join("、");
+  if (journals && journals.restored.length > 0) {
+    lines.push(
+      `已還原 ${journals.restored.length} 本手帳：${journalNames(journals.restored)}`,
+    );
+  }
+  if (journals && journals.skipped.length > 0) {
+    lines.push(
+      `手機上已經有 ${journals.skipped.length} 本手帳，沒有變動：${journalNames(journals.skipped)}`,
+    );
+  }
+  if (journals && journals.failed.length > 0) {
+    const failedJournals = journals.failed.map((f) => f.journal);
+    lines.push(
+      `${failedJournals.length} 本手帳資料有誤，沒有還原：${journalNames(failedJournals)}`,
+    );
+  }
+  // Skipped illustrations are not worth a line: nothing on the phone changed
+  if (report.illustrations && report.illustrations.restored > 0) {
+    lines.push(`已還原 ${report.illustrations.restored} 張手繪插圖`);
   }
   // 備份是空的，或只有個人記帳而且消費手機上都已經有了
   return lines.length > 0 ? lines.join("\n") : "備份裡沒有需要還原的資料";

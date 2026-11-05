@@ -90,6 +90,42 @@ export default function RootLayout() {
               name="ledger/[id]/stats"
               options={{ title: "統計", headerShown: false }}
             />
+            {/* 旅遊手帳：書架、手帳內頁、日記頁、設定自己畫頁首；建立手帳和建立帳本一樣用導覽列，
+                寫日記／編輯日記和消費表單一樣是 modal */}
+            <Stack.Screen
+              name="journal/index"
+              options={{ title: "旅遊手帳", headerShown: false }}
+            />
+            <Stack.Screen name="journal/new" options={{ title: "新手帳" }} />
+            <Stack.Screen
+              name="journal/[id]/index"
+              options={{ title: "手帳", headerShown: false }}
+            />
+            <Stack.Screen
+              name="journal/[id]/settings"
+              options={{ title: "手帳設定", headerShown: false }}
+            />
+            <Stack.Screen
+              name="journal/[id]/entry/[entryId]/index"
+              options={{ title: "日記", headerShown: false }}
+            />
+            <Stack.Screen
+              name="journal/[id]/write"
+              options={{ title: "寫日記", presentation: "modal" }}
+            />
+            <Stack.Screen
+              name="journal/[id]/entry/[entryId]/edit"
+              options={{ title: "編輯日記", presentation: "modal" }}
+            />
+            {/* 我的插圖自己畫頁首；畫板是全螢幕 modal，不能往下滑關掉，免得往下畫線時把畫板關了 */}
+            <Stack.Screen
+              name="illustrations/index"
+              options={{ title: "我的插圖", headerShown: false }}
+            />
+            <Stack.Screen
+              name="illustrations/draw"
+              options={{ title: "畫插圖", presentation: "fullScreenModal" }}
+            />
             <Stack.Screen
               name="ledger/[id]/add-expense"
               options={{ title: "新增消費", presentation: "modal" }}

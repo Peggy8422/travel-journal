@@ -118,6 +118,57 @@ describe("describeRestoreReport", () => {
     ).toBe(["已還原 1 本：「東京」", "個人記帳已還原"].join("\n"));
   });
 
+  it("adds a line for each kind of journal result", () => {
+    const journal = (name: string) => ({
+      id: name,
+      name,
+      ledgerId: null,
+      cover: { tape: "sakura" as const, photo: null },
+      createdAt: "",
+      updatedAt: "",
+    });
+    expect(
+      describeRestoreReport({
+        restored: [],
+        skipped: [],
+        failed: [],
+        personalExpensesAdded: 0,
+        journals: {
+          restored: [journal("京都")],
+          skipped: [journal("台南")],
+          failed: [{ journal: journal("壞掉的"), reason: "x" }],
+        },
+      }),
+    ).toBe(
+      [
+        "已還原 1 本手帳：「京都」",
+        "手機上已經有 1 本手帳，沒有變動：「台南」",
+        "1 本手帳資料有誤，沒有還原：「壞掉的」",
+      ].join("\n"),
+    );
+  });
+
+  it("counts restored illustrations but not skipped ones", () => {
+    const empty = {
+      restored: [],
+      skipped: [],
+      failed: [],
+      personalExpensesAdded: 0,
+    };
+    expect(
+      describeRestoreReport({
+        ...empty,
+        illustrations: { restored: 3, skipped: 1 },
+      }),
+    ).toBe("已還原 3 張手繪插圖");
+    expect(
+      describeRestoreReport({
+        ...empty,
+        illustrations: { restored: 0, skipped: 2 },
+      }),
+    ).toBe("備份裡沒有需要還原的資料");
+  });
+
   it("reports a personal ledger that could not be restored", () => {
     expect(
       describeRestoreReport({
