@@ -15,6 +15,8 @@ const PERSONAL_COLORS = COVER_COLORS.ai;
 
 /** 沒綁帳本的手帳用牛皮紙色 */
 const JOURNAL_COLORS = { deep: "#7E5F3A", tint: "#E6D6B8" };
+/** 收藏的地點用金色紙膠帶的顏色 */
+export const PLACE_COLORS = { deep: "#A9832F", tint: "#F0E2BC" };
 
 /** 帳本在地球上的顏色：索引籤底色（tint）與標記、選取條（deep） */
 export function ledgerColors(ledger: MapLedger): {
@@ -26,14 +28,16 @@ export function ledgerColors(ledger: MapLedger): {
       return PERSONAL_COLORS;
     case "journals":
       return JOURNAL_COLORS;
+    case "places":
+      return PLACE_COLORS;
     case "shared":
       return COVER_COLORS[ledger.cover.palette];
   }
 }
 
 /**
- * 地球右側的直書索引籤：最上面是個人記帳，下面依年份收合分帳帳本。
- * 帳本可以複選，選中的籤會往左凸出、左緣加一條帳本色。
+ * 地球右側的直書索引籤：最上面是個人記帳、沒綁帳本的手帳、收藏的地點，下面依年份收合分帳帳本。
+ * 索引籤可以複選，選中的籤會往左凸出、左緣加一條帳本色。
  */
 export function GlobeIndex({
   top,
@@ -63,15 +67,15 @@ export function GlobeIndex({
   const theme = useTheme();
   const personal = ledgers.find((l) => l.kind === "personal");
   const journals = ledgers.find((l) => l.kind === "journals");
+  const places = ledgers.find((l) => l.kind === "places");
   const years = groupLedgersByYear(ledgers);
 
   return (
     <View
       accessibilityRole="toolbar"
-      accessibilityLabel="選擇要顯示在地圖上的帳本"
+      accessibilityLabel="選擇要顯示在地球上的帳本、手帳或收藏"
       style={[styles.column, { top }]}
     >
-      <Text style={[styles.heading, { color: theme.textMuted }]}>帳本</Text>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.list}
@@ -94,6 +98,15 @@ export function GlobeIndex({
             sub="未綁帳本"
             selected={picked.includes(journals.id)}
             onPress={() => onToggleLedger(journals.id)}
+          />
+        )}
+        {places && (
+          <LedgerTab
+            ledger={places}
+            label="收藏"
+            sub={`${places.expenseCount} 個地點`}
+            selected={picked.includes(places.id)}
+            onPress={() => onToggleLedger(places.id)}
           />
         )}
         {years.map(({ year, ledgers: inYear }) => {
@@ -171,7 +184,7 @@ export function GlobeIndex({
         {picked.length > 0 && (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="清除選取的帳本"
+            accessibilityLabel="清除選取的索引籤"
             onPress={onClear}
             style={({ pressed }) => [
               styles.clear,
@@ -356,15 +369,10 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     gap: 6,
   },
-  heading: {
-    paddingTop: 4,
-    paddingRight: 14,
-    fontFamily: fonts.regular,
-    fontSize: 12,
-  },
   list: {
     alignItems: "flex-end",
     gap: 6,
+    paddingTop: 8,
     paddingBottom: 8,
   },
   year: {

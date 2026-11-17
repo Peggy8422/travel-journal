@@ -5,7 +5,13 @@ import {
   T0,
 } from "../../../data/repositories/testRecords";
 import { coverFromId } from "../../../domain/ledger";
-import { filterPins, loadMapData, UNBOUND_JOURNALS_ID } from "./mapData";
+import {
+  filterPins,
+  loadMapData,
+  mapLedgerName,
+  SAVED_PLACES_ID,
+  UNBOUND_JOURNALS_ID,
+} from "./mapData";
 
 const shinjuku = { latitude: 35.6905, longitude: 139.7024 };
 const kyoto = { latitude: 35.0116, longitude: 135.7681 };
@@ -286,6 +292,68 @@ describe("loadMapData", () => {
     expect((await loadMapData(db)).ledgers.map((l) => l.kind)).toEqual([
       "shared",
     ]);
+  });
+});
+
+describe("saved places on the map", () => {
+  async function withPlaces() {
+    const setup = await setupLedger();
+    for (const [id, createdAt, deletedAt] of [
+      ["cafe", "2026-10-02T00:00:00.000Z", null],
+      ["ramen", "2026-10-03T00:00:00.000Z", null],
+      ["gone", "2026-10-04T00:00:00.000Z", "2026-10-05T00:00:00.000Z"],
+    ] as const) {
+      await setup.repos.savedPlaces.insert({
+        id,
+        name: id,
+        location: kyoto,
+        city: "京都市",
+        kind: id === "cafe" ? "cafe" : "restaurant",
+        status: id === "ramen" ? "visited" : "want",
+        note: "",
+        ratings: [],
+        revisit: false,
+        photos: [],
+        createdAt,
+        updatedAt: createdAt,
+        deletedAt,
+      });
+    }
+    return setup;
+  }
+
+  it("puts saved places behind their own tab, newest first, without deleted ones", async () => {
+    const { db } = await withPlaces();
+    const data = await loadMapData(db);
+    expect(data.ledgers.map((l) => [l.id, l.kind, l.expenseCount])).toEqual([
+      [SAVED_PLACES_ID, "places", 2],
+      ["ledger-1", "shared", 0],
+    ]);
+    expect(mapLedgerName(data.ledgers[0]!)).toBe("收藏地點");
+    expect(data.pins).toEqual([
+      expect.objectContaining({
+        kind: "place",
+        id: "ramen",
+        ledgerId: SAVED_PLACES_ID,
+        title: "ramen",
+        placeName: "ramen",
+        placeKind: "restaurant",
+        status: "visited",
+        city: "京都市",
+      }),
+      expect.objectContaining({ id: "cafe", status: "want" }),
+    ]);
+  });
+
+  it("drops saved places when a day is picked", async () => {
+    const { db } = await withPlaces();
+    const { pins } = await loadMapData(db);
+    expect(
+      filterPins(pins, { ledgerId: SAVED_PLACES_ID, date: null }),
+    ).toHaveLength(2);
+    expect(filterPins(pins, { ledgerId: null, date: "2026-10-12" })).toEqual(
+      [],
+    );
   });
 });
 

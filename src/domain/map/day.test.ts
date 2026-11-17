@@ -39,6 +39,20 @@ function journalPin(
   };
 }
 
+function savedPin(id: string): MapPin {
+  return {
+    kind: "place",
+    id,
+    ledgerId: "places:saved",
+    title: id,
+    placeName: id,
+    point: shibuya,
+    placeKind: "cafe",
+    status: "want",
+    city: "東京",
+  };
+}
+
 describe("localDateOf", () => {
   it("uses the date where the expense happened, not the device time zone", () => {
     // 23:30 in Tokyo is still 10/12 there, though already 10/13 in Hawaii
@@ -49,6 +63,10 @@ describe("localDateOf", () => {
 
   it("uses the entry date for a journal place", () => {
     expect(localDateOf(journalPin("temple", "2026-10-13"))).toBe("2026-10-13");
+  });
+
+  it("has no date for a saved place", () => {
+    expect(localDateOf(savedPin("cafe"))).toBeNull();
   });
 });
 
@@ -65,6 +83,12 @@ describe("pinDates", () => {
 
   it("returns nothing without pins", () => {
     expect(pinDates([])).toEqual([]);
+  });
+
+  it("leaves out saved places, as they have no date", () => {
+    expect(
+      pinDates([savedPin("cafe"), pin("a", "2026-10-12T09:00:00+09:00")]),
+    ).toEqual(["2026-10-12"]);
   });
 });
 

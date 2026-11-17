@@ -32,10 +32,12 @@ import {
 } from "../services/globeView";
 import type { MapEntry } from "../services/globeView";
 import type { MapData, MapExpense, MapItem } from "../services/mapData";
+import type { PlaceMapPin } from "../../../domain/map";
+import { PLACE_KIND_STYLES } from "../../places/components/placeKinds";
 import { GlobeArt } from "./GlobeArt";
-import { GlobeIndex, ledgerColors } from "./GlobeIndex";
+import { GlobeIndex, ledgerColors, PLACE_COLORS } from "./GlobeIndex";
 import { GlobeSheet } from "./GlobeSheet";
-import { KraftCard } from "./MapExpenseRow";
+import { KraftCard, PlaceStar } from "./MapExpenseRow";
 
 /** 右側索引籤的寬度 */
 const INDEX_WIDTH = 76;
@@ -214,6 +216,18 @@ function GlobeStage({
     });
   }
 
+  /** 標出這個收藏的地點並打開地點頁 */
+  function openPlace(place: PlaceMapPin) {
+    setFocusId(place.id);
+    motion.jumpTo({
+      lon: place.point.longitude,
+      lat: place.point.latitude,
+      k: view.k,
+      cy: cySheet,
+    });
+    router.push({ pathname: "/places/[id]", params: { id: place.id } });
+  }
+
   function pickCluster(items: readonly MapItem[]) {
     const ids = items.map((e) => e.id);
     if (placeIds && placeIds.join(",") === ids.join(",")) {
@@ -233,7 +247,7 @@ function GlobeStage({
   }
 
   // Pins of the picked ledgers on the visible side, merged when they overlap.
-  // Expenses and journal places are merged apart, as they are drawn differently
+  // Expenses, journal places and saved places are merged apart, as they are drawn differently
   const projection = globeProjection(view, { cx, radius });
   const onScreen = pins
     .filter((p) => pickedIdList.includes(p.ledgerId))
@@ -265,7 +279,17 @@ function GlobeStage({
       ? { ...c, x: c.x + JOURNAL_NUDGE, y: c.y - JOURNAL_NUDGE }
       : c,
   );
-  const clusters = [...expenseClusters, ...journalClusters];
+  const placeClusters = clusterOnScreen(
+    onScreen.filter((p) => p.item.kind === "place"),
+    CLUSTER_DISTANCE,
+  ).map((c) =>
+    [...expenseClusters, ...journalClusters].some(
+      (e) => Math.hypot(e.x - c.x, e.y - c.y) < CLUSTER_DISTANCE,
+    )
+      ? { ...c, x: c.x - JOURNAL_NUDGE, y: c.y - JOURNAL_NUDGE }
+      : c,
+  );
+  const clusters = [...expenseClusters, ...journalClusters, ...placeClusters];
   const [hx, hy, hz] = orthographic(projection, GLOBE_HOME.lon, GLOBE_HOME.lat);
   const home = toScreen(projection, hx, hy);
   const showHome =
@@ -273,11 +297,15 @@ function GlobeStage({
     view.k < 2.6 &&
     !clusters.some((c) => Math.hypot(c.x - home.x, c.y - home.y) < 30);
 
+  // Any tab with something on it: a ledger, the journals or the saved places
+  const pickable = ledgers.some(
+    (l) => l.kind !== "personal" || l.expenseCount > 0,
+  );
   const hint = failed
     ? "讀取地圖資料失敗，請稍後再試。"
-    : data && !ledgers.some((l) => l.kind === "shared")
+    : data && !pickable
       ? "還沒有帳本。到「帳本」分頁建立一本，記帳時記下地點，足跡就會出現在地球上。"
-      : "從右邊的索引籤挑一本帳本，這趟旅行的足跡和消費就會出現在地球上。";
+      : "從右邊的索引籤挑幾張，去過、想去的地方就會出現在地球上。";
 
   return (
     <>
@@ -289,7 +317,7 @@ function GlobeStage({
           accessibilityRole="image"
           accessibilityLabel={
             picked.length > 0
-              ? `可以拖曳轉動的地球，標出 ${picked.length} 本帳本的消費地點`
+              ? `可以拖曳轉動的地球，標出選取的 ${picked.length} 張索引籤的地點`
               : "以台灣為中心慢慢自轉的地球，可以拖曳轉動"
           }
         >
@@ -331,10 +359,27 @@ function GlobeStage({
             ledgerIds.size === 1 && only ? ledgerColors(only).deep : theme.text;
           const marked =
             focus !== undefined || placeIds?.join(",") === ids.join(",");
+          const first = cluster.items[0];
           return (
             <GlobePin
               key={ids[0]}
-              journal={cluster.items[0].kind === "journal"}
+              variant={
+                first.kind === "place"
+                  ? {
+                      kind: "place",
+                      // One kind of place shows its colour; a mix shows the tab's gold
+                      color: cluster.items.every(
+                        (e) =>
+                          e.kind === "place" && e.placeKind === first.placeKind,
+                      )
+                        ? PLACE_KIND_STYLES[first.placeKind].color
+                        : PLACE_COLORS.deep,
+                      visited: cluster.items.every(
+                        (e) => e.kind === "place" && e.status === "visited",
+                      ),
+                    }
+                  : { kind: first.kind }
+              }
               x={cluster.x}
               y={cluster.y}
               count={cluster.items.length}
@@ -438,7 +483,7 @@ function GlobeStage({
             <WashiTape color="#E9C46A" tilt={-4} opacity={0.85} />
           </View>
           <Text style={[styles.hintText, { color: theme.text }]}>{hint}</Text>
-          {!failed && ledgers.some((l) => l.kind === "shared") && (
+          {!failed && pickable && (
             <Svg
               width={34}
               height={26}
@@ -470,6 +515,7 @@ function GlobeStage({
           focusId={focusId}
           onOpen={openExpense}
           onOpenEntry={openEntry}
+          onOpenPlace={openPlace}
           onOpenDetail={() =>
             router.push({
               pathname: "/map",
@@ -483,11 +529,11 @@ function GlobeStage({
 }
 
 /**
- * 地球上的標記：消費是帳本色圓點，多筆合在一起時寫筆數；日記是牛皮紙小卡。
- * 旁邊可以掛一個地名小標籤
+ * 地球上的標記：消費是帳本色圓點，多筆合在一起時寫筆數；日記是牛皮紙小卡；
+ * 收藏的地點是星星（想去空心、去過塗色）。旁邊可以掛一個地名小標籤
  */
 function GlobePin({
-  journal,
+  variant,
   x,
   y,
   count,
@@ -498,7 +544,13 @@ function GlobePin({
   accessibilityLabel,
   onPress,
 }: {
-  journal: boolean;
+  variant:
+    | { readonly kind: "expense" | "journal" }
+    | {
+        readonly kind: "place";
+        readonly color: string;
+        readonly visited: boolean;
+      };
   x: number;
   y: number;
   count: number;
@@ -519,7 +571,25 @@ function GlobePin({
       onPress={onPress}
       style={[styles.pin, { left: x - 22, top: y - 22 }]}
     >
-      {journal ? (
+      {variant.kind === "place" ? (
+        <View style={[styles.star, marked && styles.starMarked]}>
+          <PlaceStar
+            status={variant.visited ? "visited" : "want"}
+            color={variant.color}
+            size={count > 1 ? 30 : 24}
+          />
+          {count > 1 && (
+            <Text
+              style={[
+                styles.starCount,
+                { color: variant.visited ? theme.surface : theme.text },
+              ]}
+            >
+              {count}
+            </Text>
+          )}
+        </View>
+      ) : variant.kind === "journal" ? (
         <KraftCard
           width={count > 1 ? 26 : 22}
           height={count > 1 ? 28 : 24}
@@ -648,6 +718,19 @@ const styles = StyleSheet.create({
     height: 44,
     alignItems: "center",
     justifyContent: "center",
+  },
+  star: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  starMarked: {
+    transform: [{ scale: 1.25 }],
+  },
+  starCount: {
+    position: "absolute",
+    top: 10,
+    fontFamily: fonts.bold,
+    fontSize: 10,
   },
   pinCount: {
     fontFamily: fonts.accent,

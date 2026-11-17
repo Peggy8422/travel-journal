@@ -11,7 +11,9 @@ import {
 } from "../../../shared/ui/handDrawn";
 import { BackButton, PageMessage } from "../../../shared/ui/PageHeader";
 import { useTheme } from "../../../shared/ui/theme";
-import { PlacePinIcon } from "../../journal/components/EntryPlaces";
+import { SmallButton } from "../../../shared/ui/components";
+import { GlobeIcon, PlacePinIcon } from "../../journal/components/EntryPlaces";
+import { SAVED_PLACES_ID } from "../../map/services/mapData";
 import {
   PhotoCollage,
   PhotoViewer,
@@ -28,7 +30,8 @@ const WANT_STAMP = "#3F5F8F";
 
 /**
  * 一個收藏的地點（只能看）：類型、名稱、城市、想去／去過的印章，
- * 去過的話有自己的評分與「還想再去」，下面是心得和照片。右上角「編輯」才進表單。
+ * 去過的話有自己的評分與「還想再去」，下面是心得和照片。右上角「編輯」才進表單；
+ * 「在地圖上看」打開詳細地圖，選起這個地點、旁邊的收藏也看得到。
  * 導覽列隱藏，返回鍵自己畫。
  */
 export function PlaceDetailScreen({ placeId }: { placeId: string }) {
@@ -121,6 +124,20 @@ function Detail({ detail }: { detail: PlaceDetail }) {
                 labelScale={0.36}
               />
             </View>
+          </View>
+
+          <View style={styles.mapRow}>
+            <SmallButton
+              title="在地圖上看"
+              accessibilityLabel="在詳細地圖上看這個地點和其他收藏"
+              icon={<GlobeIcon size={16} color={theme.text} />}
+              onPress={() =>
+                router.push({
+                  pathname: "/map",
+                  params: { ledgers: SAVED_PLACES_ID, place: place.id },
+                })
+              }
+            />
           </View>
 
           {visited && (
@@ -247,6 +264,10 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bold,
     fontSize: 23,
     lineHeight: 31,
+  },
+  mapRow: {
+    flexDirection: "row",
+    marginTop: -8,
   },
   cityRow: {
     flexDirection: "row",
