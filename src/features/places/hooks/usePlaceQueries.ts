@@ -8,6 +8,7 @@ import {
   loadPlaceForm,
   loadPlaceList,
 } from "../services/placeCommands";
+import { loadSavedPlaces } from "../services/placeHere";
 
 /** 收藏清單：地點、評分項目與最近刪除的 */
 export function usePlaceList() {
@@ -34,5 +35,12 @@ export function usePlaceForm(placeId: string | null) {
 export function useCriteria() {
   const db = useDatabase();
   const load = useCallback(() => loadCriteria(db), [db]);
+  return useFocusedQuery(load);
+}
+
+/** 收藏清單裡沒刪除的地點，日記頁、消費明細判斷地點收藏過了沒 */
+export function useSavedPlaces() {
+  const db = useDatabase();
+  const load = useCallback(() => loadSavedPlaces(db), [db]);
   return useFocusedQuery(load);
 }

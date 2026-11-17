@@ -1,5 +1,5 @@
 import { router, Stack } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert,
   Keyboard,
@@ -54,6 +54,7 @@ import {
   type PlaceForm,
   type PlaceInput,
 } from "../services/placeCommands";
+import type { PlacePrefill } from "../services/placeHere";
 import { PLACE_KIND_STYLES, PLACE_STATUS_LABELS } from "./placeKinds";
 import { RevisitHeart, ScoreDots } from "./PlaceRatings";
 
@@ -72,17 +73,32 @@ function fit(text: string | null, max: number): string {
   return text?.slice(0, max).trim() ?? "";
 }
 
-/** 收藏地點（placeId 為 null）與編輯地點共用的 modal，保留原生導覽列放取消、儲存 */
-export function PlaceFormScreen({ placeId }: { placeId: string | null }) {
+/**
+ * 收藏地點（placeId 為 null）與編輯地點共用的 modal，保留原生導覽列放取消、儲存。
+ * prefill 是從日記、消費「收藏這裡」帶來的名稱、座標與類型，存好後回到原本的畫面。
+ */
+export function PlaceFormScreen({
+  placeId,
+  prefill = null,
+}: {
+  placeId: string | null;
+  prefill?: PlacePrefill | null;
+}) {
   const { data, error } = usePlaceForm(placeId);
   if (error) return <MessageScreen text="讀取地點失敗" />;
   if (!data) return null;
   if (!data.ok) return <MessageScreen text={describeError(data.error)} />;
   // Mounted once the data is in, so the fields start from it
-  return <Form form={data.value} />;
+  return <Form form={data.value} prefill={placeId === null ? prefill : null} />;
 }
 
-function Form({ form }: { form: PlaceForm }) {
+function Form({
+  form,
+  prefill,
+}: {
+  form: PlaceForm;
+  prefill: PlacePrefill | null;
+}) {
   const theme = useTheme();
   const deps = useLedgerCommandDeps();
   const toast = useToast();
@@ -90,17 +106,22 @@ function Form({ form }: { form: PlaceForm }) {
   const currentPlace = useCurrentPlace(locator);
   const { place, criteria } = form;
   const [location, setLocation] = useState<GeoPoint | null>(
-    place?.location ?? null,
+    place?.location ?? prefill?.location ?? null,
   );
-  const [name, setName] = useState<AutoText>({
-    text: place?.name ?? "",
-    auto: false,
+  // A prefilled name follows the location like a looked-up one
+  const [name, setName] = useState<AutoText>(() => {
+    const suggested = fit(prefill?.name ?? null, TEXT_LIMITS.placeName);
+    return place
+      ? { text: place.name, auto: false }
+      : { text: suggested, auto: suggested !== "" };
   });
   const [city, setCity] = useState<AutoText>({
     text: place?.city ?? "",
     auto: false,
   });
-  const [kind, setKind] = useState<PlaceKind>(place?.kind ?? "restaurant");
+  const [kind, setKind] = useState<PlaceKind>(
+    place?.kind ?? prefill?.kind ?? "restaurant",
+  );
   const [status, setStatus] = useState<PlaceStatus>(place?.status ?? "want");
   const [note, setNote] = useState(place?.note ?? "");
   const [scores, setScores] = useState<ReadonlyMap<string, number>>(
@@ -125,6 +146,21 @@ function Form({ form }: { form: PlaceForm }) {
   );
   const locateState = currentPlace.state;
   const busy = locateState.status === "locating";
+
+  // The prefilled location still needs its city (looked up once, on open)
+  const [opened] = useState(prefill);
+  useEffect(() => {
+    if (!opened) return;
+    let live = true;
+    void cityOf(locator, opened.location).then((found) => {
+      const text = fit(found, TEXT_LIMITS.city);
+      if (!live || text === "") return;
+      setCity((c) => (c.text === "" ? { text, auto: true } : c));
+    });
+    return () => {
+      live = false;
+    };
+  }, [opened]);
 
   /** 選了地點：名稱、城市還沒自己改過的話跟著換 */
   function placeAt(point: GeoPoint, placeName: string | null) {
@@ -216,6 +252,10 @@ function Form({ form }: { form: PlaceForm }) {
       if (place) {
         router.back();
         toast("已儲存");
+      } else if (prefill) {
+        // Back to the entry or expense, where the star now shows it saved
+        router.back();
+        toast(`收藏了「${result.value.name}」`);
       } else {
         router.replace({
           pathname: "/places/[id]",

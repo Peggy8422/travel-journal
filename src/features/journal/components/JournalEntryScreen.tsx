@@ -42,6 +42,9 @@ import { JournalStamp } from "./JournalStamp";
 import { PencilIcon } from "./PencilIcon";
 import { TAPE_COLORS } from "./tapes";
 import type { EntrySticker } from "../../../domain/journal";
+import type { SavedPlaceRecord } from "../../../domain/places";
+import { SaveHereButton } from "../../places/components/SaveHereButton";
+import { useSavedPlaces } from "../../places/hooks/usePlaceQueries";
 
 /** 捲動區上方的留白，頁面從這裡開始 */
 const PAGE_TOP = 4;
@@ -56,6 +59,7 @@ const PAGE_TOP = 4;
 export function JournalEntryScreen({ entryId }: { entryId: string }) {
   const theme = useTheme();
   const { data, error } = useEntry(entryId);
+  const savedPlaces = useSavedPlaces().data;
   /** 貼插圖中時是打開那時頁面捲到哪裡，擺插圖的畫面從同一處開始；沒在貼時為 null */
   const [editing, setEditing] = useState<number | null>(null);
   /** 看日記時從哪裡開始捲（貼完插圖回來停在原處） */
@@ -82,12 +86,14 @@ export function JournalEntryScreen({ entryId }: { entryId: string }) {
       {editing === null ? (
         <EntryView
           detail={data.value}
+          savedPlaces={savedPlaces}
           offset={viewOffset}
           onEditStickers={setEditing}
         />
       ) : (
         <StickerEditor
           detail={data.value}
+          savedPlaces={savedPlaces}
           offset={editing}
           onClose={(offset) => {
             setViewOffset(offset);
@@ -101,10 +107,12 @@ export function JournalEntryScreen({ entryId }: { entryId: string }) {
 
 function EntryView({
   detail,
+  savedPlaces,
   offset,
   onEditStickers,
 }: {
   detail: EntryDetail;
+  savedPlaces: readonly SavedPlaceRecord[] | undefined;
   offset: number;
   onEditStickers: (offset: number) => void;
 }) {
@@ -155,6 +163,7 @@ function EntryView({
           stickers={entry.stickers}
           art={detail.illustrations}
           onOpenPhoto={setViewing}
+          savedPlaces={savedPlaces}
         />
       </ScrollView>
       {viewing !== null && (
@@ -174,10 +183,12 @@ function EntryView({
  */
 function StickerEditor({
   detail,
+  savedPlaces,
   offset,
   onClose,
 }: {
   detail: EntryDetail;
+  savedPlaces: readonly SavedPlaceRecord[] | undefined;
   offset: number;
   onClose: (offset: number) => void;
 }) {
@@ -273,6 +284,7 @@ function StickerEditor({
           selected={selected}
           panHandlers={board.panHandlers}
           onPageSize={board.setPageSize}
+          savedPlaces={savedPlaces}
         />
       </ScrollView>
       <StickerTray
@@ -303,6 +315,7 @@ function EntryPage({
   panHandlers,
   onPageSize,
   onOpenPhoto,
+  savedPlaces,
 }: {
   detail: EntryDetail;
   stickers: readonly EntrySticker[];
@@ -311,6 +324,8 @@ function EntryPage({
   panHandlers?: GestureResponderHandlers;
   onPageSize?: (width: number, height: number) => void;
   onOpenPhoto?: (index: number) => void;
+  /** 收藏清單，地點旁邊顯示收藏過了沒；還沒讀到時不顯示 */
+  savedPlaces: readonly SavedPlaceRecord[] | undefined;
 }) {
   const theme = useTheme();
   const { entry, journal, dayNumber, daySpending } = detail;
@@ -407,6 +422,14 @@ function EntryPage({
                 >
                   {place.name}
                 </Text>
+                {/* Shown while placing stickers too, so the page keeps its layout */}
+                <View pointerEvents={panHandlers ? "none" : "auto"}>
+                  <SaveHereButton
+                    prefill={{ ...place, kind: "other" }}
+                    places={savedPlaces}
+                    short
+                  />
+                </View>
               </View>
             ))}
           </View>
@@ -574,7 +597,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    minHeight: 28,
+    minHeight: 34,
   },
   placeName: {
     flex: 1,

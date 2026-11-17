@@ -23,6 +23,7 @@ import { describeError } from "../../ledger/components/messages";
 import { toLocalIsoString } from "../../ledger/services/localTimestamp";
 import { usePlace } from "../hooks/usePlaceQueries";
 import type { PlaceDetail } from "../services/placeCommands";
+import { PlaceHere } from "./PlaceHere";
 import { PLACE_KIND_STYLES, PLACE_STATUS_LABELS } from "./placeKinds";
 import { RatingList, RevisitHeart } from "./PlaceRatings";
 
@@ -32,6 +33,7 @@ const WANT_STAMP = "#3F5F8F";
  * 一個收藏的地點（只能看）：類型、名稱、城市、想去／去過的印章，
  * 去過的話有自己的評分與「還想再去」，下面是心得和照片。右上角「編輯」才進表單；
  * 「在地圖上看」打開詳細地圖，選起這個地點、旁邊的收藏也看得到。
+ * 最下面列出在這裡寫過的日記、記過的消費（用距離判斷）。
  * 導覽列隱藏，返回鍵自己畫。
  */
 export function PlaceDetailScreen({ placeId }: { placeId: string }) {
@@ -179,6 +181,8 @@ function Detail({ detail }: { detail: PlaceDetail }) {
               onOpen={setViewing}
             />
           )}
+
+          {detail.here.length > 0 && <PlaceHere items={detail.here} />}
 
           <Text style={[styles.saved, { color: theme.textMuted }]}>
             {`收藏於 ${toLocalIsoString(new Date(place.createdAt)).slice(0, 10).replace(/-/g, "/")}`}

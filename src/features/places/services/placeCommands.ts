@@ -18,6 +18,7 @@ import {
 import type { SqlExecutor } from "../../../data/db/sqlDatabase";
 import { createRepositories } from "../../../data/repositories";
 import type { LedgerCommandDeps } from "../../ledger/services/ledgerCommands";
+import { loadHereItems, type HereItem } from "./placeHere";
 
 /*
  * 收藏地點與評分項目的寫入與讀取。和帳本一樣：驗證失敗回傳 Result，資料庫錯誤直接 throw。
@@ -209,6 +210,8 @@ export async function loadPlaceList(db: SqlExecutor): Promise<PlaceList> {
 export interface PlaceDetail {
   readonly place: SavedPlaceRecord;
   readonly criteria: readonly RatingCriterionRecord[];
+  /** 在這個地點附近的日記與消費，新的在前 */
+  readonly here: readonly HereItem[];
 }
 
 /** 刪除的地點讀不到（地點頁直接當作不存在） */
@@ -221,7 +224,11 @@ export async function loadPlace(
   if (!place || place.deletedAt !== null) {
     return err({ code: "PLACE_NOT_FOUND", placeId });
   }
-  return ok({ place, criteria: await repos.ratingCriteria.list() });
+  const [criteria, here] = await Promise.all([
+    repos.ratingCriteria.list(),
+    loadHereItems(db, place.location),
+  ]);
+  return ok({ place, criteria, here });
 }
 
 /** 新增／編輯表單要的資料 */

@@ -15,3 +15,10 @@ export {
   type SavedPlaceRecord,
 } from "./records";
 export type { RatingCriterionRepository, SavedPlaceRepository } from "./ports";
+export {
+  distanceMeters,
+  isNearby,
+  NEARBY_METERS,
+  placeKindOf,
+  savedPlaceNear,
+} from "./nearby";
