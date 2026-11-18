@@ -22,10 +22,12 @@ import {
   type MapLedger,
 } from "../services/mapData";
 import { ledgerColors } from "./GlobeIndex";
+import type { PlaceMapPin } from "../../../domain/map";
 import {
   LedgerSectionHeader,
   MapEntryRow,
   MapExpenseRow,
+  MapPlaceRow,
 } from "./MapExpenseRow";
 
 /** 地圖上的金額一律換算成新台幣（帳本的基準幣） */
@@ -34,7 +36,7 @@ const BASE = "TWD";
 /**
  * 地球下方的消費卡片：標題列可以展開／收合，清單依帳本分段，有地點的日記和消費依日期排在一起。
  * 點一筆消費（一篇日記），地球轉到那裡並標出名稱，同時打開消費明細（日記頁）；
- * 在地球上點標記時，清單只列那個地方的消費與日記。
+ * 在地球上點標記時，清單只列那個地方的消費與日記。選了「收藏」索引籤時，收藏的地點列在最後。
  */
 export function GlobeSheet({
   picked,
@@ -47,6 +49,7 @@ export function GlobeSheet({
   focusId,
   onOpen,
   onOpenEntry,
+  onOpenPlace,
   onOpenDetail,
 }: {
   picked: readonly MapLedger[];
@@ -59,22 +62,29 @@ export function GlobeSheet({
   focusId: string | null;
   onOpen: (expense: MapExpense) => void;
   onOpenEntry: (entry: MapEntry) => void;
+  onOpenPlace: (place: PlaceMapPin) => void;
   onOpenDetail: () => void;
 }) {
   const theme = useTheme();
   const multi = picked.length > 1;
   const money = (minor: number) => `${BASE} ${formatMinorAmount(minor, BASE)}`;
   const title =
-    picked.length === 1 ? mapLedgerName(picked[0]) : `${picked.length} 本帳本`;
+    picked.length === 1 ? mapLedgerName(picked[0]) : `${picked.length} 個索引`;
   const count = content.expenses.length;
-  const hasItems = count > 0 || content.entryCount > 0;
+  const hasItems =
+    count > 0 || content.entryCount > 0 || content.savedCount > 0;
   // What the list shows when narrowed to a place on the globe
   const shown: MapItem[] = content.sections.flatMap((s) =>
-    s.rows.flatMap<MapItem>((row) =>
-      row.kind === "expense"
-        ? [row.expense]
-        : row.entry.pins.filter((p) => placeIds?.includes(p.id) ?? true),
-    ),
+    s.rows.flatMap<MapItem>((row) => {
+      switch (row.kind) {
+        case "expense":
+          return [row.expense];
+        case "entry":
+          return row.entry.pins.filter((p) => placeIds?.includes(p.id) ?? true);
+        case "place":
+          return [row.place];
+      }
+    }),
   );
   const placeNames = [
     ...new Set(shown.map((e) => e.placeName ?? e.title)),
@@ -82,11 +92,16 @@ export function GlobeSheet({
   const summary = [
     content.entryCount > 0 ? `${content.entryCount} 篇日記` : null,
     count > 0 ? `${count} 筆消費` : null,
+    content.savedCount > 0 ? `${content.savedCount} 個收藏` : null,
     `${content.placeCount} 個地點`,
   ]
     .filter((part) => part !== null)
     .join(" · ");
   const onlyJournals = picked.every((l) => l.kind === "journals");
+  // Journals and saved places have no money to add up
+  const noMoney = picked.every(
+    (l) => l.kind === "journals" || l.kind === "places",
+  );
 
   return (
     <View style={[styles.sheet, { height, backgroundColor: theme.surface }]}>
@@ -125,7 +140,7 @@ export function GlobeSheet({
                 : "還沒有標記地點的消費"}
           </Text>
         </View>
-        {!onlyJournals && (
+        {!noMoney && (
           <View style={styles.headTotal}>
             <Text style={[styles.total, { color: theme.text }]}>
               {money(content.totalBaseMinor)}
@@ -210,26 +225,41 @@ export function GlobeSheet({
         {content.sections.map(({ ledger, rows }) => (
           <View key={ledger.id}>
             {multi && <LedgerSectionHeader ledger={ledger} />}
-            {rows.map((row) =>
-              row.kind === "expense" ? (
-                <MapExpenseRow
-                  key={row.expense.id}
-                  expense={row.expense}
-                  ledger={ledger}
-                  selected={row.expense.id === focusId}
-                  accessibilityHint="在地球上標出這筆消費並打開明細"
-                  onPress={() => onOpen(row.expense)}
-                />
-              ) : (
-                <MapEntryRow
-                  key={row.entry.entryId}
-                  entry={row.entry}
-                  selected={row.entry.pins.some((p) => p.id === focusId)}
-                  accessibilityHint="在地球上標出這篇日記的地點並打開日記"
-                  onPress={() => onOpenEntry(row.entry)}
-                />
-              ),
-            )}
+            {rows.map((row) => {
+              switch (row.kind) {
+                case "expense":
+                  return (
+                    <MapExpenseRow
+                      key={row.expense.id}
+                      expense={row.expense}
+                      ledger={ledger}
+                      selected={row.expense.id === focusId}
+                      accessibilityHint="在地球上標出這筆消費並打開明細"
+                      onPress={() => onOpen(row.expense)}
+                    />
+                  );
+                case "entry":
+                  return (
+                    <MapEntryRow
+                      key={row.entry.entryId}
+                      entry={row.entry}
+                      selected={row.entry.pins.some((p) => p.id === focusId)}
+                      accessibilityHint="在地球上標出這篇日記的地點並打開日記"
+                      onPress={() => onOpenEntry(row.entry)}
+                    />
+                  );
+                case "place":
+                  return (
+                    <MapPlaceRow
+                      key={row.place.id}
+                      place={row.place}
+                      selected={row.place.id === focusId}
+                      accessibilityHint="在地球上標出這個地點並打開地點頁"
+                      onPress={() => onOpenPlace(row.place)}
+                    />
+                  );
+              }
+            })}
           </View>
         ))}
       </ScrollView>

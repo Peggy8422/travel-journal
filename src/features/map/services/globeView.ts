@@ -2,6 +2,7 @@ import {
   groupByLocation,
   localDateOf,
   type JournalMapPin,
+  type PlaceMapPin,
 } from "../../../domain/map";
 import type { MapData, MapExpense, MapItem, MapLedger } from "./mapData";
 
@@ -40,12 +41,13 @@ export interface MapEntry {
 /** 消費卡片清單的一列 */
 export type SheetRow =
   | { readonly kind: "expense"; readonly expense: MapExpense }
-  | { readonly kind: "entry"; readonly entry: MapEntry };
+  | { readonly kind: "entry"; readonly entry: MapEntry }
+  | { readonly kind: "place"; readonly place: PlaceMapPin };
 
 export interface GlobeSheetContent {
   /**
    * 有東西要列出的帳本，依索引籤的順序；每本依日期由舊到新，
-   * 同一天的日記排在消費前面，消費依時間由舊到新
+   * 同一天的日記排在消費前面，消費依時間由舊到新；收藏的地點依收藏的時間由新到舊
    */
   readonly sections: readonly {
     readonly ledger: MapLedger;
@@ -55,6 +57,8 @@ export interface GlobeSheetContent {
   readonly expenses: readonly MapExpense[];
   /** 選取帳本裡有地點的日記篇數（不受 placeIds 影響） */
   readonly entryCount: number;
+  /** 選取的收藏地點數（選了「收藏」索引籤才有；不受 placeIds 影響） */
+  readonly savedCount: number;
   /** 不同座標的數量（同一家店的多筆消費、同一個地方的日記算一個） */
   readonly placeCount: number;
   /** 換算成新台幣的合計；匯率資料有誤的消費不算進去 */
@@ -74,13 +78,21 @@ export function globeSheet(
   const pins = data.pins.filter((p) => pickedIds.includes(p.ledgerId));
   const expenses = pins.filter((p) => p.kind === "expense");
   const entries = entriesOf(pins);
-  const rows = sheetRows(expenses, entries).filter((row) =>
-    placeIds === null
-      ? true
-      : row.kind === "expense"
-        ? placeIds.includes(row.expense.id)
-        : row.entry.pins.some((p) => placeIds.includes(p.id)),
-  );
+  const saved = pins.filter((p) => p.kind === "place");
+  const rows = [
+    ...sheetRows(expenses, entries),
+    ...saved.map((place) => ({ kind: "place", place }) as const),
+  ].filter((row) => {
+    if (placeIds === null) return true;
+    switch (row.kind) {
+      case "expense":
+        return placeIds.includes(row.expense.id);
+      case "entry":
+        return row.entry.pins.some((p) => placeIds.includes(p.id));
+      case "place":
+        return placeIds.includes(row.place.id);
+    }
+  });
   return {
     sections: picked
       .map((ledger) => ({
@@ -90,6 +102,7 @@ export function globeSheet(
       .filter((s) => s.rows.length > 0),
     expenses,
     entryCount: entries.length,
+    savedCount: saved.length,
     placeCount: groupByLocation(pins).length,
     totalBaseMinor: expenses.reduce((sum, e) => sum + (e.baseMinor ?? 0), 0),
   };
@@ -139,9 +152,14 @@ function sheetRows(
 }
 
 function rowLedgerId(row: SheetRow): string {
-  return row.kind === "expense"
-    ? row.expense.ledgerId
-    : row.entry.pins[0].ledgerId;
+  switch (row.kind) {
+    case "expense":
+      return row.expense.ledgerId;
+    case "entry":
+      return row.entry.pins[0].ledgerId;
+    case "place":
+      return row.place.ledgerId;
+  }
 }
 
 /** 在畫面上合在一起的標記 */
@@ -181,13 +199,15 @@ export function clusterDescription(items: readonly MapItem[]): string {
   return `${names.join("、")}，${countLabel(items)}`;
 }
 
-/** 「2 篇日記、3 筆消費」；沒有的那一種不寫 */
+/** 「2 篇日記、3 筆消費、1 個收藏」；沒有的那一種不寫 */
 export function countLabel(items: readonly MapItem[]): string {
   const expenses = items.filter((p) => p.kind === "expense").length;
   const entries = entriesOf(items).length;
+  const saved = items.filter((p) => p.kind === "place").length;
   return [
     entries > 0 ? `${entries} 篇日記` : null,
     expenses > 0 ? `${expenses} 筆消費` : null,
+    saved > 0 ? `${saved} 個收藏` : null,
   ]
     .filter((part) => part !== null)
     .join("、");

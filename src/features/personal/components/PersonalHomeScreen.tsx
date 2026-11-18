@@ -27,12 +27,16 @@ import {
 } from "../../journal/services/journalDates";
 import { PersonalSplit } from "../../ledger/components/PersonalSplit";
 import { usePersonalSpending } from "../../ledger/hooks/usePersonalQueries";
+import { PLACE_KIND_STYLES } from "../../places/components/placeKinds";
+import { usePlaceList } from "../../places/hooks/usePlaceQueries";
+import type { SavedPlaceRecord } from "../../../domain/places";
 import { toLocalIsoString } from "../../ledger/services/localTimestamp";
 
 const STAMP = "#B5452B";
 
 /**
- * 「個人」分頁：01 個人記帳（這個月的花費與入口）、02 旅遊手帳（最近的一本與入口）。
+ * 「個人」分頁：01 個人記帳（這個月的花費與入口）、02 旅遊手帳（最近的一本與入口）、
+ * 03 收藏清單（最近收藏的想去地點與入口）。
  * 導覽列隱藏，頁首自己畫。
  */
 export function PersonalHomeScreen() {
@@ -40,6 +44,9 @@ export function PersonalHomeScreen() {
   const insets = useSafeAreaInsets();
   const { data } = usePersonalSpending();
   const { data: journals } = useJournalShelf();
+  const { data: placeList } = usePlaceList();
+  const places = placeList?.places ?? [];
+  const wanted = places.filter((p) => p.status === "want");
   const month = toLocalIsoString(new Date()).slice(0, 7);
   // 讀取中或讀取失敗時只是不顯示金額，按鈕仍然可以用
   const summary =
@@ -122,6 +129,19 @@ export function PersonalHomeScreen() {
             }
           />
           <JournalCard latest={journals ? latestJournal(journals) : null} />
+        </View>
+
+        <View style={styles.section}>
+          <SectionTitle
+            number="03"
+            title="收藏清單"
+            hint={
+              places.length > 0
+                ? `想去 ${wanted.length} · 去過 ${places.length - wanted.length}`
+                : "想去的店、去過的好地方"
+            }
+          />
+          <PlacesCard wanted={wanted.slice(0, 3)} empty={places.length === 0} />
         </View>
       </ScrollView>
     </View>
@@ -258,6 +278,87 @@ function JournalCard({ latest }: { latest: JournalOverview | null }) {
             title="＋ 建立手帳"
             variant="primary"
             onPress={() => router.push("/journal/new")}
+          />
+        )}
+      </View>
+    </View>
+  );
+}
+
+/** 收藏清單的便條紙：最近收藏、還沒去的三個地點；還沒有收藏時是一段說明 */
+function PlacesCard({
+  wanted,
+  empty,
+}: {
+  wanted: readonly SavedPlaceRecord[];
+  empty: boolean;
+}) {
+  const theme = useTheme();
+  return (
+    <View style={[styles.places, { backgroundColor: theme.surface }]}>
+      <SketchFrame radius={10} strokeWidth={1.2} />
+      <View style={styles.placesTape}>
+        <WashiTape color="#C9A35B" tilt={-4} opacity={0.85} />
+      </View>
+      {empty ? (
+        <Text style={[styles.placesText, { color: theme.text }]}>
+          看到想去的店、聽到朋友推薦的景點，先收藏起來；去過之後用自己的評分項目打分數。
+        </Text>
+      ) : wanted.length === 0 ? (
+        <Text style={[styles.placesText, { color: theme.textMuted }]}>
+          想去的地方都去過了！
+        </Text>
+      ) : (
+        <View style={styles.placesList}>
+          <Text style={[styles.placesKicker, { color: theme.textMuted }]}>
+            Want to go
+          </Text>
+          {wanted.map((place) => (
+            <Pressable
+              key={place.id}
+              accessibilityRole="button"
+              onPress={() =>
+                router.push({
+                  pathname: "/places/[id]",
+                  params: { id: place.id },
+                })
+              }
+              style={({ pressed }) => [
+                styles.placeRow,
+                { opacity: pressed ? 0.6 : 1 },
+              ]}
+            >
+              <View
+                style={[
+                  styles.placeDot,
+                  { backgroundColor: PLACE_KIND_STYLES[place.kind].color },
+                ]}
+              />
+              <Text
+                numberOfLines={1}
+                style={[styles.placeName, { color: theme.text }]}
+              >
+                {place.name}
+              </Text>
+              {place.city !== "" && (
+                <Text style={[styles.placeCity, { color: theme.textMuted }]}>
+                  {place.city}
+                </Text>
+              )}
+            </Pressable>
+          ))}
+        </View>
+      )}
+      <View style={styles.actions}>
+        <SmallButton
+          title="＋ 收藏地點"
+          variant="primary"
+          onPress={() => router.push("/places/new")}
+        />
+        {!empty && (
+          <SmallButton
+            title="全部收藏"
+            onPress={() => router.push("/places")}
           />
         )}
       </View>
@@ -411,6 +512,56 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 25,
     color: "#3A332D",
+  },
+  places: {
+    gap: 12,
+    paddingTop: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 18,
+    borderRadius: 10,
+    boxShadow: "2px 3px 0px rgba(58,51,45,0.1)",
+  },
+  placesTape: {
+    position: "absolute",
+    left: 24,
+    top: -8,
+    width: 64,
+    height: 17,
+  },
+  placesText: {
+    fontFamily: fonts.regular,
+    fontSize: 15,
+    lineHeight: 25,
+  },
+  placesList: {
+    gap: 6,
+  },
+  placesKicker: {
+    fontFamily: fonts.accent,
+    fontSize: 18,
+    lineHeight: 20,
+    paddingRight: accentOverhang(18),
+  },
+  placeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    minHeight: 36,
+  },
+  placeDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  placeName: {
+    flex: 1,
+    minWidth: 0,
+    fontFamily: fonts.regular,
+    fontSize: 15.5,
+  },
+  placeCity: {
+    fontFamily: fonts.regular,
+    fontSize: 13,
   },
   journalButtons: {
     flexDirection: "row",

@@ -164,6 +164,12 @@ describe("describeRestoreReport", () => {
     expect(
       describeRestoreReport({
         ...empty,
+        places: { restored: 4, skipped: 2 },
+      }),
+    ).toBe("已還原 4 個收藏地點");
+    expect(
+      describeRestoreReport({
+        ...empty,
         illustrations: { restored: 0, skipped: 2 },
       }),
     ).toBe("備份裡沒有需要還原的資料");

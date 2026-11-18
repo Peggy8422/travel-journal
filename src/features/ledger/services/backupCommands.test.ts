@@ -92,6 +92,8 @@ describe("backup and restore", () => {
           ledgers: backup,
           journals: [],
           illustrations: [],
+          places: [],
+          ratingCriteria: [],
           photos: {},
         }),
       ),
@@ -359,6 +361,8 @@ describe("journals in backups", () => {
       ledgers: [],
       journals,
       illustrations: [],
+      places: [],
+      ratingCriteria: [],
       photos: {},
     });
     expect(ledgers).toHaveLength(1);
@@ -488,5 +492,130 @@ describe("illustrations in backups", () => {
         await createRepositories(target).journalEntries.findById("entry-1")
       )?.stickers.map((s) => s.illustrationId),
     ).toEqual(["deer"]);
+  });
+});
+
+describe("saved places in backups", () => {
+  const T = NOW.toISOString();
+
+  async function withPlaces() {
+    const db = await createTestDatabase();
+    const photos = createMemoryCoverPhotoStore();
+    await photos.writeBase64("ramen.jpg", "UkFNRU4=");
+    const repos = createRepositories(db);
+    await repos.ratingCriteria.insert({
+      id: "service",
+      label: "服務",
+      sortOrder: 3,
+      archivedAt: null,
+      createdAt: T,
+      updatedAt: T,
+    });
+    await repos.savedPlaces.insert({
+      id: "ramen",
+      name: "本家 第一旭",
+      location: { latitude: 34.9851, longitude: 135.7614 },
+      city: "京都",
+      kind: "restaurant",
+      status: "visited",
+      note: "",
+      ratings: [
+        { criterionId: "taste", score: 5 },
+        { criterionId: "service", score: 3 },
+      ],
+      revisit: true,
+      photos: ["ramen.jpg"],
+      createdAt: T,
+      updatedAt: T,
+      deletedAt: null,
+    });
+    return { db, photos };
+  }
+
+  it("carries places, their photos and own criteria to a new phone", async () => {
+    const source = await withPlaces();
+    const file = await buildBackupFile(source.db, source.photos, NOW);
+
+    const target = await createTestDatabase();
+    const repos = createRepositories(target);
+    // The phone renamed a default criterion; the backup must not undo it
+    const taste = (await repos.ratingCriteria.findById("taste"))!;
+    await repos.ratingCriteria.update({ ...taste, label: "味道" });
+    const phone = createMemoryCoverPhotoStore();
+    const report = unwrap(
+      await restoreFromBackupText(target, phone, file.content),
+    );
+    expect(report.places).toEqual({ restored: 1, skipped: 0 });
+    expect(await repos.savedPlaces.findById("ramen")).toMatchObject({
+      ratings: [
+        { criterionId: "taste", score: 5 },
+        { criterionId: "service", score: 3 },
+      ],
+      photos: ["ramen.jpg"],
+    });
+    expect(await phone.readBase64("ramen.jpg")).toBe("UkFNRU4=");
+    expect((await repos.ratingCriteria.list()).map((c) => c.label)).toEqual([
+      "味道",
+      "氣氛",
+      "CP值",
+      "服務",
+    ]);
+
+    const again = unwrap(
+      await restoreFromBackupText(target, phone, file.content),
+    );
+    expect(again.places).toEqual({ restored: 0, skipped: 1 });
+    expect(await repos.ratingCriteria.list()).toHaveLength(4);
+  });
+
+  it("archives criteria past the limit and drops scores it cannot place", async () => {
+    const source = await withPlaces();
+    const raw = JSON.parse(
+      (await buildBackupFile(source.db, source.photos, NOW)).content,
+    );
+    raw.ratingCriteria = raw.ratingCriteria.filter(
+      (c: { id: string }) => c.id !== "service",
+    );
+    const target = await createTestDatabase();
+    const repos = createRepositories(target);
+    for (const [i, id] of ["a", "b"].entries()) {
+      await repos.ratingCriteria.insert({
+        id,
+        label: id,
+        sortOrder: 3 + i,
+        archivedAt: null,
+        createdAt: T,
+        updatedAt: T,
+      });
+    }
+    raw.ratingCriteria.push({
+      id: "extra",
+      label: "排隊",
+      sortOrder: 9,
+      archivedAt: null,
+      createdAt: T,
+      updatedAt: T,
+    });
+    unwrap(
+      await restoreFromBackupText(
+        target,
+        createMemoryCoverPhotoStore(),
+        JSON.stringify(raw),
+      ),
+    );
+    expect(await repos.ratingCriteria.findById("extra")).toMatchObject({
+      sortOrder: 5,
+      archivedAt: T,
+    });
+    expect((await repos.savedPlaces.findById("ramen"))?.ratings).toEqual([
+      { criterionId: "taste", score: 5 },
+    ]);
+  });
+
+  it("keeps place photos when tidying up", async () => {
+    const { db, photos } = await withPlaces();
+    await createRepositories(db).savedPlaces.softDelete("ramen", T);
+    expect(await pruneCoverPhotos(db, photos)).toBe(0);
+    expect(await photos.readBase64("ramen.jpg")).toBe("UkFNRU4=");
   });
 });

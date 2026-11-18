@@ -47,8 +47,12 @@ interface DraftPhoto {
 /**
  * 表單裡的照片：剛挑的照片先放在暫存檔，按儲存時才用 commit 存進 App；
  * 中途取消就不會留下照片，拿掉的舊照片之後由 tidyCoverPhotos 清掉。
+ * limit 是最多幾張（日記與收藏地點各有自己的上限）。
  */
-export function useEntryPhotos(saved: readonly string[]) {
+export function useEntryPhotos(
+  saved: readonly string[],
+  limit: number = ENTRY_PHOTO_LIMIT,
+) {
   const [photos, setPhotos] = useState<readonly DraftPhoto[]>(() =>
     saved.map((name) => ({ key: name, saved: name, uri: coverPhotoUri(name) })),
   );
@@ -59,16 +63,17 @@ export function useEntryPhotos(saved: readonly string[]) {
     photos,
     busy,
     error,
-    room: ENTRY_PHOTO_LIMIT - photos.length,
+    limit,
+    room: limit - photos.length,
     async add() {
       setError(null);
       setBusy(true);
       try {
-        const uris = await pickEntryPhotos(ENTRY_PHOTO_LIMIT - photos.length);
+        const uris = await pickEntryPhotos(limit - photos.length);
         setPhotos((current) => [
           ...current,
           ...uris
-            .slice(0, ENTRY_PHOTO_LIMIT - current.length)
+            .slice(0, limit - current.length)
             .map((uri) => ({ key: uri, saved: null, uri })),
         ]);
       } catch {
@@ -127,7 +132,7 @@ export function EntryPhotoField({
       <View style={styles.fieldHead}>
         <Text style={[styles.label, { color: theme.text }]}>照片</Text>
         <Text style={[styles.count, { color: theme.textMuted }]}>
-          {photos.photos.length} / {ENTRY_PHOTO_LIMIT}
+          {photos.photos.length} / {photos.limit}
         </Text>
       </View>
       <View

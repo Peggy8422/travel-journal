@@ -6,6 +6,8 @@ import { createJournalEntryRepository } from "./journalEntryRepository";
 import { createJournalRepository } from "./journalRepository";
 import { createLedgerRepository } from "./ledgerRepository";
 import { createMemberRepository } from "./memberRepository";
+import { createRatingCriterionRepository } from "./ratingCriterionRepository";
+import { createSavedPlaceRepository } from "./savedPlaceRepository";
 import { createSettlementRepository } from "./settlementRepository";
 
 export { StoredDataError } from "./shared";
@@ -28,6 +30,8 @@ export function createRepositories(
     journals: createJournalRepository(db),
     journalEntries: createJournalEntryRepository(db),
     illustrations: createIllustrationRepository(db),
+    savedPlaces: createSavedPlaceRepository(db),
+    ratingCriteria: createRatingCriterionRepository(db),
   };
 }
 

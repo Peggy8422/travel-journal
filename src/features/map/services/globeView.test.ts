@@ -1,4 +1,4 @@
-import type { JournalMapPin } from "../../../domain/map";
+import type { JournalMapPin, PlaceMapPin } from "../../../domain/map";
 import type { MapData, MapExpense, MapLedger } from "./mapData";
 import {
   clusterDescription,
@@ -52,6 +52,22 @@ const place = (
   placeName: `${entryId}-${index}`,
   point: kyoto,
   date: "2026-10-12",
+  ...overrides,
+});
+
+const saved = (
+  id: string,
+  overrides: Partial<PlaceMapPin> = {},
+): PlaceMapPin => ({
+  kind: "place",
+  id,
+  ledgerId: "places:saved",
+  title: id,
+  placeName: id,
+  point: kyoto,
+  placeKind: "restaurant",
+  status: "want",
+  city: "京都市",
   ...overrides,
 });
 
@@ -126,7 +142,11 @@ describe("globeSheet", () => {
 
     const sheet = globeSheet(withEntries, ["kyoto"], null);
     const rows = sheet.sections[0].rows.map((r) =>
-      r.kind === "expense" ? r.expense.id : r.entry.entryId,
+      r.kind === "expense"
+        ? r.expense.id
+        : r.kind === "entry"
+          ? r.entry.entryId
+          : r.place.id,
     );
 
     expect(rows).toEqual(["day1", "lunch", "day2", "snack"]);
@@ -145,6 +165,35 @@ describe("globeSheet", () => {
         }),
       },
     ]);
+  });
+
+  it("lists saved places in their own section after the ledgers", () => {
+    const withPlaces: MapData = {
+      ledgers: [
+        ledger("places:saved", "", "places"),
+        ledger("tokyo", "2026-10"),
+      ],
+      pins: [expense("ramen", "tokyo"), saved("cafe"), saved("bar")],
+    };
+
+    const sheet = globeSheet(withPlaces, ["tokyo", "places:saved"], null);
+    expect(
+      sheet.sections.map((s) => [
+        s.ledger.id,
+        s.rows.map((r) => (r.kind === "place" ? r.place.id : r.kind)),
+      ]),
+    ).toEqual([
+      ["places:saved", ["cafe", "bar"]],
+      ["tokyo", ["expense"]],
+    ]);
+    expect(sheet.savedCount).toBe(2);
+    expect(sheet.expenses).toHaveLength(1);
+
+    const narrowed = globeSheet(withPlaces, ["places:saved"], ["bar"]);
+    expect(narrowed.sections[0]?.rows).toEqual([
+      { kind: "place", place: withPlaces.pins[2] },
+    ]);
+    expect(narrowed.savedCount).toBe(2);
   });
 
   it("leaves out picked ledgers without located expenses", () => {
@@ -206,5 +255,13 @@ describe("clusterLabel", () => {
 
     expect(clusterLabel(items)).toBe("清水寺");
     expect(clusterDescription(items)).toBe("清水寺，1 篇日記、1 筆消費");
+  });
+
+  it("counts saved places too", () => {
+    const items = [saved("一蘭"), saved("一風堂"), expense("a", "t")];
+    expect(clusterLabel(items)).toBe("一蘭 等");
+    expect(clusterDescription(items)).toBe(
+      "一蘭、一風堂、a，1 筆消費、2 個收藏",
+    );
   });
 });

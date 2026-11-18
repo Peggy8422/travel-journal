@@ -15,10 +15,12 @@ import Svg, { Circle, Path } from "react-native-svg";
 
 import {
   groupByLocation,
+  locationKey,
   pinDates,
   regionForPoints,
   routeOf,
   type PinGroup,
+  type PlaceMapPin,
 } from "../../../domain/map";
 import type { GeoPoint } from "../../../domain/ledger";
 import { Chip, CloseButton, Label, Row } from "../../../shared/ui/components";
@@ -34,29 +36,37 @@ import { countLabel, entriesOf } from "../services/globeView";
 import {
   filterPins,
   mapLedgerName,
+  SAVED_PLACES_ID,
   type MapItem,
   type MapLedger,
   type PinFilter,
 } from "../services/mapData";
+import { PLACE_COLORS } from "./GlobeIndex";
 import {
   KRAFT,
   LedgerSectionHeader,
   MapEntryRow,
   MapExpenseRow,
+  MapPlaceRow,
 } from "./MapExpenseRow";
 
 /**
  * 詳細地圖：從地球的消費卡片或日記頁進來，只看選取的帳本（日記的地點跟著手帳綁定的帳本）。
  * 可以依帳本、日期篩選，選了某一天會畫出當天消費的路線；也可以顯示目前位置。
+ * 收藏的地點不屬於帳本、也沒有日期，用「收藏」開關疊在上面（在當地看附近有沒有想去的），
+ * 不受帳本與日期篩選影響。
  */
 export function MapDetailScreen({
   ledgerIds,
   initialDate,
+  focusPlaceId,
 }: {
-  /** 地球上選取的帳本 */
+  /** 地球上選取的帳本；有「收藏」索引籤時一打開就顯示收藏的地點 */
   ledgerIds: readonly string[];
   /** 一打開就只看這一天（日記頁的「在地圖上看」）；那天沒有地點時看全部日期 */
   initialDate?: string;
+  /** 一打開就看這個收藏的地點並選起來（地點頁的「在地圖上看」） */
+  focusPlaceId?: string;
 }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -66,7 +76,11 @@ export function MapDetailScreen({
   const [ledgerId, setLedgerId] = useState<string | null>(null);
   /** 當地日期 YYYY-MM-DD；null 代表全部日期 */
   const [date, setDate] = useState<string | null>(initialDate ?? null);
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  /** undefined：還沒點過，選起要看的那個收藏地點（有的話） */
+  const [selectedKey, setSelectedKey] = useState<string | null | undefined>();
+  const [showSaved, setShowSaved] = useState(
+    ledgerIds.includes(SAVED_PLACES_ID) || focusPlaceId !== undefined,
+  );
   const userLocation = useUserLocation();
 
   if (error) {
@@ -78,12 +92,18 @@ export function MapDetailScreen({
     );
   }
 
-  const pins = data.pins.filter((p) => ledgerIds.includes(p.ledgerId));
+  // Saved places are an overlay of their own, not one of the ledgers
+  const pins = data.pins.filter(
+    (p) => p.kind !== "place" && ledgerIds.includes(p.ledgerId),
+  );
+  const saved = data.pins.filter((p): p is PlaceMapPin => p.kind === "place");
+  const focusPlace = saved.find((p) => p.id === focusPlaceId);
   // Picked ledgers that still have pins, in the globe's index order
   const ledgers = data.ledgers.filter(
     (l) => ledgerIds.includes(l.id) && pins.some((p) => p.ledgerId === l.id),
   );
-  if (pins.length === 0) {
+  const placesLedger = data.ledgers.find((l) => l.kind === "places");
+  if (pins.length === 0 && saved.length === 0) {
     return (
       <PageMessage
         onBack={router.back}
@@ -91,6 +111,8 @@ export function MapDetailScreen({
       />
     );
   }
+  // Nothing else to show: the saved places are the map
+  const savedShown = showSaved || pins.length === 0;
 
   // 篩選的帳本被刪除或已沒有地點時，回到全部帳本；日期同理
   const activeLedgerId = ledgers.some((l) => l.id === ledgerId)
@@ -100,19 +122,27 @@ export function MapDetailScreen({
     filterPins(pins, { ledgerId: activeLedgerId, date: null }),
   );
   const activeDate = date !== null && dates.includes(date) ? date : null;
-  const visiblePins = filterPins(pins, {
-    ledgerId: activeLedgerId,
-    date: activeDate,
-  });
+  const visiblePins: MapItem[] = [
+    ...filterPins(pins, { ledgerId: activeLedgerId, date: activeDate }),
+    ...(savedShown ? saved : []),
+  ];
   const groups = groupByLocation(visiblePins);
-  const selected = groups.find((g) => g.key === selectedKey);
+  const activeKey =
+    selectedKey === undefined
+      ? focusPlace
+        ? locationKey(focusPlace.point)
+        : null
+      : selectedKey;
+  const selected = groups.find((g) => g.key === activeKey);
   // 只有選了某一天才畫路線，全部日期連在一起沒有意義
   const route = activeDate === null ? [] : routeOf(visiblePins);
   const dayHasExpenses = visiblePins.some((p) => p.kind === "expense");
   const title =
-    ledgers.length === 1
-      ? mapLedgerName(ledgers[0])
-      : `${ledgers.length} 本帳本`;
+    ledgers.length === 0
+      ? "收藏地點"
+      : ledgers.length === 1
+        ? mapLedgerName(ledgers[0])
+        : `${ledgers.length} 本帳本`;
 
   function applyFilter(filter: PinFilter) {
     setLedgerId(filter.ledgerId);
@@ -122,6 +152,12 @@ export function MapDetailScreen({
       filterPins(pins, filter).map((p) => p.point),
     );
     if (region) mapRef.current?.animateToRegion(region, 300);
+  }
+
+  /** 收藏的地點是疊上去的，開關時地圖不移動 */
+  function toggleSaved() {
+    setShowSaved(!showSaved);
+    setSelectedKey(null);
   }
 
   function selectLedger(id: string | null) {
@@ -195,8 +231,20 @@ export function MapDetailScreen({
           )}
         </Pressable>
       </View>
-      {(ledgers.length > 1 || dates.length > 1) && (
+      {(ledgers.length > 1 ||
+        dates.length > 1 ||
+        (saved.length > 0 && pins.length > 0)) && (
         <View style={styles.filters}>
+          {saved.length > 0 && pins.length > 0 && (
+            <View style={styles.chipRow}>
+              <Chip
+                label={`★ 收藏 ${saved.length}`}
+                dot={PLACE_COLORS.deep}
+                selected={showSaved}
+                onPress={toggleSaved}
+              />
+            </View>
+          )}
           {ledgers.length > 1 && (
             <ScrollView
               horizontal
@@ -269,12 +317,16 @@ export function MapDetailScreen({
         <DayMap
           mapRef={mapRef}
           initialRegion={regionForPoints(
-            filterPins(pins, { ledgerId: null, date: activeDate }).map(
-              (p) => p.point,
-            ),
+            focusPlace
+              ? [focusPlace.point]
+              : pins.length > 0
+                ? filterPins(pins, { ledgerId: null, date: activeDate }).map(
+                    (p) => p.point,
+                  )
+                : saved.map((p) => p.point),
           )}
           groups={groups}
-          selectedKey={selectedKey}
+          selectedKey={activeKey}
           onSelect={setSelectedKey}
           showsUser={userLocation.showsUser}
           route={route}
@@ -284,6 +336,7 @@ export function MapDetailScreen({
           <PinGroupCard
             group={selected}
             ledgers={ledgers}
+            placesLedger={placesLedger}
             showLedger={activeLedgerId === null && ledgers.length > 1}
             bottom={insets.bottom + spacing.md}
             onClose={() => setSelectedKey(null)}
@@ -381,7 +434,9 @@ function DayMap({
                 ? theme.primary
                 : group.pins.every((p) => p.kind === "journal")
                   ? KRAFT.edge
-                  : undefined
+                  : group.pins.every((p) => p.kind === "place")
+                    ? PLACE_COLORS.deep
+                    : undefined
             }
             onPress={() => onSelect(group.key)}
           />
@@ -425,12 +480,15 @@ function projectRoute(
 function PinGroupCard({
   group,
   ledgers,
+  placesLedger,
   showLedger,
   bottom,
   onClose,
 }: {
   group: PinGroup<MapItem>;
   ledgers: readonly MapLedger[];
+  /** 「收藏」的索引籤，收藏的地點在卡片上的分段小標用 */
+  placesLedger: MapLedger | undefined;
   /** 顯示全部帳本時，依帳本分段並標出帳本名稱 */
   showLedger: boolean;
   bottom: number;
@@ -448,6 +506,7 @@ function PinGroupCard({
       };
     })
     .filter((s) => s.entries.length + s.expenses.length > 0);
+  const places = group.pins.filter((p) => p.kind === "place");
 
   return (
     <View style={[styles.card, { bottom, backgroundColor: theme.surface }]}>
@@ -489,6 +548,26 @@ function PinGroupCard({
             ))}
           </View>
         ))}
+        {places.length > 0 && (
+          <View>
+            {sections.length > 0 && placesLedger && (
+              <LedgerSectionHeader ledger={placesLedger} />
+            )}
+            {places.map((place) => (
+              <MapPlaceRow
+                key={place.id}
+                place={place}
+                accessibilityHint="打開這個地點"
+                onPress={() =>
+                  router.push({
+                    pathname: "/places/[id]",
+                    params: { id: place.id },
+                  })
+                }
+              />
+            ))}
+          </View>
+        )}
       </ScrollView>
     </View>
   );

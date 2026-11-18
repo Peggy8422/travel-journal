@@ -1,19 +1,25 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import Svg, { Path } from "react-native-svg";
 
 import { formatMinorAmount } from "../../../domain/ledger";
-import { localDateOf } from "../../../domain/map";
+import { localDateOf, type PlaceMapPin } from "../../../domain/map";
+import type { PlaceStatus } from "../../../domain/places";
 import { fonts } from "../../../shared/ui/fonts";
 import { useTheme } from "../../../shared/ui/theme";
 import { PencilIcon } from "../../journal/components/PencilIcon";
 import { CategoryIcon } from "../../ledger/components/CategoryIcon";
 import { formatLocalDate } from "../../ledger/services/localTimestamp";
+import {
+  PLACE_KIND_STYLES,
+  PLACE_STATUS_LABELS,
+} from "../../places/components/placeKinds";
 import type { MapEntry } from "../services/globeView";
 import {
   mapLedgerName,
   type MapExpense,
   type MapLedger,
 } from "../services/mapData";
-import { ledgerColors } from "./GlobeIndex";
+import { ledgerColors, PLACE_COLORS } from "./GlobeIndex";
 
 /** 地圖上的日記用牛皮紙小卡，和帳本色的圓點分開 */
 export const KRAFT = { fill: "#D8C29E", edge: "#7E5F3A", ink: "#5E4A30" };
@@ -178,6 +184,88 @@ export function MapEntryRow({
       </View>
       <View style={styles.badge}>
         <Text style={styles.badgeText}>日記</Text>
+      </View>
+    </Pressable>
+  );
+}
+
+const STAR =
+  "M12 2.9l2.7 5.5 6 .8-4.4 4.2 1.1 6-5.4-2.9-5.4 2.9 1.1-6-4.4-4.2 6-.8z";
+
+/** 收藏的地點的星星：想去是空心，去過塗上顏色 */
+export function PlaceStar({
+  status,
+  color,
+  size,
+}: {
+  status: PlaceStatus;
+  color: string;
+  size: number;
+}) {
+  const theme = useTheme();
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path
+        d={STAR}
+        fill={status === "visited" ? color : theme.surface}
+        stroke={status === "visited" ? theme.text : color}
+        strokeOpacity={status === "visited" ? 0.55 : 1}
+        strokeWidth={1.7}
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+/** 一個收藏的地點：星星、名稱、「類型 · 城市」，右邊一個「想去／去過」小章 */
+export function MapPlaceRow({
+  place,
+  selected = false,
+  accessibilityHint,
+  onPress,
+}: {
+  place: PlaceMapPin;
+  selected?: boolean;
+  accessibilityHint: string;
+  onPress: () => void;
+}) {
+  const theme = useTheme();
+  const kind = PLACE_KIND_STYLES[place.placeKind];
+  const status = PLACE_STATUS_LABELS[place.status];
+  const sub = place.city ? `${kind.label} · ${place.city}` : kind.label;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      accessibilityLabel={`收藏：${place.title}，${status}，${sub}`}
+      accessibilityHint={accessibilityHint}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.row,
+        {
+          backgroundColor: selected ? PLACE_COLORS.tint : "transparent",
+          opacity: pressed ? 0.7 : 1,
+        },
+      ]}
+    >
+      <View style={styles.kraftSlot}>
+        <PlaceStar status={place.status} color={kind.color} size={28} />
+      </View>
+      <View style={styles.main}>
+        <Text numberOfLines={1} style={[styles.title, { color: theme.text }]}>
+          {place.title}
+        </Text>
+        <Text
+          numberOfLines={1}
+          style={[styles.sub, { color: theme.textMuted }]}
+        >
+          {sub}
+        </Text>
+      </View>
+      <View style={[styles.badge, { borderColor: PLACE_COLORS.deep }]}>
+        <Text style={[styles.badgeText, { color: PLACE_COLORS.deep }]}>
+          {status}
+        </Text>
       </View>
     </Pressable>
   );

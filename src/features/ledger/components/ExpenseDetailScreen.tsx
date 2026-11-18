@@ -13,6 +13,9 @@ import {
   ReceiptPaper,
 } from "../../../shared/ui/handDrawn";
 import { useTheme } from "../../../shared/ui/theme";
+import { SaveHereButton } from "../../places/components/SaveHereButton";
+import { useSavedPlaces } from "../../places/hooks/usePlaceQueries";
+import { prefillFromExpense } from "../../places/services/placeHere";
 import { useExpenseDetail } from "../hooks/useLedgerQueries";
 import { formatLocalDate } from "../services/localTimestamp";
 import { SelfBadge, SettledTag } from "./badges";
@@ -29,6 +32,7 @@ export function ExpenseDetailScreen({ expenseId }: { expenseId: string }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { data, error } = useExpenseDetail(expenseId);
+  const savedPlaces = useSavedPlaces();
   const gone = data?.ok === false && data.error.code === "EXPENSE_NOT_FOUND";
 
   useEffect(() => {
@@ -145,6 +149,18 @@ export function ExpenseDetailScreen({ expenseId }: { expenseId: string }) {
         <DetailRow label="時間" value={time} />
         {(expense.placeName !== null || expense.location !== null) && (
           <DetailRow label="地點" value={expense.placeName ?? "已記錄位置"} />
+        )}
+        {expense.location !== null && (
+          <View style={styles.saveHere}>
+            <SaveHereButton
+              prefill={prefillFromExpense({
+                ...expense,
+                location: expense.location,
+              })}
+              places={savedPlaces.data}
+              replace
+            />
+          </View>
         )}
         {!personal && payer && (
           <DetailRow
@@ -328,6 +344,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     textAlign: "right",
+  },
+  saveHere: {
+    alignItems: "flex-end",
+    marginTop: -6,
   },
   shares: {
     gap: 6,

@@ -1,4 +1,4 @@
-import { formatPlaceName, type GeocodedAddress } from "./placeName";
+import { formatCity, formatPlaceName, type GeocodedAddress } from "./placeName";
 
 const empty: GeocodedAddress = {
   name: null,
@@ -62,5 +62,18 @@ describe("formatPlaceName", () => {
   it("falls back to country, then null", () => {
     expect(formatPlaceName([{ ...empty, country: "Japan" }])).toBe("Japan");
     expect(formatPlaceName([{ ...empty, name: "  " }])).toBeNull();
+  });
+});
+
+describe("formatCity", () => {
+  it("uses the city, then the wider areas", () => {
+    expect(formatCity([])).toBeNull();
+    expect(formatCity([{ ...empty, city: " 京都市 ", region: "京都府" }])).toBe(
+      "京都市",
+    );
+    expect(formatCity([{ ...empty, city: " ", region: "東京都" }])).toBe(
+      "東京都",
+    );
+    expect(formatCity([{ ...empty, country: "日本" }])).toBeNull();
   });
 });

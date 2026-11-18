@@ -10,6 +10,8 @@ import type {
   IllustrationRestoreReport,
   JournalRestoreReport,
 } from "../../journal/services/journalBackup";
+import type { PlaceRestoreReport } from "../../places/services/placeBackup";
+import type { PlaceCommandError } from "../../places/services/placeCommands";
 import type { RestoreReport } from "../services/backupCommands";
 import type { LedgerCommandError } from "../services/ledgerCommands";
 import type { LedgerSummaryError } from "../services/ledgerSummary";
@@ -27,7 +29,8 @@ export type DisplayableError =
   | ResolveFxRateError
   | BackupFileError
   | LocateError
-  | PlaceSearchError;
+  | PlaceSearchError
+  | PlaceCommandError;
 
 const TEXT_FIELD_LABELS: Readonly<Record<LimitedTextField, string>> = {
   ledgerName: "帳本名稱",
@@ -38,6 +41,9 @@ const TEXT_FIELD_LABELS: Readonly<Record<LimitedTextField, string>> = {
   journalName: "手帳名稱",
   entryTitle: "日記標題",
   entryBody: "日記內容",
+  city: "城市",
+  placeNote: "心得",
+  ratingLabel: "評分項目",
 };
 
 /** 錯誤代碼轉成給使用者看的訊息 */
@@ -77,6 +83,16 @@ export function describeError(error: DisplayableError): string {
       return `一張插圖最多 ${error.maxStrokes} 筆，先存起來，剩下的畫在另一張吧`;
     case "TOO_MANY_STICKERS":
       return `一篇日記最多貼 ${error.maxStickers} 張插圖`;
+    case "PLACE_NOT_FOUND":
+      return "找不到這個地點，可能已被刪除";
+    case "RATING_CRITERION_NOT_FOUND":
+      return "找不到這個評分項目，請重新整理再試一次";
+    case "EMPTY_CRITERION_LABEL":
+      return "請輸入評分項目的名稱";
+    case "DUPLICATE_CRITERION_LABEL":
+      return `已經有「${error.label}」這個評分項目了`;
+    case "TOO_MANY_CRITERIA":
+      return `評分項目最多 ${error.max} 個，先封存一個再新增`;
     case "EXPENSE_NOT_FOUND":
       return "找不到這筆消費，可能已被刪除";
     case "SETTLEMENT_NOT_FOUND":
@@ -197,6 +213,7 @@ export function describeRestoreReport(
   report: RestoreReport & {
     readonly journals?: JournalRestoreReport;
     readonly illustrations?: IllustrationRestoreReport;
+    readonly places?: PlaceRestoreReport;
   },
 ): string {
   const shared = (ledgers: readonly LedgerRecord[]) =>
@@ -253,6 +270,9 @@ export function describeRestoreReport(
   // Skipped illustrations are not worth a line: nothing on the phone changed
   if (report.illustrations && report.illustrations.restored > 0) {
     lines.push(`已還原 ${report.illustrations.restored} 張手繪插圖`);
+  }
+  if (report.places && report.places.restored > 0) {
+    lines.push(`已還原 ${report.places.restored} 個收藏地點`);
   }
   // 備份是空的，或只有個人記帳而且消費手機上都已經有了
   return lines.length > 0 ? lines.join("\n") : "備份裡沒有需要還原的資料";

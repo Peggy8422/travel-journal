@@ -1,5 +1,9 @@
 import type { IllustrationRecord, JournalBackup } from "../../domain/journal";
 import type { LedgerBackup } from "../../domain/ledger";
+import type {
+  RatingCriterionRecord,
+  SavedPlaceRecord,
+} from "../../domain/places";
 import { unwrap, unwrapErr } from "../../domain/ledger/testFixtures";
 import {
   makeExpenseRecord,
@@ -108,11 +112,41 @@ const illustration: IllustrationRecord = {
   updatedAt: "2026-10-05T00:00:00.000Z",
 };
 
+const place: SavedPlaceRecord = {
+  id: "p1",
+  name: "本家 第一旭",
+  location: { latitude: 34.9851, longitude: 135.7614 },
+  city: "京都",
+  kind: "restaurant",
+  status: "visited",
+  note: "湯頭很濃",
+  ratings: [
+    { criterionId: "taste", score: 5 },
+    { criterionId: "c1", score: 3 },
+  ],
+  revisit: true,
+  photos: ["ramen.jpg"],
+  createdAt: T0,
+  updatedAt: T0,
+  deletedAt: "2026-10-06T00:00:00.000Z",
+};
+
+const criterion: RatingCriterionRecord = {
+  id: "c1",
+  label: "服務",
+  sortOrder: 3,
+  archivedAt: "2026-10-07T00:00:00.000Z",
+  createdAt: T0,
+  updatedAt: T0,
+};
+
 const contents = {
   exportedAt: "2026-10-21T00:00:00.000Z",
   ledgers: [entry],
   journals: [journalEntry],
   illustrations: [illustration],
+  places: [place],
+  ratingCriteria: [criterion],
   photos: {},
 };
 
@@ -134,6 +168,8 @@ describe("backup file", () => {
       ledgers: [],
       journals: [],
       illustrations: [],
+      places: [],
+      ratingCriteria: [],
       photos: {},
     };
     expect(unwrap(parseBackup(serializeBackup(empty)))).toEqual(empty);
@@ -393,6 +429,62 @@ describe("backup file illustrations", () => {
     [
       "stickers that is not a list",
       (r: Record<string, any>) => (r.journals[0].entries[0].stickers = {}),
+    ],
+  ])("rejects %s", (_, mutate) => {
+    expect(unwrapErr(parseBackup(corrupted(mutate))).code).toBe(
+      "INVALID_BACKUP",
+    );
+  });
+});
+
+describe("backup file saved places", () => {
+  it("reads backups before version 8 as having no places or criteria", () => {
+    const raw = JSON.parse(serializeBackup(contents));
+    raw.version = 7;
+    delete raw.places;
+    delete raw.ratingCriteria;
+    const parsed = unwrap(parseBackup(JSON.stringify(raw)));
+    expect(parsed.places).toEqual([]);
+    expect(parsed.ratingCriteria).toEqual([]);
+  });
+
+  it("falls back on unknown codes and drops broken scores and unsafe photos", () => {
+    const parsed = unwrap(
+      parseBackup(
+        corrupted((r) => {
+          r.places[0].kind = "onsen";
+          r.places[0].status = "maybe";
+          r.places[0].revisit = "yes";
+          r.places[0].ratings.push({ criterionId: "vibe", score: "great" });
+          r.places[0].ratings[0].score = 9;
+          r.places[0].photos.push("../secret.jpg");
+        }),
+      ),
+    );
+    expect(parsed.places[0]).toMatchObject({
+      kind: "other",
+      status: "want",
+      revisit: false,
+      ratings: [
+        { criterionId: "taste", score: 5 },
+        { criterionId: "c1", score: 3 },
+      ],
+      photos: ["ramen.jpg"],
+    });
+  });
+
+  it.each([
+    [
+      "a place without a location",
+      (r: Record<string, any>) => delete r.places[0].location,
+    ],
+    [
+      "ratings that is not a list",
+      (r: Record<string, any>) => (r.places[0].ratings = {}),
+    ],
+    [
+      "a criterion without a label",
+      (r: Record<string, any>) => delete r.ratingCriteria[0].label,
     ],
   ])("rejects %s", (_, mutate) => {
     expect(unwrapErr(parseBackup(corrupted(mutate))).code).toBe(

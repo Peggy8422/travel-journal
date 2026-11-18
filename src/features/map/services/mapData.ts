@@ -19,7 +19,9 @@ import {
   type ExpenseMapPin,
   type JournalMapPin,
   type MapPin,
+  type PlaceMapPin,
 } from "../../../domain/map";
+import type { SavedPlaceRecord } from "../../../domain/places";
 import { entryHeading } from "../../journal/services/journalDates";
 import { tripMonthOf } from "../../ledger/services/ledgerOverview";
 
@@ -29,8 +31,11 @@ import { tripMonthOf } from "../../ledger/services/ledgerOverview";
  */
 export const UNBOUND_JOURNALS_ID = "journals:unbound";
 
-/** 地球上索引籤的種類：分帳帳本、個人記帳，或沒綁帳本的手帳 */
-export type MapLedgerKind = LedgerKind | "journals";
+/** 收藏的地點在地球上共用一張「收藏」索引籤，用這個 id 當作它們的帳本 */
+export const SAVED_PLACES_ID = "places:saved";
+
+/** 地球上索引籤的種類：分帳帳本、個人記帳、沒綁帳本的手帳，或收藏的地點 */
+export type MapLedgerKind = LedgerKind | "journals" | "places";
 
 export interface MapLedger {
   readonly id: string;
@@ -42,13 +47,13 @@ export interface MapLedger {
   readonly tripMonth: string;
   /**
    * 帳本裡的消費筆數（含沒有地點的）；個人記帳一筆都沒有時索引籤淡化、不能點。
-   * 「手帳」索引籤是沒綁帳本的手帳裡的日記篇數
+   * 「手帳」索引籤是沒綁帳本的手帳裡的日記篇數，「收藏」索引籤是收藏的地點數
    */
   readonly expenseCount: number;
 }
 
-/** 地圖上的一個點：有座標的消費，或日記裡的一個地點 */
-export type MapItem = MapExpense | JournalMapPin;
+/** 地圖上的一個點：有座標的消費、日記裡的一個地點，或收藏的地點 */
+export type MapItem = MapExpense | JournalMapPin | PlaceMapPin;
 
 /** 地圖上的一筆消費：pin 之外再帶地球消費卡片要顯示的金額與分類 */
 export interface MapExpense extends ExpenseMapPin {
@@ -61,11 +66,14 @@ export interface MapExpense extends ExpenseMapPin {
 }
 
 export interface MapData {
-  /** 有座標的消費依消費時間由舊到新，接著是日記的地點，依日記日期由舊到新 */
+  /**
+   * 有座標的消費依消費時間由舊到新，接著是日記的地點，依日記日期由舊到新，
+   * 最後是收藏的地點，依收藏的時間由新到舊
+   */
   readonly pins: readonly MapItem[];
   /**
    * 所有帳本（沒有地點的也列出來，地球的索引籤要用）：
-   * 個人帳本在最前面，接著是有日記的「手帳」索引籤，
+   * 個人帳本在最前面，接著是有日記的「手帳」索引籤、有收藏的「收藏」索引籤，
    * 分帳帳本依旅行月份由新到舊，同月份依建立時間由新到舊
    */
   readonly ledgers: readonly MapLedger[];
@@ -77,13 +85,14 @@ export interface MapJournal {
   readonly entries: readonly JournalEntryRecord[];
 }
 
-/** 讀取所有帳本與其中有座標的消費，以及日記的地點 */
+/** 讀取所有帳本與其中有座標的消費、日記的地點，以及收藏的地點 */
 export async function loadMapData(db: SqlExecutor): Promise<MapData> {
   const repos = createRepositories(db);
-  const [ledgers, expenses, journals] = await Promise.all([
+  const [ledgers, expenses, journals, places] = await Promise.all([
     repos.ledgers.list(),
     repos.expenses.listWithLocation(),
     repos.journals.list(),
+    repos.savedPlaces.list(),
   ]);
   const journalEntries = await Promise.all(
     journals.map(async (journal) => ({
@@ -102,7 +111,7 @@ export async function loadMapData(db: SqlExecutor): Promise<MapData> {
       };
     }),
   );
-  return buildMapData(entries, expenses, journalEntries);
+  return buildMapData(entries, expenses, journalEntries, places);
 }
 
 export function buildMapData(
@@ -113,6 +122,7 @@ export function buildMapData(
   }[],
   expenses: readonly LocatedExpenseRecord[],
   journals: readonly MapJournal[] = [],
+  places: readonly SavedPlaceRecord[] = [],
 ): MapData {
   const ledgerById = new Map(ledgers.map((l) => [l.ledger.id, l.ledger]));
   const mapLedgers: MapLedger[] = ledgers.map(
@@ -137,13 +147,24 @@ export function buildMapData(
       expenseCount: unboundEntries,
     });
   }
+  const saved = places.filter((p) => p.deletedAt === null);
+  if (saved.length > 0) {
+    mapLedgers.push({
+      id: SAVED_PLACES_ID,
+      name: "收藏",
+      kind: "places",
+      cover: coverFromId(SAVED_PLACES_ID),
+      tripMonth: "",
+      expenseCount: saved.length,
+    });
+  }
   // sort is stable, so ledgers in the same month keep the list order (newest first)
   const sorted = [...mapLedgers].sort((a, b) =>
     a.kind !== b.kind
       ? KIND_ORDER[a.kind] - KIND_ORDER[b.kind]
       : b.tripMonth.localeCompare(a.tripMonth),
   );
-  const places = journals
+  const entryPlaces = journals
     .flatMap(({ journal, entries }) =>
       entries.flatMap((entry) => journalPins(journal, entry)),
     )
@@ -152,7 +173,8 @@ export function buildMapData(
   return {
     pins: [
       ...expenses.map((e) => toMapExpense(e, ledgerById.get(e.ledgerId))),
-      ...places,
+      ...entryPlaces,
+      ...saved.map(toPlacePin),
     ],
     ledgers: sorted,
   };
@@ -161,7 +183,8 @@ export function buildMapData(
 const KIND_ORDER: Readonly<Record<MapLedgerKind, number>> = {
   personal: 0,
   journals: 1,
-  shared: 2,
+  places: 2,
+  shared: 3,
 };
 
 /** 索引籤以外顯示帳本名稱的地方（卡片標題、篩選、分段小標） */
@@ -171,6 +194,8 @@ export function mapLedgerName(ledger: MapLedger): string {
       return "個人記帳";
     case "journals":
       return "未綁帳本的手帳";
+    case "places":
+      return "收藏地點";
     case "shared":
       return ledger.name;
   }
@@ -194,6 +219,20 @@ function journalPins(
   }));
 }
 
+function toPlacePin(place: SavedPlaceRecord): PlaceMapPin {
+  return {
+    kind: "place",
+    id: place.id,
+    ledgerId: SAVED_PLACES_ID,
+    title: place.name,
+    placeName: place.name,
+    point: place.location,
+    placeKind: place.kind,
+    status: place.status,
+    city: place.city,
+  };
+}
+
 export interface PinFilter {
   /** null 代表全部帳本 */
   readonly ledgerId: string | null;
@@ -201,7 +240,10 @@ export interface PinFilter {
   readonly date: string | null;
 }
 
-/** 依帳本與日期篩選；日記的地點跟著它的手帳綁定的帳本 */
+/**
+ * 依帳本與日期篩選；日記的地點跟著它的手帳綁定的帳本。
+ * 收藏的地點沒有日期，選了某一天時不會留下
+ */
 export function filterPins<T extends MapPin>(
   pins: readonly T[],
   { ledgerId, date }: PinFilter,

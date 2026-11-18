@@ -5,9 +5,10 @@ export type {
   MapPin,
   MapRegion,
   PinGroup,
+  PlaceMapPin,
 } from "./types";
 export { regionForPoints, type RegionOptions } from "./region";
-export { groupByLocation } from "./group";
+export { groupByLocation, locationKey } from "./group";
 export { localDateOf, pinDates, routeOf } from "./day";
 export {
   approachView,

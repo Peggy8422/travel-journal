@@ -1,7 +1,8 @@
 import type { GeoPoint } from "../ledger";
+import type { PlaceKind, PlaceStatus } from "../places";
 
-/** 地圖上的一個點：一筆消費，或日記裡記下的一個地點 */
-export type MapPin = ExpenseMapPin | JournalMapPin;
+/** 地圖上的一個點：一筆消費、日記裡記下的一個地點，或一個收藏的地點 */
+export type MapPin = ExpenseMapPin | JournalMapPin | PlaceMapPin;
 
 export interface ExpenseMapPin {
   readonly kind: "expense";
@@ -34,6 +35,22 @@ export interface JournalMapPin {
   readonly point: GeoPoint;
   /** 日記的日期，旅行當地的 YYYY-MM-DD */
   readonly date: string;
+}
+
+/** 收藏的一個地點（想去或去過）；沒有日期，不算在路線、不受日期篩選 */
+export interface PlaceMapPin {
+  readonly kind: "place";
+  /** 收藏地點的 id */
+  readonly id: string;
+  /** 收藏地點不屬於任何帳本，由呼叫端給一個共用的 id，讓篩選帳本的程式不用分開處理 */
+  readonly ledgerId: string;
+  readonly title: string;
+  /** 和 title 一樣是地點名稱，讓標記旁的地名小標籤不用分開處理 */
+  readonly placeName: string;
+  readonly point: GeoPoint;
+  readonly placeKind: PlaceKind;
+  readonly status: PlaceStatus;
+  readonly city: string;
 }
 
 /** 地圖顯示範圍：中心點加上緯度、經度的跨度（度） */
