@@ -36,30 +36,33 @@ import {
   entrySharePages,
   shareCaption,
   sharePageLabel,
-  sharePagePhoto,
+  sharePagePhotos,
+  type ShareFormat,
   type SharePage,
 } from "../services/shareEntry";
 import {
-  SHARE_CARD_HEIGHT,
   SHARE_CARD_WIDTH,
-  SHARE_IMAGE_HEIGHT,
   SHARE_IMAGE_WIDTH,
   ShareCard,
+  shareCardSize,
   type ShareCardView,
 } from "./ShareCards";
 
-/** 預覽卡片縮小的比例，一次看得到一張多 */
-const THUMB_SCALE = 0.62;
-const THUMB_WIDTH = Math.round(SHARE_CARD_WIDTH * THUMB_SCALE);
-const THUMB_HEIGHT = Math.round(SHARE_CARD_HEIGHT * THUMB_SCALE);
+/** 預覽卡片縮小的比例：貼文一次看得到一張多，限動比較高所以再小一點 */
+const THUMB_SCALE: Record<ShareFormat, number> = { post: 0.62, story: 0.5 };
+const FORMATS: readonly { format: ShareFormat; label: string }[] = [
+  { format: "post", label: "貼文 4:5" },
+  { format: "story", label: "限動 9:16" },
+];
 /** 底部按鈕列（不含安全區域）的高度：上下留白加兩顆按鈕，提示要浮在它上面 */
 const BAR_PADDING = 12;
 const BAR_GAP = 8;
 const BAR_HEIGHT = BAR_PADDING * 2 + 48 * 2 + BAR_GAP;
 
 /**
- * 分享到 IG：把一篇日記做成輪播貼文的幾張圖片。
- * 勾選的頁面依序存進照片 App 的「旅遊手帳」相簿，使用者到 IG 新增貼文時一次選取；也可以只分享正在看的那一張。
+ * 分享到 IG：把一篇日記做成輪播貼文的幾張圖片，或一張限動拼貼。
+ * 貼文勾選的頁面依序存進照片 App 的「旅遊手帳」相簿，使用者到 IG 新增貼文時一次選取；
+ * 也可以只分享正在看的那一張。限動直接打開分享選單，選 Instagram 的「限時動態」。
  * IG 不會帶入分享時的文字，貼文文字讓使用者複製後自己貼上。
  */
 export function ShareEntryScreen({ entryId }: { entryId: string }) {
@@ -90,10 +93,12 @@ function SharePreview({ detail }: { detail: EntryDetail }) {
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const { entry } = detail;
-  const pages = entrySharePages(entry);
+  const [format, setFormat] = useState<ShareFormat>("post");
+  const post = format === "post";
+  const pages = entrySharePages(entry, format);
   /** 取消勾選、不存的頁面 */
   const [off, setOff] = useState<ReadonlySet<string>>(new Set());
-  /** 照片已經載入完的頁面 */
+  /** 已經載入完的照片，「頁面:第幾張」 */
   const [loaded, setLoaded] = useState<ReadonlySet<string>>(new Set());
   const [current, setCurrent] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -101,17 +106,28 @@ function SharePreview({ detail }: { detail: EntryDetail }) {
   const cards = useRef(new Map<string, ShareCardView>());
 
   const currentPage = pages[Math.min(current, pages.length - 1)]!;
-  const chosen = pages.filter((page) => !off.has(page.key));
+  const chosen = post ? pages.filter((page) => !off.has(page.key)) : pages;
   const isReady = (page: SharePage) =>
-    sharePagePhoto(page, entry) === null || loaded.has(page.key);
+    sharePagePhotos(page, entry).every((_, i) =>
+      loaded.has(`${page.key}:${i}`),
+    );
+  const allReady = chosen.every(isReady);
   const caption = shareCaption(detail);
+  const size = shareCardSize(format);
+  const scale = THUMB_SCALE[format];
+
+  function pickFormat(next: ShareFormat) {
+    setFormat(next);
+    setCurrent(0);
+    setFailure(null);
+  }
 
   async function capture(page: SharePage): Promise<string> {
     const view = cards.current.get(page.key);
     if (!view) throw new Error(`Card ${page.key} is not on screen`);
     return captureCard(view, {
       pixelWidth: SHARE_IMAGE_WIDTH,
-      pixelHeight: SHARE_IMAGE_HEIGHT,
+      pixelHeight: size.pixelHeight,
       pixelRatio: PixelRatio.get(),
     });
   }
@@ -160,6 +176,36 @@ function SharePreview({ detail }: { detail: EntryDetail }) {
     <View style={[styles.fill, { backgroundColor: theme.background }]}>
       <PaperBackground />
       <ScrollView contentContainerStyle={styles.scroll}>
+        <View
+          accessibilityRole="tablist"
+          style={[styles.formats, { backgroundColor: theme.chip }]}
+        >
+          {FORMATS.map((item) => {
+            const on = item.format === format;
+            return (
+              <Pressable
+                key={item.format}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: on }}
+                onPress={() => pickFormat(item.format)}
+                style={[styles.format, on && styles.formatOn]}
+              >
+                <Text
+                  style={[
+                    styles.formatText,
+                    {
+                      color: theme.text,
+                      fontFamily: on ? fonts.bold : fonts.regular,
+                    },
+                  ]}
+                >
+                  {item.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -179,13 +225,20 @@ function SharePreview({ detail }: { detail: EntryDetail }) {
                   style={[
                     styles.thumb,
                     {
+                      width: Math.round(SHARE_CARD_WIDTH * scale),
+                      height: Math.round(size.height * scale),
                       boxShadow: selected
                         ? `0px 0px 0px 2.5px ${theme.primary}, 0px 6px 16px rgba(58,51,45,0.2)`
                         : "0px 0px 0px 1px rgba(58,51,45,0.18), 0px 4px 12px rgba(58,51,45,0.14)",
                     },
                   ]}
                 >
-                  <View style={styles.thumbScale}>
+                  <View
+                    style={[
+                      styles.thumbScale,
+                      { height: size.height, transform: [{ scale }] },
+                    ]}
+                  >
                     <ShareCard
                       ref={(view) => {
                         if (view) cards.current.set(page.key, view);
@@ -193,16 +246,15 @@ function SharePreview({ detail }: { detail: EntryDetail }) {
                       }}
                       detail={detail}
                       page={page}
-                      onReady={() =>
+                      onPhotoReady={(index) => {
+                        const key = `${page.key}:${index}`;
                         setLoaded((done) =>
-                          done.has(page.key)
-                            ? done
-                            : new Set(done).add(page.key),
-                        )
-                      }
+                          done.has(key) ? done : new Set(done).add(key),
+                        );
+                      }}
                     />
                   </View>
-                  {!checked && (
+                  {post && !checked && (
                     <View
                       pointerEvents="none"
                       style={[
@@ -213,55 +265,63 @@ function SharePreview({ detail }: { detail: EntryDetail }) {
                     />
                   )}
                 </Pressable>
-                <CheckChip
-                  label={label}
-                  checked={checked}
-                  onPress={() =>
-                    setOff((current) => {
-                      const next = new Set(current);
-                      if (checked) next.add(page.key);
-                      else next.delete(page.key);
-                      return next;
-                    })
-                  }
-                />
+                {post && (
+                  <CheckChip
+                    label={label}
+                    checked={checked}
+                    onPress={() =>
+                      setOff((current) => {
+                        const next = new Set(current);
+                        if (checked) next.add(page.key);
+                        else next.delete(page.key);
+                        return next;
+                      })
+                    }
+                  />
+                )}
               </View>
             );
           })}
         </ScrollView>
 
         <Text style={[styles.hint, { color: theme.textMuted }]}>
-          {`勾選的頁面會依序存進相簿裡的「${SHARE_ALBUM}」。到 IG 新增貼文時一次選取這幾張，就是一則輪播貼文。`}
+          {post
+            ? `勾選的頁面會依序存進相簿裡的「${SHARE_ALBUM}」。到 IG 新增貼文時一次選取這幾張，就是一則輪播貼文。`
+            : "按「分享到限動」打開分享選單，點 Instagram 後選「限時動態」。"}
         </Text>
 
-        <View style={[styles.captionBox, { backgroundColor: theme.surface }]}>
-          <View style={styles.captionHead}>
-            <Text
-              accessibilityRole="header"
-              style={[styles.captionTitle, { color: theme.text }]}
-            >
-              貼文文字
+        {post && (
+          <View style={[styles.captionBox, { backgroundColor: theme.surface }]}>
+            <View style={styles.captionHead}>
+              <Text
+                accessibilityRole="header"
+                style={[styles.captionTitle, { color: theme.text }]}
+              >
+                貼文文字
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="複製貼文文字"
+                onPress={copyCaption}
+                style={({ pressed }) => [
+                  styles.copy,
+                  { opacity: pressed ? 0.6 : 1 },
+                ]}
+              >
+                <CopyIcon color={theme.text} />
+                <Text style={[styles.copyText, { color: theme.text }]}>
+                  複製
+                </Text>
+              </Pressable>
+            </View>
+            <Text selectable style={[styles.caption, { color: theme.text }]}>
+              {caption}
             </Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="複製貼文文字"
-              onPress={copyCaption}
-              style={({ pressed }) => [
-                styles.copy,
-                { opacity: pressed ? 0.6 : 1 },
-              ]}
-            >
-              <CopyIcon color={theme.text} />
-              <Text style={[styles.copyText, { color: theme.text }]}>複製</Text>
-            </Pressable>
+            <Text style={[styles.captionNote, { color: theme.textMuted }]}>
+              IG 不會帶入分享時的文字，複製後在 IG 的說明欄貼上。
+            </Text>
           </View>
-          <Text selectable style={[styles.caption, { color: theme.text }]}>
-            {caption}
-          </Text>
-          <Text style={[styles.captionNote, { color: theme.textMuted }]}>
-            IG 不會帶入分享時的文字，複製後在 IG 的說明欄貼上。
-          </Text>
-        </View>
+        )}
       </ScrollView>
 
       <View
@@ -274,21 +334,37 @@ function SharePreview({ detail }: { detail: EntryDetail }) {
         ]}
       >
         <ErrorText message={failure} />
-        <Button
-          title={
-            chosen.every(isReady)
-              ? `存到相簿（${chosen.length} 張）`
-              : "照片載入中…"
-          }
-          disabled={busy || chosen.length === 0 || !chosen.every(isReady)}
-          onPress={save}
-        />
-        <Button
-          title={`分享「${sharePageLabel(currentPage)}」這一張`}
-          variant="secondary"
-          disabled={busy || !isReady(currentPage)}
-          onPress={shareCurrent}
-        />
+        {post ? (
+          <>
+            <Button
+              title={
+                allReady ? `存到相簿（${chosen.length} 張）` : "照片載入中…"
+              }
+              disabled={busy || chosen.length === 0 || !allReady}
+              onPress={save}
+            />
+            <Button
+              title={`分享「${sharePageLabel(currentPage)}」這一張`}
+              variant="secondary"
+              disabled={busy || !isReady(currentPage)}
+              onPress={shareCurrent}
+            />
+          </>
+        ) : (
+          <>
+            <Button
+              title={allReady ? "分享到限動" : "照片載入中…"}
+              disabled={busy || !allReady}
+              onPress={shareCurrent}
+            />
+            <Button
+              title="存到相簿"
+              variant="secondary"
+              disabled={busy || !allReady}
+              onPress={save}
+            />
+          </>
+        )}
       </View>
     </View>
   );
@@ -381,17 +457,42 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10,
   },
+  formats: {
+    alignSelf: "center",
+    flexDirection: "row",
+    gap: 4,
+    padding: 4,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 19,
+    borderBottomRightRadius: 21,
+    borderBottomLeftRadius: 20,
+  },
+  format: {
+    minWidth: 128,
+    minHeight: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 14,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 16,
+    borderBottomRightRadius: 17,
+    borderBottomLeftRadius: 15,
+  },
+  formatOn: {
+    backgroundColor: "#FFFDF8",
+    boxShadow:
+      "0px 0px 0px 1.2px rgba(58,51,45,0.45), 1px 2px 0px rgba(58,51,45,0.1)",
+  },
+  formatText: {
+    fontSize: 14.5,
+  },
   thumb: {
-    width: THUMB_WIDTH,
-    height: THUMB_HEIGHT,
     borderRadius: 3,
     overflow: "hidden",
   },
   thumbScale: {
     width: SHARE_CARD_WIDTH,
-    height: SHARE_CARD_HEIGHT,
     transformOrigin: "top left",
-    transform: [{ scale: THUMB_SCALE }],
   },
   dim: {
     opacity: 0.62,
