@@ -12,7 +12,6 @@ import {
   type NativeSyntheticEvent,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Svg, { Path } from "react-native-svg";
 
 import { notifyDataChanged } from "../../../shared/hooks/useFocusedQuery";
 import { HeaderAction } from "../../../shared/ui/components";
@@ -45,6 +44,7 @@ import { TAPE_COLORS } from "./tapes";
 import type { EntrySticker } from "../../../domain/journal";
 import type { SavedPlaceRecord } from "../../../domain/places";
 import { SaveHereButton } from "../../places/components/SaveHereButton";
+import { ShareIcon } from "../../share/components/ShareIcon";
 import { useSavedPlaces } from "../../places/hooks/usePlaceQueries";
 
 /** 捲動區上方的留白，頁面從這裡開始 */
@@ -480,24 +480,6 @@ function PillButton({
       {icon}
       <Text style={[styles.editText, { color: theme.text }]}>{label}</Text>
     </Pressable>
-  );
-}
-
-/** 分享：方框加往上的箭頭 */
-function ShareIcon({ color }: { color: string }) {
-  return (
-    <Svg
-      width={17}
-      height={17}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke={color}
-      strokeWidth={1.7}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <Path d="M8.5 9.5H7a2 2 0 0 0-2 2v7.2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7.2a2 2 0 0 0-2-2h-1.5M12.1 14.6V3.6M8.4 7.1l3.7-3.6 3.6 3.7" />
-    </Svg>
   );
 }
 

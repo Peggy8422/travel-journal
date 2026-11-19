@@ -24,6 +24,7 @@ export function JournalCover({
   width,
   tilt = 0,
   photoUri,
+  onPhotoLoad,
 }: {
   cover: Cover;
   title: string;
@@ -33,6 +34,8 @@ export function JournalCover({
   tilt?: number;
   /** 剛挑的照片（還沒存檔）；省略時用 cover.photo 存好的照片 */
   photoUri?: string;
+  /** 照片載入完（或失敗）時呼叫，分享卡要等照片載入完才存成圖片 */
+  onPhotoLoad?: () => void;
 }) {
   const patternId = `kraft${useId().replace(/:/g, "")}`;
   const height = Math.round((width * 4) / 3);
@@ -73,6 +76,8 @@ export function JournalCover({
               source={{ uri: source }}
               style={styles.photo}
               contentFit="cover"
+              onLoad={onPhotoLoad}
+              onError={onPhotoLoad}
             />
             <View
               style={[

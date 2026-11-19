@@ -1,5 +1,5 @@
 import { Image } from "expo-image";
-import type { ComponentRef, ReactNode, Ref } from "react";
+import type { Ref } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Svg, {
   Circle,
@@ -11,16 +11,24 @@ import Svg, {
   Rect,
 } from "react-native-svg";
 
-import type { JournalTape } from "../../../domain/journal";
 import { accentOverhang, fonts } from "../../../shared/ui/fonts";
 import {
   DashedLine,
-  PaperBackground,
   RuledPaper,
   WashiTape,
 } from "../../../shared/ui/handDrawn";
 import { useTheme } from "../../../shared/ui/theme";
 import { coverPhotoUri } from "../../ledger/services/appCoverPhotos";
+import {
+  POLAROID,
+  POLAROID_SHADOW,
+  ShareCardFrame,
+  type ShareCardView,
+} from "../../share/components/ShareCardFrame";
+import {
+  SHARE_CARD_WIDTH,
+  shareCardSize,
+} from "../../share/services/shareFormat";
 import type { EntryDetail } from "../services/entryCommands";
 import { entryHeading, weekdayOf } from "../services/journalDates";
 import {
@@ -29,7 +37,6 @@ import {
   scaleBar,
   shareStickerIds,
   sketchPoints,
-  type ShareFormat,
   type SharePage,
 } from "../services/shareEntry";
 import { PlacePinIcon } from "./EntryPlaces";
@@ -38,32 +45,9 @@ import { JournalStamp } from "./JournalStamp";
 import { KRAFT, TAPE_COLORS } from "./tapes";
 
 /*
- * 分享到 IG 的卡片（設計稿的「分享卡」）。貼文用 360×450、限動用 360×640 的版面畫，
- * 存成圖片時放大成 1080 寬，所以這裡的尺寸都是固定值，不跟著螢幕寬度變。
+ * 分享一篇日記的卡片（設計稿的「分享卡」）：輪播貼文的封面、照片、文字、地點，
+ * 以及限動拼貼。版面尺寸是固定值，見 features/share/services/shareFormat.ts。
  */
-
-/** 卡片版面的寬度；高度依格式（shareCardSize） */
-export const SHARE_CARD_WIDTH = 360;
-/** 存成圖片的像素寬度 */
-export const SHARE_IMAGE_WIDTH = 1080;
-
-/** 卡片版面的高度與存成圖片的像素高度：貼文 4:5、限動 9:16 */
-export function shareCardSize(format: ShareFormat): {
-  height: number;
-  pixelHeight: number;
-} {
-  return format === "story"
-    ? { height: 640, pixelHeight: 1920 }
-    : { height: 450, pixelHeight: 1350 };
-}
-
-/** 要存成圖片的那個 View */
-export type ShareCardView = ComponentRef<typeof View>;
-
-const POLAROID = "#FFFDF8";
-const FOOTER_INK = "#6E645A";
-const POLAROID_SHADOW =
-  "0px 0px 0px 0.8px rgba(58,51,45,0.16), 2px 6px 14px rgba(58,51,45,0.2)";
 
 /**
  * 一頁分享卡。ref 指到要存成圖片的那個 View。
@@ -84,10 +68,10 @@ export function ShareCard({
   const { journal, entry } = detail;
   const story = page.kind === "story";
   return (
-    <CardFrame
+    <ShareCardFrame
       ref={ref}
       height={shareCardSize(story ? "story" : "post").height}
-      tape={journal.cover.tape}
+      swatch={TAPE_COLORS[journal.cover.tape].color}
       footerName={journal.name}
       // The story keeps the bottom quiet for IG's reply bar
       footerDate={story ? null : dottedDate(entry.date)}
@@ -108,60 +92,7 @@ export function ShareCard({
       ) : (
         <StoryPage detail={detail} onPhotoReady={onPhotoReady} />
       )}
-    </CardFrame>
-  );
-}
-
-/** 方眼和紙底，頁尾寫手帳名稱和日期（沒有日期時名稱置中） */
-function CardFrame({
-  ref,
-  height,
-  tape,
-  footerName,
-  footerDate,
-  children,
-}: {
-  ref?: Ref<ShareCardView>;
-  height: number;
-  tape: JournalTape;
-  footerName: string;
-  footerDate: string | null;
-  children: ReactNode;
-}) {
-  const theme = useTheme();
-  const swatch = (
-    <View
-      style={[styles.footerTape, { backgroundColor: TAPE_COLORS[tape].color }]}
-    />
-  );
-  return (
-    <View
-      ref={ref}
-      // Android drops views that only lay out children; captureRef needs a real one
-      collapsable={false}
-      style={[styles.card, { height, backgroundColor: theme.background }]}
-    >
-      <PaperBackground />
-      {children}
-      {footerDate !== null ? (
-        <View style={styles.footer}>
-          <View style={styles.footerName}>
-            {swatch}
-            <Text numberOfLines={1} style={styles.footerText}>
-              {footerName}
-            </Text>
-          </View>
-          <Text style={styles.footerDate}>{footerDate}</Text>
-        </View>
-      ) : (
-        <View style={[styles.footer, styles.storyFooter]}>
-          {swatch}
-          <Text numberOfLines={1} style={[styles.footerText, styles.storyName]}>
-            {footerName}
-          </Text>
-        </View>
-      )}
-    </View>
+    </ShareCardFrame>
   );
 }
 
@@ -736,54 +667,6 @@ function longDate(date: string): string {
 }
 
 const styles = StyleSheet.create({
-  card: {
-    width: SHARE_CARD_WIDTH,
-    overflow: "hidden",
-  },
-  footer: {
-    position: "absolute",
-    left: 22,
-    right: 22,
-    bottom: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-  footerName: {
-    flex: 1,
-    minWidth: 0,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  footerTape: {
-    width: 14,
-    height: 6,
-    transform: [{ rotate: "-6deg" }],
-  },
-  footerText: {
-    flexShrink: 1,
-    fontFamily: fonts.regular,
-    fontSize: 11.5,
-    color: FOOTER_INK,
-  },
-  storyFooter: {
-    bottom: 34,
-    justifyContent: "center",
-    gap: 6,
-  },
-  storyName: {
-    flexShrink: 1,
-    fontSize: 12,
-  },
-  footerDate: {
-    fontFamily: fonts.accent,
-    fontSize: 15,
-    lineHeight: 18,
-    paddingRight: accentOverhang(15),
-    color: FOOTER_INK,
-  },
   cover: {
     flex: 1,
     paddingTop: 22,

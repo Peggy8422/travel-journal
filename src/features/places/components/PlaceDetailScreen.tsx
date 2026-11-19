@@ -19,6 +19,7 @@ import {
   PhotoViewer,
 } from "../../journal/components/EntryPhotos";
 import { PencilIcon } from "../../journal/components/PencilIcon";
+import { ShareIcon } from "../../share/components/ShareIcon";
 import { describeError } from "../../ledger/components/messages";
 import { toLocalIsoString } from "../../ledger/services/localTimestamp";
 import { usePlace } from "../hooks/usePlaceQueries";
@@ -31,7 +32,7 @@ const WANT_STAMP = "#3F5F8F";
 
 /**
  * 一個收藏的地點（只能看）：類型、名稱、城市、想去／去過的印章，
- * 去過的話有自己的評分與「還想再去」，下面是心得和照片。右上角「編輯」才進表單；
+ * 去過的話有自己的評分與「還想再去」，下面是心得和照片。右上角「編輯」才進表單，「分享」做成 IG 的地點卡；
  * 「在地圖上看」打開詳細地圖，選起這個地點、旁邊的收藏也看得到。
  * 最下面列出在這裡寫過的日記、記過的消費（用距離判斷）。
  * 導覽列隱藏，返回鍵自己畫。
@@ -68,22 +69,40 @@ function Detail({ detail }: { detail: PlaceDetail }) {
       <PaperBackground />
       <View style={[styles.topRow, { paddingTop: insets.top + 6 }]}>
         <BackButton onPress={router.back} />
-        <Pressable
-          accessibilityRole="button"
-          onPress={() =>
-            router.push({
-              pathname: "/places/[id]/edit",
-              params: { id: place.id },
-            })
-          }
-          style={({ pressed }) => [
-            styles.edit,
-            { backgroundColor: theme.surface, opacity: pressed ? 0.7 : 1 },
-          ]}
-        >
-          <PencilIcon color={theme.text} size={17} />
-          <Text style={[styles.editText, { color: theme.text }]}>編輯</Text>
-        </Pressable>
+        <View style={styles.actions}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() =>
+              router.push({
+                pathname: "/places/[id]/share",
+                params: { id: place.id },
+              })
+            }
+            style={({ pressed }) => [
+              styles.edit,
+              { backgroundColor: theme.surface, opacity: pressed ? 0.7 : 1 },
+            ]}
+          >
+            <ShareIcon color={theme.text} />
+            <Text style={[styles.editText, { color: theme.text }]}>分享</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() =>
+              router.push({
+                pathname: "/places/[id]/edit",
+                params: { id: place.id },
+              })
+            }
+            style={({ pressed }) => [
+              styles.edit,
+              { backgroundColor: theme.surface, opacity: pressed ? 0.7 : 1 },
+            ]}
+          >
+            <PencilIcon color={theme.text} size={17} />
+            <Text style={[styles.editText, { color: theme.text }]}>編輯</Text>
+          </Pressable>
+        </View>
       </View>
 
       <ScrollView
@@ -211,6 +230,11 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 12,
     paddingBottom: 10,
+  },
+  actions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   edit: {
     flexDirection: "row",

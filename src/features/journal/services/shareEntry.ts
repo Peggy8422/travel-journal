@@ -3,15 +3,13 @@ import type {
   JournalRecord,
 } from "../../../domain/journal";
 import type { GeoPoint } from "../../../domain/ledger";
+import type { ShareFormat } from "../../share/services/shareFormat";
 import { entryHeading } from "./journalDates";
 
 /*
  * 把一篇日記做成 IG 的圖片：輪播貼文是封面、每張照片各一頁、內文、去過的地方；
  * 限時動態是一張拼貼。只決定有哪些頁、貼文文字怎麼寫；卡片長相在 ShareCards。
  */
-
-/** 貼文 4:5（輪播）或限時動態 9:16 */
-export type ShareFormat = "post" | "story";
 
 export type SharePage =
   | { readonly kind: "cover"; readonly key: string }
