@@ -19,6 +19,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { fonts } from "./fonts";
 import { useTheme } from "./theme";
 
+/** 提示離安全區域底部的距離（預設避開分頁列） */
+const DEFAULT_OFFSET = 104;
 /** 提示停留的時間；新的提示會取代舊的並重新計時 */
 const DURATION_MS = 2400;
 /** 帶按鈕的提示（例如刪除後的「復原」）多留一點時間讓人按 */
@@ -37,8 +39,17 @@ const ToastContext = createContext<ShowToast>(() => {});
 /**
  * 操作完成後的短提示（例如「加入了 小安」），掛在最外層的 layout，
  * 所以換頁（例如刪除帳本後回到書架）也看得到。錯誤訊息仍放在畫面上，不用提示。
+ *
+ * 原生 modal 會蓋住最外層的提示：留在 modal 裡提示的畫面（例如分享到 IG）要自己再包一層，
+ * offset 是提示離安全區域底部的距離，用來避開畫面底部的按鈕。
  */
-export function ToastProvider({ children }: { children: ReactNode }) {
+export function ToastProvider({
+  children,
+  offset = DEFAULT_OFFSET,
+}: {
+  children: ReactNode;
+  offset?: number;
+}) {
   const [toast, setToast] = useState<{
     id: number;
     message: string;
@@ -71,6 +82,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         <ToastNote
           key={toast.id}
           message={toast.message}
+          offset={offset}
           action={
             toast.action && {
               label: toast.action.label,
@@ -95,9 +107,11 @@ export function useToast(): ShowToast {
 function ToastNote({
   message,
   action,
+  offset,
 }: {
   message: string;
   action?: ToastAction;
+  offset: number;
 }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -116,7 +130,7 @@ function ToastNote({
     <View
       style={[
         styles.layer,
-        { bottom: insets.bottom + 104 },
+        { bottom: insets.bottom + offset },
         // Only a note with a button takes touches; a plain one lets taps through
         { pointerEvents: action ? "box-none" : "none" },
       ]}
