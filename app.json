@@ -49,7 +49,15 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "選一張照片當帳本封面。"
+          "photosPermission": "選照片放進帳本封面、日記和收藏地點，並把分享圖片整理進「旅遊手帳」相簿。"
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "選照片放進帳本封面、日記和收藏地點，並把分享圖片整理進「旅遊手帳」相簿。",
+          "savePhotosPermission": "把手帳做成的分享圖片存進照片。",
+          "granularPermissions": ["photo"]
         }
       ]
     ],

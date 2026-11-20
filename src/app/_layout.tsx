@@ -117,6 +117,15 @@ export default function RootLayout() {
               name="journal/[id]/entry/[entryId]/edit"
               options={{ title: "編輯日記", presentation: "modal" }}
             />
+            {/* 分享到 IG 的預覽（一篇日記、整本回顧、收藏地點）：和表單一樣是 modal，左上角「取消」 */}
+            <Stack.Screen
+              name="journal/[id]/entry/[entryId]/share"
+              options={{ title: "分享到 IG", presentation: "modal" }}
+            />
+            <Stack.Screen
+              name="journal/[id]/share"
+              options={{ title: "分享到 IG", presentation: "modal" }}
+            />
             {/* 我的插圖自己畫頁首；畫板是全螢幕 modal，不能往下滑關掉，免得往下畫線時把畫板關了 */}
             <Stack.Screen
               name="illustrations/index"
@@ -146,6 +155,10 @@ export default function RootLayout() {
             <Stack.Screen
               name="places/[id]/edit"
               options={{ title: "編輯地點", presentation: "modal" }}
+            />
+            <Stack.Screen
+              name="places/[id]/share"
+              options={{ title: "分享到 IG", presentation: "modal" }}
             />
             <Stack.Screen
               name="ledger/[id]/add-expense"

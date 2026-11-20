@@ -39,6 +39,7 @@ src/app/  →  src/features/  →  src/domain/
   - 鉛筆（`pencil.ts`）是淡底色加兩道抖動的細筆跡，顆粒用 `Mask` 挖小點；亂數種子取自起點、每道筆跡各自一條亂數，畫到一半筆畫變長時前面不會跳動。
   - 貼在日記上的插圖是 `JournalEntryRecord.stickers`（`journal_entry_stickers` 子表）：位置以日記頁寬為單位（x、size 是頁寬比例，y 是離頁首幾個頁寬），換手機尺寸也貼在同一處。刪除插圖是 `ON DELETE CASCADE`，已刪除日記上的貼紙也一起消失。`updateEntry` 用 `...entry` 展開，表單沒有的欄位（貼紙）不會被洗掉。
   - 日記頁右上「貼插圖」在同一頁切換成貼插圖模式（`StickerEditor`，按「完成」才用 `saveEntryStickers` 一次存全部），不另開路由：要對著真正的頁面擺。手勢放在 `useStickerBoard` 的 class：整層 `StickerLayer` 用 `box-only` 接觸控、自己判斷點到哪張（`hitSticker`），沒點到就回傳 false 讓頁面照常捲動；按住貼紙時 `scrollEnabled` 關掉，第二根手指落在哪都算捏合。貼插圖時關掉返回手勢（`gestureEnabled`），不然從左邊拖貼紙會變成離開頁面。頁面的 `minHeight` 照最下面的貼紙撐高（`stickersBottom`），窄手機上貼紙也不會被切掉。
+  - 分享到 IG（一篇日記 `/journal/[id]/entry/[entryId]/share`、整本回顧 `/journal/[id]/share`、收藏地點 `/places/[id]/share`）：預覽、存相簿、分享共用 `features/share/`（`SharePreview` 收各頁的 `SharePageSpec`，卡片外框 `ShareCardFrame`），各自只提供卡片與貼文文字。回顧一天一張、最多 `RECAP_DAY_LIMIT` 天（IG 輪播上限 20 張）。卡片（`ShareCards`）一律用固定版面畫（貼文 360×450、限動 360×640，`shareCardSize`），預覽縮小顯示，`captureRef` 存成 1080 寬的 JPEG（寬高要除以 `PixelRatio`）；卡片上的照片（`sharePagePhotos`）都 `onLoad` 之後才能存，沒載入完按鈕停用。地點頁的草圖照經緯度投影（`sketchPoints`），不畫假的河流街道；文字頁角落只放日記上最後貼的兩張插圖，不照日記頁的位置。限動上下各約 83pt 會被 IG 蓋住，內容排在中間。存進「旅遊手帳」相簿（`saveToPhotoLibrary`，`data/files/shareImages.ts`）要完整的照片權限；只允許部分照片時 `Album.get` 找不到建好的相簿、每次都會多建一本，所以只存進照片不放相簿，完全不允許時改要「加入照片」權限、同樣只存不放相簿。IG 不會帶入分享時的文字，貼文文字讓使用者複製。
   - 備份第 7 版多了最外層的 `illustrations`，日記多了 `stickers`；還原順序是帳本 → 插圖 → 手帳，插圖不在手機上的貼紙直接丟掉。
   - 備份第 6 版多了最外層的 `journals`；還原時先還原帳本再還原手帳，綁的帳本不在手機上或已經綁給別本手帳時，改成不綁定。
 - 收藏地點（`domain/places`、`features/places`）：想去／去過的餐廳與景點，一份獨立清單、依城市分組，不屬於任何手帳或帳本。類型、狀態代碼和分類一樣只能新增（資料表不加 CHECK，讀回時認不得的退回 `other`／`want`）。
@@ -62,7 +63,7 @@ src/app/  →  src/features/  →  src/domain/
 - 帳本內頁、統計、帳本設定、個人記帳、備份、詳細地圖，以及三個分頁都隱藏導覽列（`src/app/_layout.tsx`、`src/app/(tabs)/_layout.tsx`），頁首自己畫（`shared/ui/PageHeader.tsx`）；這類畫面讀取失敗時要用 `PageMessage`，不然沒有返回鍵可以離開。新增／編輯消費是 modal，保留原生導覽列（左右放取消、儲存）。
 - 刪除消費是軟刪除，可以還原：刪除後提示紙條上有「復原」，之後也能在帳本內頁消費列表／個人記帳明細最下面收合的「最近刪除」（`DeletedExpenses.tsx`，有刪除的消費才出現）還原。還原不用重新檢查分攤：刪除的消費也算成員的引用，有引用的成員不能刪除。個人消費一樣只透過 `personalCommands`（`restorePersonalExpense`）還原。
 - 點一筆消費一律先打開只能看的消費明細（`/expense/[expenseId]`，`ExpenseDetailScreen`，從下面升起、可停在半高的 formSheet），要改再按「編輯」進收據表單；之後新增的消費列表也要接這個路由，不要直接進表單。明細蓋上來時底下的畫面會失去焦點（`useFocusEffect` 會停），地球因此是直接跳到那筆消費（`jumpTo`），不是緩動過去。
-- 操作成功的短提示用 `useToast()`（`shared/ui/Toast.tsx`，掛在最外層 layout，換頁後仍看得到），可以帶一個按鈕（`toast(message, { label, onPress })`，例如刪除消費後的「復原」，停留時間會拉長）；錯誤不要只用提示。錯誤放哪裡：
+- 操作成功的短提示用 `useToast()`（`shared/ui/Toast.tsx`，掛在最外層 layout，換頁後仍看得到；原生 modal 會蓋住它，留在 modal 裡提示的畫面要自己包一層 `ToastProvider`，例如分享到 IG），可以帶一個按鈕（`toast(message, { label, onPress })`，例如刪除消費後的「復原」，停留時間會拉長）；錯誤不要只用提示。錯誤放哪裡：
   - 屬於某個輸入欄位的（沒填、格式不對、名字重複）寫在那一欄下面：`TextField` 用 `error`，其他區塊放 `ErrorText`；字數到上限時 `TextField` 會自己在下面提示。能即時判斷的（名字重複）打字時就顯示，按鈕同時停用。
   - 按儲存才檢查出來的，用 `useFieldScroller`（`shared/hooks/`）把那一欄捲進畫面，欄位依畫面由上到下檢查。
   - 欄位下面放不下、不屬於任何欄位而且顯示處離按鈕太遠（收據表單的「儲存」在頁首；帳本設定的訊息在頁首，成員卡片在下面，設定頁 `run` 的 `alert` 選項），或是危險操作，才用 `Alert` 彈窗。

@@ -12,6 +12,7 @@ import {
   WavyEdge,
 } from "../../../shared/ui/handDrawn";
 import { BackButton, PageMessage } from "../../../shared/ui/PageHeader";
+import { ShareIcon } from "../../share/components/ShareIcon";
 import { useTheme } from "../../../shared/ui/theme";
 import { DeletedFold } from "../../ledger/components/DeletedExpenses";
 import { GearIcon } from "../../ledger/components/LedgerDetailScreen";
@@ -79,22 +80,45 @@ export function JournalBookScreen({ journalId }: { journalId: string }) {
 
         <View style={[styles.topRow, { paddingTop: insets.top + 6 }]}>
           <BackButton onPress={router.back} />
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="手帳設定"
-            onPress={() =>
-              router.push({
-                pathname: "/journal/[id]/settings",
-                params: { id: journalId },
-              })
-            }
-            style={({ pressed }) => [
-              styles.roundButton,
-              { backgroundColor: theme.surface, opacity: pressed ? 0.7 : 1 },
-            ]}
-          >
-            <GearIcon color={theme.text} />
-          </Pressable>
+          <View style={styles.topActions}>
+            {entries.length > 0 && (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="分享整本手帳的回顧到 IG"
+                onPress={() =>
+                  router.push({
+                    pathname: "/journal/[id]/share",
+                    params: { id: journalId },
+                  })
+                }
+                style={({ pressed }) => [
+                  styles.roundButton,
+                  {
+                    backgroundColor: theme.surface,
+                    opacity: pressed ? 0.7 : 1,
+                  },
+                ]}
+              >
+                <ShareIcon color={theme.text} size={19} />
+              </Pressable>
+            )}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="手帳設定"
+              onPress={() =>
+                router.push({
+                  pathname: "/journal/[id]/settings",
+                  params: { id: journalId },
+                })
+              }
+              style={({ pressed }) => [
+                styles.roundButton,
+                { backgroundColor: theme.surface, opacity: pressed ? 0.7 : 1 },
+              ]}
+            >
+              <GearIcon color={theme.text} />
+            </Pressable>
+          </View>
         </View>
 
         <View style={[styles.titleCard, { backgroundColor: theme.surface }]}>
@@ -340,6 +364,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 12,
+  },
+  topActions: {
+    flexDirection: "row",
+    gap: 8,
   },
   roundButton: {
     width: 44,

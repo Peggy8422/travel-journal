@@ -44,6 +44,7 @@ import { TAPE_COLORS } from "./tapes";
 import type { EntrySticker } from "../../../domain/journal";
 import type { SavedPlaceRecord } from "../../../domain/places";
 import { SaveHereButton } from "../../places/components/SaveHereButton";
+import { ShareIcon } from "../../share/components/ShareIcon";
 import { useSavedPlaces } from "../../places/hooks/usePlaceQueries";
 
 /** 捲動區上方的留白，頁面從這裡開始 */
@@ -129,6 +130,16 @@ function EntryView({
       <View style={[styles.topRow, { paddingTop: insets.top + 6 }]}>
         <BackButton onPress={router.back} />
         <View style={styles.actions}>
+          <PillButton
+            label="分享"
+            icon={<ShareIcon color={theme.text} />}
+            onPress={() =>
+              router.push({
+                pathname: "/journal/[id]/entry/[entryId]/share",
+                params: { id: journal.id, entryId: entry.id },
+              })
+            }
+          />
           <PillButton
             label="貼插圖"
             icon={<StickerIcon color={theme.text} />}
